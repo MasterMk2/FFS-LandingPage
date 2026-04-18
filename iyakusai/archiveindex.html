@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>医薬祭 - Iyakusai</title>
+    <style>
+        /* 基本設定 */
+        body {
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            
+            /* 画面全体を縦並びにする設定 */
+            display: flex;
+            flex-direction: column; 
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* ▼▼▼ 公式情報の枠（白いカード） ▼▼▼ */
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 30px; /* 下の画像との隙間 */
+            
+            /* 中身を整える */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* タイトル */
+        h1.site-title {
+            font-size: 28px;
+            margin: 0 0 10px 0;
+            color: #006d4d;
+        }
+        
+        p.subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .badge {
+            background-color: #00582d;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 25px;
+        }
+
+        /* 組織名 */
+        h2.org-name {
+            font-size: 18px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            color: #006d4d;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            width: 100%;
+        }
+
+        /* 情報ブロック */
+        .info-block {
+            text-align: left;
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            line-height: 1.8;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .info-row {
+            margin-bottom: 12px;
+            border-bottom: 1px dotted #ccc;
+            padding-bottom: 8px;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #555;
+            display: block;
+            font-size: 12px;
+            margin-bottom: 2px;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+            word-break: break-all;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* ▼▼▼ 枠外（ジョーク要素）のデザイン ▼▼▼ */
+        .joke-image {
+            width: 100%;
+            max-width: 350px; /* 少し控えめなサイズに */
+            height: auto;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            opacity: 0.9; /* 少しだけ馴染ませる */
+        }
+
+        .server-note {
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.5;
+        }
+
+        /* スマホ用調整 */
+        @media (max-width: 480px) {
+            .container { padding: 20px; }
+            h1.site-title { font-size: 22px; }
+        }
+    </style>
+</head>
+  
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-TDRHTBJ8BC"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-TDRHTBJ8BC');
+</script>
+  
+<body>
+
+    <div class="container">
+        <h1 class="site-title">医学薬学祭2026</h1>
+        <p class="subtitle">University of Toyama Medicine and Pharmacy Festival<br>　</p>
+        <span class="badge">Coming Soon...</span>
+      　<p>ただいま医薬祭2026に向けホームページを鋭意制作中です。<br>ご連絡・お問合せはお気軽に以下の電話番号、Emailまでお寄せください。</p>
+        <h2 class="org-name">富山大学医学薬学祭実行委員会</h2>
+
+        <div class="info-block">
+            <div class="info-row">
+                <span class="label">所在地</span>
+                〒930-0194<br>
+                富山市杉谷2630番地 富山大学杉谷キャンパス
+            </div>
+            <div class="info-row">
+                <span class="label">代表者</span>
+                委員長：西野 耀史
+            </div>
+            <div class="info-row">
+                <span class="label">電話番号</span>
+                <a href="tel:080-7806-3171">080-7806-3171</a>
+              　<br>※担当委員が受講・実習中の場合などは受話できない場合がございます。<br>その際にはお手数ですが、しばらく経ってからおかけ直しいただくか、<br>メールにてご連絡ください。
+            </div>
+            <div class="info-row">
+                <span class="label">団体代表 Email</span>
+                <a href="mailto:contact@iyakusai.jp">contact@iyakusai.jp</a>
+            </div>
+        </div>
+    </div>
+    <img src="main.jpg" alt="委員長宅サーバーの様子" class="joke-image">
+
+    <p class="server-note">
+        参考：ホームページ本格稼働までそのアクセスを一身に受ける委員長宅仮サーバー
+    </p>
+
+</body>
+</html>

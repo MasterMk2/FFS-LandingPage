@@ -37,6 +37,33 @@ services:
       DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
       DCSSB_TIMEOUT: "3.0"
     ports:
-      - "18150:8000/tcp"   # public landing (S=1 b=5 x=0 singleton)
+      - "18150:8000/tcp"   # LAN 直アクセス (192.168.3.170:18150)
     networks:
       - dcs_network
+
+  # リバースプロキシ。freedomflight.jp 公開用 (WAN:80/443 → router NAPT →
+  # 192.168.3.170:30080/30443 → container :80/:443)。
+  # DNS 設定後に Caddyfile の `http://` を消すだけで Let's Encrypt 自動発行。
+  caddy:
+    image: caddy:2
+    container_name: ffs-caddy
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Tokyo"
+    ports:
+      - "30080:80/tcp"
+      - "30443:443/tcp"
+      # - "30443:443/udp"   # QUIC/HTTP3 を使う場合 (router で UDP/443 転送も必要)
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites/iyakusai:/srv/iyakusai:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - ffs-website
+    networks:
+      - dcs_network
+
+volumes:
+  caddy_data:
+  caddy_config:

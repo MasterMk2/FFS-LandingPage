@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ja" data-lt-installed="true"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>医学薬学祭2026 - 富山大学</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com/">
+  <link href="newindex_files/css2.css" rel="stylesheet">
+  <style>
+    :root {
+      --c-bg: #0a0e1a;
+      --c-surface: #111729;
+      --c-surface-light: #1a2238;
+      --c-accent: #4fc3f7;
+      --c-accent2: #7c4dff;
+      --c-accent3: #00e5ff;
+      --c-text: #e8eaf6;
+      --c-text-muted: #8892b0;
+      --c-border: rgba(79, 195, 247, 0.15);
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Noto Sans JP', 'Zen Kaku Gothic New', sans-serif;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.7;
+    }
+
+    /* ─── Animated background ─── */
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .bg-canvas .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.3;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--c-accent2), transparent 70%);
+      top: -10%; left: -10%;
+      animation-delay: 0s !important;
+    }
+
+    .orb-2 {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, var(--c-accent), transparent 70%);
+      bottom: -15%; right: -10%;
+      animation-delay: -7s !important;
+    }
+
+    .orb-3 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, var(--c-accent3), transparent 70%);
+      top: 40%; left: 50%;
+      animation-delay: -14s !important;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(60px, -40px) scale(1.1); }
+      50% { transform: translate(-30px, 50px) scale(0.95); }
+      75% { transform: translate(40px, 20px) scale(1.05); }
+    }
+
+    /* ─── Grid overlay ─── */
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(79, 195, 247, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(79, 195, 247, 0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ─── Content wrapper ─── */
+    .content {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ─── Hero section ─── */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 18px;
+      border: 1px solid var(--c-border);
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--c-accent);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      backdrop-filter: blur(10px);
+      background: rgba(79, 195, 247, 0.06);
+      animation: fadeSlideUp 0.8s ease-out both;
+    }
+
+    .hero-badge .dot {
+      width: 6px; height: 6px;
+      background: var(--c-accent);
+      border-radius: 50%;
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.7); }
+    }
+
+    .hero-title-en {
+      font-family: var(--font-display);
+      font-size: clamp(0.85rem, 1.5vw, 1rem);
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--c-text-muted);
+      margin-bottom: 1rem;
+      animation: fadeSlideUp 0.8s 0.15s ease-out both;
+    }
+
+    .hero-title-jp {
+      font-size: clamp(3rem, 8vw, 6.5rem);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+      animation: fadeSlideUp 0.8s 0.3s ease-out both;
+      background: linear-gradient(135deg, #ffffff 0%, var(--c-accent) 50%, var(--c-accent3) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-year {
+      font-family: var(--font-display);
+      font-size: clamp(3.5rem, 9vw, 7rem);
+      font-weight: 800;
+      line-height: 1;
+      color: transparent;
+      -webkit-text-stroke: 1.5px var(--c-accent);
+      letter-spacing: 0.05em;
+      margin-bottom: 2rem;
+      animation: fadeSlideUp 0.8s 0.45s ease-out both;
+    }
+
+    .hero-university {
+      font-size: clamp(0.9rem, 1.8vw, 1.15rem);
+      font-weight: 400;
+      color: var(--c-text-muted);
+      letter-spacing: 0.15em;
+      animation: fadeSlideUp 0.8s 0.6s ease-out both;
+    }
+
+    .scroll-indicator {
+      position: absolute;
+      bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      animation: fadeSlideUp 0.8s 1s ease-out both;
+    }
+
+    .scroll-indicator span {
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--c-text-muted);
+    }
+
+    .scroll-line {
+      width: 1px;
+      height: 40px;
+      background: linear-gradient(to bottom, var(--c-accent), transparent);
+      animation: scroll-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes scroll-pulse {
+      0%, 100% { opacity: 1; transform: scaleY(1); }
+      50% { opacity: 0.3; transform: scaleY(0.6); }
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── Info section ─── */
+    .info-section {
+      padding: 6rem 2rem 4rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--c-accent);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-label::before {
+      content: '';
+      width: 30px;
+      height: 1px;
+      background: var(--c-accent);
+    }
+
+    .section-heading {
+      font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      line-height: 1.4;
+    }
+
+    .section-body {
+      color: var(--c-text-muted);
+      font-size: 0.95rem;
+      line-height: 2;
+      margin-bottom: 3rem;
+    }
+
+    /* ─── Contact cards ─── */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .contact-card {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--c-accent), var(--c-accent2));
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    .contact-card:hover {
+      border-color: rgba(79, 195, 247, 0.3);
+      transform: translateY(-4px);
+      box-shadow: 0 20px 60px rgba(79, 195, 247, 0.08);
+    }
+
+    .contact-card:hover::before { opacity: 1; }
+
+    .card-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: rgba(79, 195, 247, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.2rem;
+      font-size: 1.2rem;
+    }
+
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--c-text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .card-value {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--c-text);
+      line-height: 1.6;
+    }
+
+    .card-value a {
+      color: var(--c-accent);
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    .card-value a:hover {
+      color: var(--c-accent3);
+    }
+
+    .card-note {
+      margin-top: 0.8rem;
+      font-size: 0.78rem;
+      color: var(--c-text-muted);
+      line-height: 1.6;
+      opacity: 0.7;
+    }
+
+    /* ─── Committee info ─── */
+    .committee-block {
+      margin-top: 3rem;
+      padding: 2.5rem;
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2.5rem;
+      align-items: center;
+    }
+
+    .committee-detail {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .committee-detail .card-label {
+      margin-bottom: 0.3rem;
+    }
+
+    .committee-detail .card-value {
+      font-size: 0.95rem;
+    }
+
+    /* ─── Server photo section ─── */
+    .server-section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 2rem 4rem;
+    }
+
+    .server-photo-wrapper {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--c-border);
+      background: var(--c-surface);
+    }
+
+    .server-photo-wrapper img {
+      width: 100%;
+      display: block;
+      opacity: 0.85;
+      transition: opacity 0.4s;
+    }
+
+    .server-photo-wrapper:hover img {
+      opacity: 1;
+    }
+
+    .server-photo-caption {
+      padding: 1.2rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--c-surface-light);
+      border-top: 1px solid var(--c-border);
+    }
+
+    .server-photo-caption .caption-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(124, 77, 255, 0.15);
+      color: var(--c-accent2);
+      white-space: nowrap;
+    }
+
+    .server-photo-caption .caption-text {
+      font-size: 0.82rem;
+      color: var(--c-text-muted);
+      line-height: 1.5;
+    }
+
+    /* ─── Footer ─── */
+    footer {
+      text-align: center;
+      padding: 4rem 2rem 2.5rem;
+      font-size: 0.78rem;
+      color: var(--c-text-muted);
+      letter-spacing: 0.05em;
+      opacity: 0.6;
+    }
+
+    footer .footer-logo {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: var(--c-text);
+      opacity: 0.4;
+      letter-spacing: 0.08em;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 600px) {
+      .info-section { padding: 4rem 1.5rem 3rem; }
+      .contact-card { padding: 1.5rem; }
+      .committee-block { padding: 1.5rem; gap: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated background -->
+  <div class="bg-canvas">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+  <div class="grid-overlay"></div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        Coming Soon
+      </div>
+      <p class="hero-title-en">University of Toyama — Medicine &amp; Pharmacy Festival</p>
+      <h1 class="hero-title-jp">医学薬学祭</h1>
+      <div class="hero-year">2026</div>
+      <p class="hero-university">富山大学 杉谷キャンパス</p>
+
+      <div class="scroll-indicator">
+        <span>Scroll</span>
+        <div class="scroll-line"></div>
+      </div>
+    </section>
+
+    <!-- Info -->
+    <section class="info-section">
+      <div class="section-label">Information</div>
+      <h2 class="section-heading">ホームページ準備中</h2>
+      <p class="section-body">
+        ただいま医薬祭2026に向けホームページを鋭意制作中です。<br>
+        ご連絡・お問合せはお気軽に以下の電話番号、Emailまでお寄せください。
+      </p>
+
+      <div class="section-label">Contact</div>
+      <div class="contact-grid">
+
+        <div class="contact-card">
+          <div class="card-icon">📞</div>
+          <div class="card-label">電話番号</div>
+          <div class="card-value">
+            <a href="tel:080-7806-3171">080-7806-3171</a>
+          </div>
+          <div class="card-note">
+            ※担当委員が受講・実習中の場合は受話できないことがございます。しばらく経ってからおかけ直しいただくか、メールにてご連絡ください。
+          </div>
+        </div>
+
+        <div class="contact-card">
+          <div class="card-icon">✉️</div>
+          <div class="card-label">団体代表 Email</div>
+          <div class="card-value">
+            <a href="mailto:contact@iyakusai.jp">contact@iyakusai.jp</a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Committee -->
+      <div class="committee-block">
+        <div class="committee-detail">
+          <div class="card-label">組織名</div>
+          <div class="card-value">富山大学 医学薬学祭実行委員会</div>
+        </div>
+        <div class="committee-detail">
+          <div class="card-label">委員長</div>
+          <div class="card-value">西野 耀史</div>
+        </div>
+        <div class="committee-detail">
+          <div class="card-label">所在地</div>
+          <div class="card-value">〒930-0194<br>富山市杉谷2630番地<br>富山大学杉谷キャンパス</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Server photo -->
+    <section class="server-section">
+      <div class="section-label">Behind the Scenes</div>
+      <div class="server-photo-wrapper">
+        <img src="main.jpg" alt="委員長宅サーバーの様子">
+        <div class="server-photo-caption">
+          <span class="caption-tag">参考</span>
+          <span class="caption-text">ホームページ本格稼働までそのアクセスを一身に受ける委員長宅仮サーバー</span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="footer-logo">IYAKUSAI 2026</div>
+      <p>© 2026 富山大学 医学薬学祭実行委員会</p>
+    </footer>
+
+  </div>
+
+
+
+</body></html>

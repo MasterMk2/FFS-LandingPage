@@ -1,0 +1,54 @@
+###############################################################################
+# Caddy reverse proxy / static host
+#
+# ネットワーク経路:
+#   [WAN] :80/:443 → [router NAPT] → 192.168.3.170:30080 / :30443
+#     → [host] → docker publish → [ffs-caddy] :80 / :443 (container internal)
+# Caddy 自身はコンテナ内で標準の 80/443 を listen する。
+#
+# TLS:
+#   各サイト DNS が host の公開 IP に向いて、かつルータ NAPT が上記経路で
+#   通るようになったら、サイトブロック先頭の `http://` を外すだけで
+#   Let's Encrypt が自動発行する。
+#
+# 振り分け:
+#   iyakusai.com / www.iyakusai.com / 2025.iyakusai.com
+#       → /srv/iyakusai/ の静的ファイル
+#   freedomflight.jp / www.freedomflight.jp
+#       → ffs-website:8000 (FastAPI)
+#   catch-all (未登録ホスト / IP 直打ち on :80)
+#       → 404
+###############################################################################
+
+{
+	admin off
+	email xxxx@gmail.com
+	log {
+		output stdout
+		format console
+	}
+}
+
+(iyakusai_common) {
+	root * /srv/iyakusai
+	encode zstd gzip
+	file_server
+	log
+}
+
+http://iyakusai.com, http://www.iyakusai.com, http://2025.iyakusai.com {
+	import iyakusai_common
+}
+
+http://freedomflight.jp, http://www.freedomflight.jp {
+	encode zstd gzip
+	reverse_proxy ffs-website:8000 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+	log
+}
+
+:80 {
+	respond "Not Found" 404
+}

@@ -1,0 +1,42 @@
+###############################################################################
+# FFS Landing / Status Site
+#
+# DCSServerBot (dcsserverbot) は ../ffs-dcs-server/ の compose project で
+# dcs-server-1 と netns 共有で起動している。WebService (port 9876) + RestAPI
+# plugin が dcs-server-1 の netns 内で listen するので、同じ dcs_network に
+# 外部参加すれば http://dcs-server-1:9876/stats/... で到達できる。
+#
+# 依存ネットワーク:
+#   ffs-dcs-server_dcs_network (ffs-dcs-server compose が作成)
+#   ↑ compose の default project 名 `ffs-dcs-server` に prefix される。
+#     別名を付けている場合は下の `name:` を合わせて変更する。
+#
+# 起動順序:
+#   1. ../ffs-dcs-server/ で `docker compose up -d dcsserverbot` を先に
+#   2. (初回のみ) ../ffs-dcs-server/scripts/apply-restapi-config.sh を実行
+#   3. ../ffs-dcs-server/ で `docker compose restart dcsserverbot`
+#   4. 当ディレクトリで `docker compose up -d --build`
+###############################################################################
+
+networks:
+  dcs_network:
+    name: ffs-dcs-server_dcs_network
+    external: true
+
+services:
+  ffs-website:
+    build:
+      context: .
+    image: ffs-website:latest
+    container_name: ffs-website
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Tokyo"
+      DCSSB_BASE_URL: "${DCSSB_WEBSERVICE_URL:-http://dcs-server-1:9876}"
+      DCSSB_API_PREFIX: "${DCSSB_API_PREFIX:-/stats}"
+      DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
+      DCSSB_TIMEOUT: "3.0"
+    ports:
+      - "18150:8000/tcp"   # public landing (S=1 b=5 x=0 singleton)
+    networks:
+      - dcs_network

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<section
+  id="servers"
+  hx-get="/panel/servers"
+  hx-trigger="load, every {{ poll_seconds }}s"
+  hx-swap="innerHTML">
+  <p class="loading">loading...</p>
+</section>
+{% endblock %}

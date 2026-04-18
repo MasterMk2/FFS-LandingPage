@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}FFS DCS Status{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+<script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
+</head>
+<body>
+<header class="hero">
+  <h1>FFS DCS Server Status</h1>
+  <p class="subtitle">DCS World 専用サーバの稼働状況 (自動更新)</p>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+<footer>
+  <small>Powered by DCSServerBot RestAPI</small>
+</footer>
+</body>
+</html>

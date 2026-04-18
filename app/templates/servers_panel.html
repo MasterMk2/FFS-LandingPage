@@ -1,0 +1,47 @@
+{% if error %}
+<div class="error">
+  <strong>DCSSB API に到達できません:</strong> {{ error }}
+</div>
+{% elif not servers %}
+<div class="error">サーバ情報が取得できませんでした。</div>
+{% else %}
+<div class="grid">
+{% for s in servers %}
+  {% set status = s.get("status") or s.get("state") or "unknown" %}
+  {% set status_class = "up" if status|lower in ["running","paused","up"] else ("down" if status|lower in ["shutdown","stopped","down","unregistered"] else "warn") %}
+  <article class="card status-{{ status_class }}">
+    <header>
+      <h2>{{ s.get("server_name") or s.get("name") or "(unnamed)" }}</h2>
+      <span class="badge">{{ status }}</span>
+    </header>
+    <dl>
+      <dt>Mission</dt>
+      <dd>{{ s.get("mission_name") or s.get("current_mission") or "-" }}</dd>
+      <dt>Theatre</dt>
+      <dd>{{ s.get("theatre") or s.get("mission_theatre") or "-" }}</dd>
+      <dt>Players</dt>
+      <dd>{{ s.get("num_players") if s.get("num_players") is not none else (s.get("players")|length if s.get("players") is iterable and s.get("players") is not string else "-") }}
+        {% if s.get("max_players") %} / {{ s.get("max_players") }}{% endif %}
+      </dd>
+      {% if s.get("mission_time") is not none %}
+      <dt>Mission Time</dt>
+      <dd>{{ s.get("mission_time") }}s</dd>
+      {% endif %}
+      {% if s.get("password") %}
+      <dt>Password</dt>
+      <dd>required</dd>
+      {% endif %}
+      {% if s.get("weather") %}
+      <dt>Weather</dt>
+      <dd class="weather">
+        {% set w = s.get("weather") %}
+        {% if w.get("temperature") is not none %}🌡 {{ w.get("temperature") }}°C{% endif %}
+        {% if w.get("wind_speed") is not none %} 💨 {{ w.get("wind_speed") }} m/s{% endif %}
+      </dd>
+      {% endif %}
+    </dl>
+  </article>
+{% endfor %}
+</div>
+{% endif %}
+<p class="updated">updated at {{ updated_at }}</p>

@@ -80,7 +80,9 @@ footer{padding:1rem;text-align:center;color:var(--muted);border-top:1px solid va
 .chart-svg .spark-area{fill:currentColor;opacity:.18;stroke:none}
 .chart-svg .spark-line{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .fps-chart{color:var(--accent)}
+.cpu-chart{color:#f5a97f}
 .mem-chart{color:#7aa2f7}
+.players-chart{color:#c6a0f6}
 
 /* サーバカード内: extensions / weather */
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.82rem}
@@ -110,3 +112,24 @@ footer{padding:1rem;text-align:center;color:var(--muted);border-top:1px solid va
 .lb-table .rank{width:2.5rem;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
 .lb-table th.num,.lb-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .lb-table th.ts,.lb-table td.ts{color:var(--muted);font-variant-numeric:tabular-nums;font-size:.8rem;white-space:nowrap}
+
+/* /tracks page */
+.tracks-page .tracks-header{margin-bottom:1rem}
+.tracks-page .tracks-header h2{margin:0 0 .25rem;font-size:1.4rem}
+.tracks-page code{background:rgba(255,255,255,.05);padding:.1rem .35rem;border-radius:4px;font-size:.85em}
+.tracks-section{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;margin-bottom:1rem}
+.tracks-section h3{margin:0 0 .5rem;font-size:1rem;color:var(--accent);display:flex;align-items:baseline;gap:.5rem}
+.tracks-section .count{color:var(--muted);font-size:.8rem;font-weight:400}
+.tracks-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.tracks-table th,.tracks-table td{padding:.4rem .5rem;text-align:left;border-bottom:1px solid var(--border)}
+.tracks-table thead th{color:var(--muted);font-weight:600;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase}
+.tracks-table tbody tr:last-child td{border-bottom:none}
+.tracks-table tbody tr:hover{background:rgba(255,255,255,.02)}
+.tracks-table td.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;word-break:break-all}
+.tracks-table th.num,.tracks-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;width:5rem}
+.tracks-table th.ts,.tracks-table td.ts{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;width:10rem}
+.tracks-table th.dl,.tracks-table td.dl{text-align:right;width:5rem}
+.dl-link{display:inline-block;color:var(--accent);text-decoration:none;padding:.2rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;transition:all .15s;white-space:nowrap}
+.dl-link:hover{background:rgba(100,255,218,.1);border-color:var(--accent)}
+.qstat-link{color:inherit;text-decoration:none;border-bottom:1px dashed rgba(100,255,218,.4)}
+.qstat-link:hover{color:var(--accent);border-bottom-color:var(--accent)}

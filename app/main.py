@@ -6,9 +6,13 @@ import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+from urllib.parse import urlparse
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from datetime import datetime as _datetime
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -34,7 +38,34 @@ highscore_cache = cache.Fetcher(
     interval=300,
     name="highscore",
 )
-ALL_CACHES = [servers_cache, load_cache, highscore_cache]
+
+
+async def _fetch_tracks_all() -> dict:
+    """summary + 各サーバの trk 一覧を 1 バッチで取得。"""
+    summary_res = await dcssb.get_tracks_summary()
+    summary: dict = summary_res.data if summary_res.ok and isinstance(summary_res.data, dict) else {}
+    lists: dict[str, list] = {}
+    for server in summary.keys():
+        if summary[server].get("unavailable"):
+            lists[server] = []
+            continue
+        list_res = await dcssb.get_tracks_list(server)
+        lists[server] = (
+            list_res.data
+            if list_res.ok and isinstance(list_res.data, list)
+            else []
+        )
+    return {
+        "summary": summary,
+        "lists": lists,
+        "error": summary_res.error if not summary_res.ok else None,
+    }
+
+
+tracks_cache = cache.Fetcher(
+    fetch=_fetch_tracks_all, interval=60, name="tracks"
+)
+ALL_CACHES = [servers_cache, load_cache, highscore_cache, tracks_cache]
 
 
 @asynccontextmanager
@@ -165,10 +196,38 @@ def _processed_servers_from_cache() -> list:
     return _expand_extensions(result.data)
 
 
+# ランディング自体を指す URL は Services バーから除外する (自己リンク防止)。
+# DCSSB の `WebSite: url: https://freedomflight.jp/` エントリなどをフィルタする。
+_SELF_HOSTS = {"freedomflight.jp", "www.freedomflight.jp"}
+
+# Services バーに出さない extension 名のパターン。過去の nodes.yaml 残骸や
+# 上位互換エントリが別名で重複表示されるのを防ぐ。
+_SERVICES_EXCLUDED_NAME_SUBSTRINGS = ("Tacview Replay",)
+
+
 def _services_from_cache() -> list[dict]:
-    """base.html の Services バーに渡すグローバルサービス一覧。"""
+    """base.html の Services バーに渡すグローバルサービス一覧。
+
+    自ホストの **ルート URL** (= ランディング自身) のみ除外する。
+    同一ホストでも path 付き (例: `/tracks`) はランディング内の別ページへの
+    導線として Services バーに残す。
+    """
     services, _ = _split_extensions(_processed_servers_from_cache())
-    return services
+    out: list[dict] = []
+    for svc in services:
+        name = svc.get("name") or ""
+        if any(s in name for s in _SERVICES_EXCLUDED_NAME_SUBSTRINGS):
+            continue
+        try:
+            parsed = urlparse(svc["value"])
+            host = (parsed.hostname or "").lower()
+            path = (parsed.path or "").strip()
+        except Exception:
+            host, path = "", ""
+        if host in _SELF_HOSTS and path in ("", "/"):
+            continue
+        out.append(svc)
+    return out
 
 
 def _fmt_age(dt: datetime | None) -> str:
@@ -198,10 +257,17 @@ def _home_stats() -> dict:
         1 for s in servers if (s.get("status") or "").lower() == "running"
     )
     total_players = sum(len(s.get("players") or []) for s in servers)
+    # tracks cache から総数を合算。unavailable サーバは 0 として扱う。
+    tracks_c = tracks_cache.get()
+    tracks_total = 0
+    if tracks_c.value and isinstance(tracks_c.value, dict):
+        for info in (tracks_c.value.get("summary") or {}).values():
+            tracks_total += int(info.get("count") or 0)
     return {
         "running_count": running,
         "total_servers": len(servers),
         "total_players": total_players,
+        "tracks_total": tracks_total,
         "age": _fmt_age(cached.fetched_at),
     }
 
@@ -238,7 +304,11 @@ async def panel_servers(request: Request):
     error = cached.error
     if result is not None:
         if result.ok and isinstance(result.data, list):
-            servers = _expand_extensions(result.data)
+            # serverload パネル (DB 由来、name 昇順) と並びを揃えるため sort。
+            servers = sorted(
+                _expand_extensions(result.data),
+                key=lambda s: s.get("name") or "",
+            )
         elif result.error:
             error = result.error
     _, global_ext_names = _split_extensions(servers)
@@ -286,21 +356,49 @@ HIGHSCORE_CATEGORIES = [
     ("Ground Targets", "地上目標撃破", "Kills"),
     # Air Defence は SAM / AAA / MANPADS / 対空レーダーをまとめた DCS カテゴリ。
     ("Air Defence", "対空 (SAM/AAA)", "Kills"),
-    ("KD-Ratio", "KD 比", "Ratio"),
     ("PvP-KD-Ratio", "PvP KD 比", "Ratio"),
 ]
 
 
+_JST = ZoneInfo("Asia/Tokyo")
+
+
+def _fmt_highscore_date(raw: str) -> str:
+    """DCSSB の date 文字列 (ISO 8601 naive, UTC 格納) を JST 表示に整形。"""
+    if not raw:
+        return ""
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return raw[:16] if len(raw) > 16 else raw
+    if dt.tzinfo is None:
+        # DCSSB は UTC で保存している想定 (postgres timestamp はデフォで UTC)。
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_JST).strftime("%Y-%m-%d %H:%M")
+
+
 def _format_highscore_entry(cat_key: str, entry: dict) -> dict:
     nick = entry.get("nick") or "?"
-    date = entry.get("date") or ""
-    if date and "T" in date:
-        date = date.replace("T", " ")[:16]
+    date = _fmt_highscore_date(entry.get("date") or "")
     value: str = "-"
     if cat_key == "playtime":
         secs = int(entry.get("playtime") or 0)
         h, rem = divmod(secs, 3600)
         value = f"{h}h {rem // 60:02d}m"
+    elif cat_key == "Ground Targets":
+        for k, v in entry.items():
+            if k in ("nick", "date"):
+                continue
+            if isinstance(v, bool):
+                continue
+            if isinstance(v, int):
+                value = f"{v}"
+                break
+            if isinstance(v, float):
+                value = f"{int(v)}"  # 小数点以下を切り捨て
+                break
+            value = str(v)
+            break
     else:
         for k, v in entry.items():
             if k in ("nick", "date"):
@@ -316,6 +414,90 @@ def _format_highscore_entry(cat_key: str, entry: dict) -> dict:
             value = str(v)
             break
     return {"nick": nick, "value": value, "date": date}
+
+
+def _fmt_bytes(n: int) -> str:
+    n = int(n or 0)
+    if n < 1024:
+        return f"{n} B"
+    if n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    if n < 1024**3:
+        return f"{n / (1024 * 1024):.1f} MB"
+    return f"{n / (1024**3):.2f} GB"
+
+
+_TRACK_SERVER_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+_TRACK_FILENAME_RE = re.compile(r"^[A-Za-z0-9._-]+\.trk$")
+
+
+@app.get("/tracks", response_class=HTMLResponse)
+async def tracks_page(request: Request):
+    cached = tracks_cache.get()
+    data = cached.value or {}
+    error = data.get("error") or cached.error
+    summary = data.get("summary") or {}
+    raw_lists = data.get("lists") or {}
+    server_tracks: dict[str, list[dict]] = {}
+    unavailable: dict[str, bool] = {}
+    for server in sorted(summary.keys()):
+        unavailable[server] = bool(summary[server].get("unavailable"))
+        files = []
+        for f in raw_lists.get(server) or []:
+            files.append(
+                {
+                    "name": f.get("name"),
+                    "size": f.get("size") or 0,
+                    "size_human": _fmt_bytes(f.get("size") or 0),
+                    "mtime": f.get("mtime"),
+                    "mtime_str": (
+                        _datetime.fromtimestamp(int(f.get("mtime") or 0))
+                        .astimezone()
+                        .strftime("%Y-%m-%d %H:%M")
+                        if f.get("mtime")
+                        else "-"
+                    ),
+                }
+            )
+        server_tracks[server] = files
+    return templates.TemplateResponse(
+        "tracks.html",
+        {
+            "request": request,
+            "server_tracks": server_tracks,
+            "unavailable": unavailable,
+            "error": error,
+            "updated_at": _fmt_dt(cached.fetched_at),
+            "age": _fmt_age(cached.fetched_at),
+            "external_services": _services_from_cache(),
+        },
+    )
+
+
+@app.get("/proxy/tracks/{server}/{filename}")
+async def proxy_track_download(server: str, filename: str):
+    """.trk ダウンロードプロキシ。api_key をヘッダ注入して DCSSB から取得、
+    ブラウザに attachment として返す。"""
+    if not _TRACK_SERVER_RE.match(server):
+        raise HTTPException(400, "invalid server name")
+    if not _TRACK_FILENAME_RE.match(filename):
+        raise HTTPException(400, "invalid filename")
+    try:
+        r = await dcssb.fetch_track_file(server, filename)
+    except Exception as e:
+        raise HTTPException(502, f"upstream error: {type(e).__name__}: {e}")
+    if r.status_code == 404:
+        raise HTTPException(404, "track not found")
+    if r.status_code != 200:
+        raise HTTPException(502, f"upstream HTTP {r.status_code}")
+    return Response(
+        content=r.content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "private, max-age=0",
+        },
+    )
 
 
 @app.get("/leaderboard", response_class=HTMLResponse)

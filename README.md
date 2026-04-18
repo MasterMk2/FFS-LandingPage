@@ -1,114 +1,184 @@
 # FFS-LandingPage
 
-FFS DCS サーバの **ランディング / ステータスサイト**。
-DCSServerBot (DCSSB) の WebService + RestAPI plugin を叩いて、DCS サーバ稼働
-状況 (mission / players / weather / status) を自動更新で表示する軽量 web アプリ。
+FFS DCS コミュニティの **公開ランディング + ステータスサイト + リバースプロキシ**。
 
-- フレームワーク: **FastAPI + Jinja2 + HTMX** (15 秒ポーリング)
-- Docker image: `python:3.12-slim` ベース、~100MB
-- 公開ポート: **18150/tcp** (`18Sbx` 規約: S=1 b=5 x=0 singleton)
+- Home / Status / Leaderboard / Replays の 4 ページ構成
+- DCSServerBot (DCSSB) の RestAPI + Tracks API を参照してサーバ状況・戦績・リプレイ DL を提供
+- postgres `serverstats` を読み取り専用で直接叩き、FPS/CPU/Memory の時系列グラフを SVG で描画
+- Caddy を前段に立て、`freedomflight.jp` / `iyakusai.com` / `sneaker.~` / `lardoon.~` を Host ヘッダで振り分け
+- Let's Encrypt で TLS 自動発行・自動更新
+
+## スタック
+
+- **FastAPI + Jinja2 + HTMX** (15 / 30 秒ポーリング)
+- **Caddy v2** リバースプロキシ + TLS 終端 + 静的ホスト
+- **psycopg 3** で postgres serverstats を async SELECT
+- **in-memory cache** (`app/cache.py`) で F5 連打時の upstream 負荷を遮断
+
+## 公開 URL
+
+| URL | 役割 |
+|---|---|
+| `https://freedomflight.jp/` | Home (intro + live stats) |
+| `https://freedomflight.jp/status` | サーバ状況 + Server Load 時系列 |
+| `https://freedomflight.jp/leaderboard` | 月次リーダーボード |
+| `https://freedomflight.jp/tracks` | DCS リプレイ (.trk) 一覧 + ダウンロード |
+| `https://iyakusai.com/` (+ `www` / `2025`) | 静的 HTML (別プロジェクト、同じ Caddy でホスト) |
+| `https://sneaker.freedomflight.jp/` | Sneaker (Live Map) — 実体は姉妹 repo コンテナ |
+| `https://lardoon.freedomflight.jp/` | Lardoon (Tacview Replay archive) |
+
+## トポロジ
+
+```
+ [WAN] :80/:443
+   │
+   ▼
+ [Router NAPT]  →  192.168.3.170:30080 / :30443
+                    │
+                    ▼
+                 [ ffs-caddy ]  :80 / :443 (TLS 終端、Host 振り分け)
+                    ├─── iyakusai.com       → file_server ./iyakusai/
+                    ├─── freedomflight.jp   → reverse_proxy ffs-website:8000
+                    ├─── sneaker.~          → reverse_proxy ffs-sneaklardooon:7788
+                    └─── lardoon.~          → reverse_proxy ffs-sneaklardooon:3883
+
+ [ ffs-website ] (本 repo FastAPI 本体)
+   │
+   ├─ dcs_network ── DCSSB WebService (dcs-server-1:9876)
+   │                   ├─ /stats/* (RestAPI plugin)
+   │                   └─ /tracks/* (Tracks endpoint)
+   └─ db_network  ── postgres (ffs-postgres:5432, role=ffs_landing_ro)
+                        └─ SELECT from serverstats
+```
 
 ## 構成
 
 ```
 FFS-LandingPage/
-├── docker-compose.yml      # 外部 network (ffs-dcs-server_dcs_network) へ参加
-├── Dockerfile              # python:3.12-slim
-├── requirements.txt        # fastapi / uvicorn / jinja2 / httpx
-├── .env.example            # DCSSB_API_KEY
+├── docker-compose.yml     # ffs-website + caddy、external 参加 (dcs_network, db_network)
+├── Dockerfile             # python:3.12-slim + uvicorn(--forwarded-allow-ips=*)
+├── requirements.txt       # fastapi / uvicorn / jinja2 / httpx / psycopg[binary]
+├── .env.example
+├── caddy/
+│   └── Caddyfile          # iyakusai / freedomflight / sneaker / lardoon サイトブロック
+├── iyakusai/              # 医学薬学祭サイトの静的 HTML (別コンテンツ、Caddy がそのまま配信)
 └── app/
-    ├── main.py             # FastAPI ルート (/, /panel/servers, /healthz)
-    ├── dcssb.py            # DCSSB RestAPI クライアント
-    ├── templates/          # Jinja2 (base + index + servers_panel)
+    ├── main.py            # FastAPI ルート / lifespan で cache 起動
+    ├── cache.py           # Fetcher[T] (周期リフレッシュ async キャッシュ)
+    ├── dcssb.py           # DCSSB RestAPI + Tracks クライアント
+    ├── db.py              # postgres serverstats RO クライアント + スパークライン生成
+    ├── templates/         # Jinja2 (base + home + index + leaderboard + tracks + panels)
     └── static/style.css
 ```
 
-## データ経路
+## セットアップ
 
-```
-ブラウザ ──18150/tcp──> ffs-website (uvicorn:8000)
-                         │
-                         │ dcs_network 内部 (external)
-                         ▼
-        http://dcs-server-1:9876/stats/servers
-                         │ (DCSSB master は dcs-server-1 と netns 共有)
-                         ▼
-                    DCSSB WebService + restapi plugin
-```
+### 前提
+- 姉妹リポジトリ [`ffs-dcs-server-ops`](https://github.com/KeN7879/ffs-dcs-server-ops) が同一ホストで稼働中
+- DCSSB RestAPI plugin と Tracks endpoint が有効化済
+- postgres に read-only role (`ffs_landing_ro`) 作成済、`serverstats` に SELECT 付与済
 
-DCSSB master (`dcsserverbot`) は `network_mode: service:dcs-server-1` で
-dcs-server-1 と netns を共有しているため、WebService (9876) は dcs-server-1
-の IP で listen される。本 compose は dcs_network に external 参加して
-`dcs-server-1:9876` で到達する。ホスト経由ではないので 9876 はホスト公開不要。
+### 初回
 
-## 前提
-
-- 姉妹リポジトリ [`ffs-dcs-server`](https://github.com/MasterMk2/ffs-dcs-server) が同じホスト上に clone 済で、docker compose が動作していること。
-- `ffs-dcs-server/config/dcsserverbot/main.yaml` の `opt_plugins:` に `restapi` が含まれること (ffs-dcs-server 側で設定済)。
-- `ffs-dcs-server/scripts/apply-restapi-config.sh` で WebService + RestAPI の yaml を投入済であること。
-
-## セットアップ手順
-
-### 初回のみ
-
-1. **サーバ側 (ffs-dcs-server) で RestAPI を有効化**:
-   ```bash
-   cd ../ffs-dcs-server
-   # .env に DCSSB_API_KEY=<32文字以上の乱数> を追記
-   ./scripts/apply-restapi-config.sh
-   docker compose restart dcsserverbot
-   ```
-
-2. **当リポジトリの .env を用意**:
+1. **`.env` を用意** (姉妹 repo と同値 + DB DSN):
    ```bash
    cp .env.example .env
-   # DCSSB_API_KEY に上記と同じ値を入れる
+   # DCSSB_API_KEY=<姉妹 repo と同じ値>
+   # DCSSB_DB_URL=postgresql://ffs_landing_ro:<pass>@ffs-postgres:5432/dcsserverbot
    ```
 
-3. **起動**:
+2. **起動**:
    ```bash
    docker compose up -d --build
    ```
 
-4. ブラウザで `http://<host>:18150/` にアクセス。
+3. **ルータ NAPT** で `WAN:80 → 192.168.3.170:30080`, `WAN:443 → 192.168.3.170:30443` を設定
 
-### 更新時
+4. **UFW** (既定 deny の場合):
+   ```bash
+   sudo ufw allow 30080/tcp comment 'Caddy HTTP (router NAPT :80)'
+   sudo ufw allow 30443/tcp comment 'Caddy HTTPS (router NAPT :443)'
+   ```
+
+5. **DNS** を各 FQDN で設定:
+   - `freedomflight.jp`
+   - `iyakusai.com` / `www.iyakusai.com` / `2025.iyakusai.com`
+   - `sneaker.freedomflight.jp`
+   - `lardoon.freedomflight.jp`
+
+6. ブラウザで `https://freedomflight.jp/` にアクセス。初回のみ Caddy が LE 発行で
+   数秒 delay、以降は 60 日前後の自動更新に乗る。
+
+### 更新
 
 ```bash
 git pull
 docker compose up -d --build
 ```
 
-## UFW
+コード変更の種類に応じた影響範囲:
 
-LAN/VPN のみに限定するなら:
-```bash
-sudo ufw allow from 192.168.3.0/24 to any port 18150 proto tcp \
-  comment 'FFS landing site (LAN only)'
-```
-
-player-facing (public) に公開するなら NAPT で 18150/tcp を開ける + 上記の
-`from ...` を外す。
+| 変更 | 必要な操作 |
+|---|---|
+| `app/` コード or テンプレ or CSS | `docker compose build ffs-website && up -d --force-recreate ffs-website` |
+| `caddy/Caddyfile` のみ | `docker compose restart caddy` |
+| `iyakusai/` 静的ファイル | なし (bind-mount、即反映) |
+| `.env` | `docker compose up -d --force-recreate ffs-website` |
+| `docker-compose.yml` (ポート / ネットワーク) | `docker compose up -d --force-recreate` |
 
 ## 動作確認
 
-- `curl http://localhost:18150/healthz` → `{"status":"ok"}`
-- `curl http://localhost:18150/panel/servers` → HTML フラグメント
-- ブラウザで `/` を開くと 15 秒ごとに HTMX が `/panel/servers` を polling
+```bash
+# LAN から
+curl -sk --resolve freedomflight.jp:30443:192.168.3.170 https://freedomflight.jp:30443/healthz
+# → {"status":"ok"}
+
+# 外部 (スマホ 4G 等) から
+curl -s https://freedomflight.jp/healthz
+```
+
+## キャッシュ
+
+HTTP handler は upstream (DCSSB / postgres) に直接触らず、**バックグラウンドタスクが
+更新する in-memory cache** から値を返します。F5 連打で upstream が過負荷にならない設計:
+
+| cache | interval | 用途 |
+|---|---|---|
+| `servers_cache` | 15s | Status カード、Services バー、Home live stats |
+| `load_cache` | 60s | Server Load グラフ (Monitoring の書込周期と同じ) |
+| `highscore_cache` | 300s | Leaderboard |
+| `tracks_cache` | 60s | Replays 一覧 + Home の Replay 総数 |
+
+`CachedValue` は最新 1 件のみ保持。上流障害時も直近成功値を serve 続行し、復旧時に
+自動で差し替わるのでダウンタイムに強い。
+
+## TLS 自動更新
+
+Caddy v2 の `certmagic` が 30 日前に LE 証明書を自動更新。証明書と ACME アカウントは
+`caddy_data` docker volume に永続化。コンテナ再作成でも保持される。
+
+更新の前提:
+- Caddy 常時稼働 (`restart: unless-stopped`)
+- ルータ NAPT 維持
+- UFW で 30080/30443 open
+- DNS が当ホスト IP を指し続ける
 
 ## トラブルシュート
 
-| 症状 | 原因候補 | 対処 |
+| 症状 | 主な原因 | 対処 |
 |---|---|---|
-| "DCSSB API に到達できません" | webservice.yaml / restapi.yaml 未投入 | ffs-dcs-server の `scripts/apply-restapi-config.sh` を流して bot restart |
-| HTTP 401 / Forbidden | `DCSSB_API_KEY` が ffs-dcs-server 側と不一致 | 両方の `.env` を揃えて bot を restart |
-| HTTP 404 | プレフィックス mismatch | `restapi.yaml` の `prefix: /stats` を確認 |
-| `network ffs-dcs-server_dcs_network not found` | ffs-dcs-server compose が未起動 | `cd ../ffs-dcs-server && docker compose up -d` |
-| 繋がるが空 `[]` | master ノードが DCS に未アタッチ | Discord で `/server list` を確認 |
+| `/status` でエラーパネル | DCSSB WebService 到達不可 or 401 | `.env` の `DCSSB_API_KEY` を姉妹 repo と揃え、bot restart |
+| Server Load 空 / `DCSSB_DB_URL not configured` | DSN 未設定 | `.env` に `DCSSB_DB_URL=postgresql://...` を追加 |
+| 特定サーバだけ Load 欠落 | 該当 agent の Monitoring 未稼働 (CAP_SYS_PTRACE 等) | 姉妹 repo の該当 bot コンテナに `cap_add: [SYS_PTRACE]` があるか確認 |
+| ブラウザで TLS エラー | Caddyfile の `http://` 接頭が残っている / DNS 未伝播 | Caddyfile 修正 → `docker compose restart caddy` でログ確認 |
+| mixed-content で CSS 読めず | uvicorn の `--forwarded-allow-ips` 未設定 | Dockerfile に `--forwarded-allow-ips=*` があるか確認 |
+| 外部から繋がらない | UFW / ルータ NAPT / ISP 80 遮断 | `tcpdump -i any 'tcp port 30080'` で SYN 到達確認 |
+| `network ... _network not found` | 姉妹 compose 未起動 / project 名違い | `docker network ls` で実名確認、`docker-compose.yml` の `name:` を合わせる |
 
-## 将来拡張
+より詳しい運用上の注意は [.claude/skills/ffs-landing/SKILL.md](.claude/skills/ffs-landing/SKILL.md) を参照。
 
-- `/stats/highscore` でランキングページ
-- `/stats/serverstats` で全体アクティビティグラフ
-- WebSocket 化で HTMX polling → push
-- reverse proxy (caddy/nginx) + TLS (Let's Encrypt) を前段に
+## ライセンス / クレジット
+
+- 本体コード: FFS プロジェクト内部用、ライセンス未設定
+- DCSServerBot: Special-K の実装、本 repo はその consumer
+- Caddy / FastAPI / htmx / psycopg: 各 OSS の原ライセンスに従う

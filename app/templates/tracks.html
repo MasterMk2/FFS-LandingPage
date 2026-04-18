@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Replays — FFS DCS{% endblock %}
+{% block content %}
+<section class="tracks-page">
+  <header class="tracks-header">
+    <h2>DCS Replay Tracks</h2>
+    <p class="subtle">
+      各サーバで保存されたミッションリプレイ (.trk)。
+      DCS World を起動して <code>File → Open</code> から開くと飛行を再現できます。
+    </p>
+  </header>
+
+  {% if error %}
+  <div class="error">取得失敗: {{ error }}</div>
+  {% endif %}
+
+  {% for server, files in server_tracks.items() %}
+  <section class="tracks-section">
+    <h3>{{ server }} <span class="count">({{ files|length }} tracks)</span></h3>
+    {% if unavailable.get(server) %}
+    <p class="notice">サーバが一時的に利用不可のためリストを取得できません。</p>
+    {% elif not files %}
+    <p class="notice">このサーバに保存されたリプレイはありません。</p>
+    {% else %}
+    <table class="tracks-table">
+      <thead>
+        <tr>
+          <th>Filename</th>
+          <th class="num">Size</th>
+          <th class="ts">Saved</th>
+          <th class="dl"></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for f in files %}
+        <tr>
+          <td class="mono">{{ f.name }}</td>
+          <td class="num">{{ f.size_human }}</td>
+          <td class="ts">{{ f.mtime_str }}</td>
+          <td class="dl"><a class="dl-link" href="/proxy/tracks/{{ server }}/{{ f.name }}" download>⬇ DL</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <p class="updated">updated {{ age }} ({{ updated_at }})</p>
+</section>
+{% endblock %}

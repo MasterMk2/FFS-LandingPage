@@ -31,12 +31,34 @@
 
     <div class="chart-block">
       <div class="chart-head">
+        <span class="chart-label">CPU % ({{ s.cpu_spark.n }}pt / {{ window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.1f"|format(s.cpu_spark.vmin) }} – {{ "%.1f"|format(s.cpu_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg cpu-chart">
+        <path d="{{ s.cpu_spark.area }}" class="spark-area"/>
+        <path d="{{ s.cpu_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-head">
         <span class="chart-label">Memory GB ({{ s.mem_spark.n }}pt / {{ window_minutes }}min)</span>
         <span class="chart-range">{{ "%.2f"|format(s.mem_spark.vmin) }} – {{ "%.2f"|format(s.mem_spark.vmax) }}</span>
       </div>
       <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg mem-chart">
         <path d="{{ s.mem_spark.area }}" class="spark-area"/>
         <path d="{{ s.mem_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">Players ({{ s.users_spark.n }}pt / {{ window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.0f"|format(s.users_spark.vmin) }} – {{ "%.0f"|format(s.users_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg players-chart">
+        <path d="{{ s.users_spark.area }}" class="spark-area"/>
+        <path d="{{ s.users_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
       </svg>
     </div>
   </article>

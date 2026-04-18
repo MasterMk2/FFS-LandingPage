@@ -40,8 +40,6 @@ services:
       DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
       DCSSB_TIMEOUT: "3.0"
       DCSSB_DB_URL: "${DCSSB_DB_URL:-}"
-    ports:
-      - "18950:8000/tcp"   # LAN 直アクセス (192.168.3.170:18150)
     networks:
       - dcs_network
       - db_network   # ffs-postgres 読み取り専用 SELECT (FPS/CPU/メモリ)
@@ -61,7 +59,7 @@ services:
       # - "30443:443/udp"   # QUIC/HTTP3 を使う場合 (router で UDP/443 転送も必要)
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./sites/iyakusai:/srv/iyakusai:ro
+      - ./iyakusai:/srv/iyakusai:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}FFS — Freedom Flight Squadron{% endblock %}
+{% block title %}FFS — Freedom Flight Server{% endblock %}
 {% block content %}
 <section class="home-intro">
   <h2>Welcome</h2>
@@ -20,6 +20,10 @@
     <dd>{{ stats.total_players }}</dd>
   </div>
   <div class="qstat">
+    <dt>Replay Tracks</dt>
+    <dd><a href="/tracks" class="qstat-link">{{ stats.tracks_total }}</a></dd>
+  </div>
+  <div class="qstat">
     <dt>Last Sample</dt>
     <dd class="qstat-age">{{ stats.age }}</dd>
   </div>
@@ -35,6 +39,27 @@
     <h3>Leaderboard</h3>
     <p>過去 30 日間の飛行時間 / 撃墜記録 / KD 比 など、パイロット別トップ 10 を表示します。</p>
     <span class="home-card-cta">ランキングを見る →</span>
+  </a>
+</section>
+
+<h2 class="section-title">Tools &amp; Services</h2>
+<section class="home-cards">
+  <a class="home-card" href="https://sneaker.freedomflight.jp/" target="_blank" rel="noopener">
+    <h3>Sneaker — Live Map</h3>
+    <p>
+      飛行中の機体位置を 2D マップ上でリアルタイム表示する<strong>戦況モニタ</strong>。
+      Tacview テレメトリをブラウザで受信し、味方・敵・中立の動きを追跡できます。
+      Discord で地上指揮や AWACS 役をしたいときに便利。
+    </p>
+    <span class="home-card-cta">sneaker.freedomflight.jp を開く ↗</span>
+  </a>
+  <a class="home-card" href="/tracks">
+    <h3>リプレイダウンロード</h3>
+    <p>
+      各サーバで自動保存された DCS の<strong>リプレイファイル (.trk)</strong> を一覧・ダウンロード。
+      DCS World の <code>File → Open</code> で再生でき、デブリーフィング / AAR / 機動検証に使えます。
+    </p>
+    <span class="home-card-cta">リプレイを見る →</span>
   </a>
 </section>
 {% endblock %}

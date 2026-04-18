@@ -47,7 +47,9 @@ class ServerSeries:
     latest_mem_gb: float
     latest_users: int
     fps_spark: Spark = field(default_factory=Spark)
+    cpu_spark: Spark = field(default_factory=Spark)
     mem_spark: Spark = field(default_factory=Spark)
+    users_spark: Spark = field(default_factory=Spark)
 
 
 @dataclass
@@ -109,7 +111,9 @@ async def get_server_load_series() -> LoadResult:
             continue
         latest = samples[-1]
         fps_values = [float(s["fps"]) for s in samples]
+        cpu_values = [float(s["cpu"]) for s in samples]
         mem_gb_values = [float(s["mem_ram"]) / (1024**3) for s in samples]
+        users_values = [float(s["users"]) for s in samples]
         series_list.append(
             ServerSeries(
                 name=name,
@@ -118,9 +122,11 @@ async def get_server_load_series() -> LoadResult:
                 latest_fps=float(latest["fps"]),
                 latest_cpu=float(latest["cpu"]),
                 latest_mem_gb=float(latest["mem_ram"]) / (1024**3),
-                latest_users=latest["users"],
+                latest_users=int(latest["users"]),
                 fps_spark=_sparkline(fps_values),
+                cpu_spark=_sparkline(cpu_values),
                 mem_spark=_sparkline(mem_gb_values),
+                users_spark=_sparkline(users_values),
             )
         )
     return LoadResult(ok=True, series=series_list)

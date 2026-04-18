@@ -36,14 +36,36 @@
 	log
 }
 
-http://iyakusai.com, http://www.iyakusai.com, http://2025.iyakusai.com {
+iyakusai.com, www.iyakusai.com, 2025.iyakusai.com {
 	import iyakusai_common
 }
 
-http://freedomflight.jp, http://www.freedomflight.jp {
+# www.freedomflight.jp は DNS 未設定のため TLS 化対象外。
+# A レコード追加後に `freedomflight.jp, www.freedomflight.jp {` に戻す。
+freedomflight.jp {
 	encode zstd gzip
 	reverse_proxy ffs-website:8000 {
 		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+	log
+}
+
+# Sneaker (DCS Live Map) — ffs-sneaklardooon container の 7788 を HTTPS 終端。
+# DNS: sneaker.freedomflight.jp A 111.237.107.64
+sneaker.freedomflight.jp {
+	encode zstd gzip
+	reverse_proxy ffs-sneaklardooon:7788 {
+		header_up X-Real-IP {remote_host}
+	}
+	log
+}
+
+# Lardoon (Tacview Replay archive) — ffs-sneaklardooon container の 3883 を HTTPS 終端。
+# DNS: lardoon.freedomflight.jp A 111.237.107.64
+lardoon.freedomflight.jp {
+	encode zstd gzip
+	reverse_proxy ffs-sneaklardooon:3883 {
 		header_up X-Real-IP {remote_host}
 	}
 	log

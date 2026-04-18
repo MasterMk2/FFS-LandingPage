@@ -65,7 +65,7 @@
       <div><span class="wkey">💨 Wind</span><span class="wval">{{ "%.1f"|format(w.wind_speed) }} m/s{% if w.wind_direction is not none %} @ {{ w.wind_direction }}°{% endif %}</span></div>
       {% endif %}
       {% if w.pressure is not none %}
-      <div><span class="wkey">🧭 QNH</span><span class="wval">{{ "%.0f"|format(w.pressure) }} mmHg</span></div>
+      <div><span class="wkey">🧭 QNH</span><span class="wval">{{ "%.2f"|format(w.pressure / 25.4) }} inHg</span></div>
       {% endif %}
       {% if w.visibility is not none %}
       <div><span class="wkey">👁 Visibility</span><span class="wval">{% if w.visibility >= 1000 %}{{ "%.1f"|format(w.visibility / 1000) }} km{% else %}{{ w.visibility }} m{% endif %}</span></div>

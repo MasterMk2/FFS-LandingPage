@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}FFS — Freedom Flight Squadron{% endblock %}
+{% block content %}
+<section class="home-intro">
+  <h2>Welcome</h2>
+  <p class="lead">
+    FFS は DCS World の専用サーバを運営するコミュニティです。
+    常時稼働しているマルチプレイヤー環境で、飛行訓練・合同作戦・シナリオベースのミッションを行っています。
+    サーバの稼働状況・ミッション・気象・負荷はリアルタイムで公開、飛行時間や戦果のランキングもご覧いただけます。
+  </p>
+</section>
+
+<section class="home-quick-stats" aria-label="live snapshot">
+  <div class="qstat">
+    <dt>Running Servers</dt>
+    <dd>{{ stats.running_count }} / {{ stats.total_servers }}</dd>
+  </div>
+  <div class="qstat">
+    <dt>Players Online</dt>
+    <dd>{{ stats.total_players }}</dd>
+  </div>
+  <div class="qstat">
+    <dt>Last Sample</dt>
+    <dd class="qstat-age">{{ stats.age }}</dd>
+  </div>
+</section>
+
+<section class="home-cards">
+  <a class="home-card" href="/status">
+    <h3>Server Status</h3>
+    <p>現在稼働中のサーバとミッション、気象、接続情報 (LotAtc / Tacview)、サーバ負荷 (FPS / Memory の時系列) を 15 秒毎に更新。</p>
+    <span class="home-card-cta">ステータスを見る →</span>
+  </a>
+  <a class="home-card" href="/leaderboard">
+    <h3>Leaderboard</h3>
+    <p>過去 30 日間の飛行時間 / 撃墜記録 / KD 比 など、パイロット別トップ 10 を表示します。</p>
+    <span class="home-card-cta">ランキングを見る →</span>
+  </a>
+</section>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Leaderboard — FFS DCS{% endblock %}
+{% block content %}
+<section class="leaderboard">
+  <header class="lb-header">
+    <h2>Monthly Leaderboard</h2>
+    <p class="subtle">{{ period_label }} · Top {{ limit }} per category</p>
+  </header>
+
+  {% if error %}
+  <div class="error">Leaderboard 取得失敗: {{ error }}</div>
+  {% else %}
+    <div class="lb-grid">
+    {% for cat in cats %}
+      <section class="lb-section{% if not cat.entries %} empty{% endif %}">
+        <h3>{{ cat.label }}</h3>
+        {% if cat.entries %}
+        <table class="lb-table">
+          <thead>
+            <tr>
+              <th class="rank">#</th>
+              <th>Pilot</th>
+              <th class="num">{{ cat.metric }}</th>
+              <th class="ts">Last Seen</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for e in cat.entries %}
+            <tr>
+              <td class="rank">{{ loop.index }}</td>
+              <td>{{ e.nick }}</td>
+              <td class="num">{{ e.value }}</td>
+              <td class="ts">{{ e.date }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="lb-empty">データ蓄積待ち (戦闘ログがまだありません)</p>
+        {% endif %}
+      </section>
+    {% endfor %}
+    </div>
+  {% endif %}
+  <p class="updated">updated {{ age }} ({{ updated_at }})</p>
+</section>
+{% endblock %}

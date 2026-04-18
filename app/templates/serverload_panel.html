@@ -1,0 +1,46 @@
+{% if error %}
+<div class="error"><strong>サーバ負荷情報取得失敗:</strong> {{ error }}</div>
+{% elif not series %}
+<div class="notice">直近 {{ window_minutes }} 分の負荷データがありません (DCSSB Monitoring 未稼働か全サーバ停止中)。</div>
+{% else %}
+<div class="load-charts">
+{% for s in series %}
+  {% set status_class = "up" if s.status|lower in ["running","up"] else ("warn" if s.status|lower in ["paused"] else "down") %}
+  <article class="load-chart-card status-{{ status_class }}">
+    <header>
+      <h3 class="truncate" title="{{ s.name }}">{{ s.name }}</h3>
+      <span class="badge">{{ s.status }}</span>
+    </header>
+    <dl class="load-stats">
+      <div><dt>FPS</dt><dd>{{ "%.1f"|format(s.latest_fps) }}</dd></div>
+      <div><dt>Memory</dt><dd>{{ "%.2f"|format(s.latest_mem_gb) }} GB</dd></div>
+      <div><dt>CPU</dt><dd>{{ "%.1f"|format(s.latest_cpu) }}%</dd></div>
+      <div><dt>Players</dt><dd>{{ s.latest_users }}</dd></div>
+    </dl>
+
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">FPS ({{ s.fps_spark.n }}pt / {{ window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.0f"|format(s.fps_spark.vmin) }} – {{ "%.0f"|format(s.fps_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg fps-chart">
+        <path d="{{ s.fps_spark.area }}" class="spark-area"/>
+        <path d="{{ s.fps_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">Memory GB ({{ s.mem_spark.n }}pt / {{ window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.2f"|format(s.mem_spark.vmin) }} – {{ "%.2f"|format(s.mem_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg mem-chart">
+        <path d="{{ s.mem_spark.area }}" class="spark-area"/>
+        <path d="{{ s.mem_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+  </article>
+{% endfor %}
+</div>
+{% endif %}
+<p class="updated">updated {{ age }} ({{ updated_at }})</p>

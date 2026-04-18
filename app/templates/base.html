@@ -9,8 +9,34 @@
 </head>
 <body>
 <header class="hero">
-  <h1>FFS DCS Server Status</h1>
-  <p class="subtitle">DCS World 専用サーバの稼働状況 (自動更新)</p>
+  <div class="hero-inner">
+    <h1><a href="/" class="hero-link">FFS</a></h1>
+    <p class="subtitle">DCS World Dedicated Server Community</p>
+    <nav class="top-nav">
+      <a href="/">Home</a>
+      <a href="/status">Status</a>
+      <a href="/leaderboard">Leaderboard</a>
+    </nav>
+    {% if external_services %}
+    <div class="services-bar">
+      <span class="services-label">Services</span>
+      {% for svc in external_services %}
+        {% set is_url = svc.value.startswith("http") %}
+        {% if is_url %}
+        <a class="service-chip" href="{{ svc.value }}" target="_blank" rel="noopener">
+          <span class="svc-name">{{ svc.name }}</span>
+          <span class="svc-url">{{ svc.value }}</span>
+        </a>
+        {% else %}
+        <span class="service-chip">
+          <span class="svc-name">{{ svc.name }}</span>
+          <span class="svc-url">{{ svc.value }}</span>
+        </span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
 </header>
 <main>
   {% block content %}{% endblock %}

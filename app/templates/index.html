@@ -7,4 +7,13 @@
   hx-swap="innerHTML">
   <p class="loading">loading...</p>
 </section>
+
+<h2 class="section-title">Server Load (DCS FPS / CPU / Memory)</h2>
+<section
+  id="serverload"
+  hx-get="/panel/serverload"
+  hx-trigger="load, every 30s"
+  hx-swap="innerHTML">
+  <p class="loading">loading...</p>
+</section>
 {% endblock %}

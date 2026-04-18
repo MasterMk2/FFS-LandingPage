@@ -7,41 +7,81 @@
 {% else %}
 <div class="grid">
 {% for s in servers %}
+  {% set m = s.get("mission") or {} %}
   {% set status = s.get("status") or s.get("state") or "unknown" %}
   {% set status_class = "up" if status|lower in ["running","paused","up"] else ("down" if status|lower in ["shutdown","stopped","down","unregistered"] else "warn") %}
+  {% set mission_name = s.get("mission_name") or s.get("current_mission") or m.get("name") or "-" %}
+  {% set theatre_name = s.get("theatre") or s.get("mission_theatre") or m.get("theatre") or "-" %}
+  {% set current_players = (s.get("num_players") if s.get("num_players") is not none else (s.get("players")|length if s.get("players") is iterable and s.get("players") is not string else 0)) %}
   <article class="card status-{{ status_class }}">
     <header>
-      <h2>{{ s.get("server_name") or s.get("name") or "(unnamed)" }}</h2>
+      <h2 class="truncate" title="{{ s.get('server_name') or s.get('name') or '(unnamed)' }}">{{ s.get("server_name") or s.get("name") or "(unnamed)" }}</h2>
       <span class="badge">{{ status }}</span>
     </header>
     <dl>
       <dt>Mission</dt>
-      <dd>{{ s.get("mission_name") or s.get("current_mission") or "-" }}</dd>
+      <dd class="truncate" title="{{ mission_name }}">{{ mission_name }}</dd>
       <dt>Theatre</dt>
-      <dd>{{ s.get("theatre") or s.get("mission_theatre") or "-" }}</dd>
+      <dd class="truncate" title="{{ theatre_name }}">{{ theatre_name }}</dd>
       <dt>Players</dt>
-      <dd>{{ s.get("num_players") if s.get("num_players") is not none else (s.get("players")|length if s.get("players") is iterable and s.get("players") is not string else "-") }}
-        {% if s.get("max_players") %} / {{ s.get("max_players") }}{% endif %}
-      </dd>
-      {% if s.get("mission_time") is not none %}
+      <dd>{{ current_players }}</dd>
+      {% if m.get("uptime") is not none %}
+      <dt>Uptime</dt>
+      <dd>{{ "%d:%02d:%02d"|format(m.get("uptime")//3600, (m.get("uptime")//60)%60, m.get("uptime")%60) }}</dd>
+      {% elif s.get("mission_time") is not none %}
       <dt>Mission Time</dt>
       <dd>{{ s.get("mission_time") }}s</dd>
+      {% endif %}
+      {% if s.get("address") %}
+      <dt>Address</dt>
+      <dd class="truncate mono" title="{{ s.get('address') }}">{{ s.get("address") }}</dd>
       {% endif %}
       {% if s.get("password") %}
       <dt>Password</dt>
       <dd>required</dd>
       {% endif %}
-      {% if s.get("weather") %}
-      <dt>Weather</dt>
-      <dd class="weather">
-        {% set w = s.get("weather") %}
-        {% if w.get("temperature") is not none %}🌡 {{ w.get("temperature") }}°C{% endif %}
-        {% if w.get("wind_speed") is not none %} 💨 {{ w.get("wind_speed") }} m/s{% endif %}
-      </dd>
-      {% endif %}
     </dl>
+
+    {% set local_exts = (s.extensions or []) | rejectattr("name", "in", global_ext_names) | list %}
+    {% if local_exts %}
+    <div class="ext-list">
+      {% for ext in local_exts %}
+        <div class="ext-chip" title="{{ ext.name }}{% if ext.version %} v{{ ext.version }}{% endif %}">
+          <span class="ext-name">{{ ext.name }}{% if ext.version %} v{{ ext.version }}{% endif %}</span>
+          {% if ext.value %}<span class="ext-value">{{ ext.value }}</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if s.get("weather") %}
+    {% set w = s.weather %}
+    {% set precip_map = {0: "none", 1: "rain", 2: "thunderstorm", 3: "snow"} %}
+    <div class="weather-grid">
+      {% if w.temperature is not none %}
+      <div><span class="wkey">🌡 Temp</span><span class="wval">{{ w.temperature }} °C</span></div>
+      {% endif %}
+      {% if w.wind_speed is not none %}
+      <div><span class="wkey">💨 Wind</span><span class="wval">{{ "%.1f"|format(w.wind_speed) }} m/s{% if w.wind_direction is not none %} @ {{ w.wind_direction }}°{% endif %}</span></div>
+      {% endif %}
+      {% if w.pressure is not none %}
+      <div><span class="wkey">🧭 QNH</span><span class="wval">{{ "%.0f"|format(w.pressure) }} mmHg</span></div>
+      {% endif %}
+      {% if w.visibility is not none %}
+      <div><span class="wkey">👁 Visibility</span><span class="wval">{% if w.visibility >= 1000 %}{{ "%.1f"|format(w.visibility / 1000) }} km{% else %}{{ w.visibility }} m{% endif %}</span></div>
+      {% endif %}
+      {% if w.clouds_base is not none %}
+      <div><span class="wkey">☁ Clouds</span><span class="wval">{{ w.clouds_base }} m · {{ w.clouds_density }}/10</span></div>
+      {% endif %}
+      {% if w.precipitation is not none %}
+      <div><span class="wkey">🌧 Precip</span><span class="wval">{{ precip_map.get(w.precipitation, "type " ~ w.precipitation) }}</span></div>
+      {% endif %}
+      <div><span class="wkey">🌫 Fog</span><span class="wval">{% if w.fog_enabled %}on{% if w.fog_visibility %} ({{ w.fog_visibility }} m){% endif %}{% else %}off{% endif %}</span></div>
+      <div><span class="wkey">🏜 Dust</span><span class="wval">{% if w.dust_enabled %}on{% if w.dust_visibility %} ({{ w.dust_visibility }} m){% endif %}{% else %}off{% endif %}</span></div>
+    </div>
+    {% endif %}
   </article>
 {% endfor %}
 </div>
 {% endif %}
-<p class="updated">updated at {{ updated_at }}</p>
+<p class="updated">updated {{ age }} ({{ updated_at }})</p>

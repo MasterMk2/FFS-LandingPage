@@ -59,3 +59,13 @@ async def get_servers() -> FetchResult:
 async def get_serverstats() -> FetchResult:
     """RestAPI: GET /stats/serverstats — 全体統計 (unique players, 総 playtime 等)。"""
     return await _get("/serverstats")
+
+
+async def get_highscore(
+    period: str = "month", limit: int = 10, server_name: str | None = None
+) -> FetchResult:
+    """RestAPI: GET /stats/highscore — カテゴリ別ランキング。period: day/week/month。"""
+    params: dict = {"period": period, "limit": limit}
+    if server_name:
+        params["server_name"] = server_name
+    return await _get("/highscore", params=params)

@@ -16,6 +16,18 @@ a{color:var(--accent)}
 .top-nav a{color:var(--muted);text-decoration:none;padding:.3rem .75rem;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.02);font-size:.85rem;transition:all .15s}
 .top-nav a:hover{color:var(--fg);border-color:var(--accent);background:rgba(100,255,218,.06)}
 main{padding:1.5rem;max-width:1100px;margin:0 auto}
+.hostmon{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-bottom:1rem}
+.hostmon-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.8rem .9rem;display:flex;flex-direction:column;gap:.4rem}
+.hostmon-card.caution{border-color:var(--warn)}
+.hostmon-card.warn{border-color:var(--down);background:linear-gradient(180deg,rgba(248,81,73,.06),var(--panel))}
+.hostmon-head{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
+.hostmon-label{color:var(--muted);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase}
+.hostmon-value{color:var(--fg);font-size:1.4rem;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
+.hostmon-value-sm{font-size:1rem}
+.hostmon-sub{color:var(--muted);font-size:.7rem;font-variant-numeric:tabular-nums}
+.hostmon-meta .hostmon-value{font-size:1rem}
+.swap-chart{color:#eed49f}
+.load-chart{color:#a6da95}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1rem;transition:border-color .2s}
 .card.status-up{border-color:rgba(63,185,80,.5)}

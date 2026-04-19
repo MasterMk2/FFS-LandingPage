@@ -1,5 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
+<h2 class="section-title">Host Load (Physical Machine)</h2>
+<section
+  id="sysmon"
+  hx-get="/panel/sysmon"
+  hx-trigger="load, every {{ poll_seconds }}s"
+  hx-swap="innerHTML">
+  <p class="loading">loading...</p>
+</section>
+
+<h2 class="section-title">Servers</h2>
 <section
   id="servers"
   hx-get="/panel/servers"

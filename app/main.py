@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import cache, db, dcssb
+from . import cache, db, dcssb, sysmon
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +64,11 @@ async def _fetch_tracks_all() -> dict:
 tracks_cache = cache.Fetcher(
     fetch=_fetch_tracks_all, interval=60, name="tracks"
 )
-ALL_CACHES = [servers_cache, load_cache, highscore_cache, tracks_cache]
+# ホスト CPU/mem/swap/loadavg。psutil は bind-mount した /host/proc を読む。
+sysmon_cache = cache.Fetcher(
+    fetch=sysmon.sample, interval=15, name="sysmon"
+)
+ALL_CACHES = [servers_cache, load_cache, highscore_cache, tracks_cache, sysmon_cache]
 
 
 @asynccontextmanager
@@ -307,6 +311,20 @@ async def panel_serverload(request: Request):
             "updated_at": _fmt_dt(cached.fetched_at),
             "age": _fmt_age(cached.fetched_at),
             "window_minutes": db.HISTORY_MINUTES,
+        },
+    )
+
+
+@app.get("/panel/sysmon", response_class=HTMLResponse)
+async def panel_sysmon(request: Request):
+    cached = sysmon_cache.get()
+    return templates.TemplateResponse(
+        "sysmon_panel.html",
+        {
+            "request": request,
+            "m": cached.value,
+            "error": cached.error,
+            "age": _fmt_age(cached.fetched_at),
         },
     )
 

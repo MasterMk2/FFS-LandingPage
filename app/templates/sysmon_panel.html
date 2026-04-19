@@ -1,0 +1,59 @@
+{# ホストリソース snapshot + 時系列スパークライン (HTMX で 15s 毎更新)。 #}
+{% if m is none %}
+  <p class="loading">host metrics not available{% if error %}: {{ error }}{% endif %}</p>
+{% else %}
+<div class="hostmon">
+  <div class="hostmon-card {% if m.cpu_percent >= 85 %}warn{% elif m.cpu_percent >= 70 %}caution{% endif %}">
+    <div class="hostmon-head">
+      <span class="hostmon-label">CPU</span>
+      <span class="hostmon-value">{{ m.cpu_percent }}%</span>
+    </div>
+    <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg cpu-chart">
+      <path d="{{ m.cpu_spark.area }}" class="spark-area"/>
+      <path d="{{ m.cpu_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="hostmon-sub">{{ m.cpu_count }} cores · {{ "%.1f"|format(m.cpu_spark.vmin) }}–{{ "%.1f"|format(m.cpu_spark.vmax) }}%</div>
+  </div>
+  <div class="hostmon-card {% if m.mem_percent >= 90 %}warn{% elif m.mem_percent >= 75 %}caution{% endif %}">
+    <div class="hostmon-head">
+      <span class="hostmon-label">Memory</span>
+      <span class="hostmon-value">{{ m.mem_percent }}%</span>
+    </div>
+    <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg mem-chart">
+      <path d="{{ m.mem_spark.area }}" class="spark-area"/>
+      <path d="{{ m.mem_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="hostmon-sub">{{ m.mem_used_str }} / {{ m.mem_total_str }} · {{ "%.1f"|format(m.mem_spark.vmin) }}–{{ "%.1f"|format(m.mem_spark.vmax) }}%</div>
+  </div>
+  <div class="hostmon-card {% if m.swap_percent >= 50 %}warn{% elif m.swap_percent >= 20 %}caution{% endif %}">
+    <div class="hostmon-head">
+      <span class="hostmon-label">Swap</span>
+      <span class="hostmon-value">{{ m.swap_percent }}%</span>
+    </div>
+    <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg swap-chart">
+      <path d="{{ m.swap_spark.area }}" class="spark-area"/>
+      <path d="{{ m.swap_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="hostmon-sub">{{ m.swap_used_str }} / {{ m.swap_total_str }} · {{ "%.1f"|format(m.swap_spark.vmin) }}–{{ "%.1f"|format(m.swap_spark.vmax) }}%</div>
+  </div>
+  <div class="hostmon-card {% if m.load_ratio1 >= 1.5 %}warn{% elif m.load_ratio1 >= 1.0 %}caution{% endif %}">
+    <div class="hostmon-head">
+      <span class="hostmon-label">Load (1m)</span>
+      <span class="hostmon-value">{{ m.load1 }}</span>
+    </div>
+    <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg load-chart">
+      <path d="{{ m.load_spark.area }}" class="spark-area"/>
+      <path d="{{ m.load_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="hostmon-sub">5m/15m: {{ m.load5 }} / {{ m.load15 }} · ratio1 {{ m.load_ratio1 }}× cores</div>
+  </div>
+  <div class="hostmon-card hostmon-meta">
+    <div class="hostmon-head">
+      <span class="hostmon-label">Uptime</span>
+      <span class="hostmon-value hostmon-value-sm">{{ m.uptime_str }}</span>
+    </div>
+    <div class="hostmon-sub">history: {{ m.history_points }}pt / {{ m.history_minutes }}min</div>
+    <div class="hostmon-sub">updated {{ age }}</div>
+  </div>
+</div>
+{% endif %}

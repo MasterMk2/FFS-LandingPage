@@ -40,6 +40,12 @@ services:
       DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
       DCSSB_TIMEOUT: "3.0"
       DCSSB_DB_URL: "${DCSSB_DB_URL:-}"
+      # psutil にホスト側 /proc を読ませて、コンテナ namespace でなく
+      # ホスト全体の CPU / mem / loadavg を計測する。
+      HOST_PROC: "/host/proc"
+    volumes:
+      # ホストリソース監視用。read-only で /proc だけ露出 (/sys や / は不要)。
+      - /proc:/host/proc:ro
     networks:
       - dcs_network
       - db_network   # ffs-postgres 読み取り専用 SELECT (FPS/CPU/メモリ)

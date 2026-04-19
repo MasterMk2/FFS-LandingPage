@@ -155,13 +155,9 @@ API key は**本 repo と姉妹 repo の .env で同値必須**。不一致だ�
 1 chip = 1 エンドポイント に正規化 (Tacview の RTT / Remote Ctrl 分離など)。
 
 `_split_extensions()` で全サーバに共通する value (Sneaker/Lardoon URL 等) を
-**global** と判定し、ヒーロー Services バーに集約。サーバ毎に異なる値
-(LotAtc/Tacview ポート) は per-server カード内の `ext-chip` に残す。
-
-### Services バー除外
-- `_SELF_HOSTS` (= freedomflight.jp, www.~ ) の **ルート URL** は除外 (自己リンク防止)
-- `_SERVICES_EXCLUDED_NAME_SUBSTRINGS` に含まれる名前は除外 (`Tacview Replay` 等、
-  過去の nodes.yaml 残骸対策)
+**global** と判定し、per-server カード内の `ext-chip` から除外
+(サーバ毎に異なる LotAtc/Tacview ポート等のみ残す)。
+Sneaker / Lardoon はホームページの Tools & Services セクションにハードコード。
 
 ## 9. postgres `serverstats` 連携 ([app/db.py](../../../app/db.py))
 

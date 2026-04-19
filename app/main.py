@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
-from urllib.parse import urlparse
 
 from datetime import datetime as _datetime
 
@@ -196,40 +195,6 @@ def _processed_servers_from_cache() -> list:
     return _expand_extensions(result.data)
 
 
-# ランディング自体を指す URL は Services バーから除外する (自己リンク防止)。
-# DCSSB の `WebSite: url: https://freedomflight.jp/` エントリなどをフィルタする。
-_SELF_HOSTS = {"freedomflight.jp", "www.freedomflight.jp"}
-
-# Services バーに出さない extension 名のパターン。過去の nodes.yaml 残骸や
-# 上位互換エントリが別名で重複表示されるのを防ぐ。
-_SERVICES_EXCLUDED_NAME_SUBSTRINGS = ("Tacview Replay",)
-
-
-def _services_from_cache() -> list[dict]:
-    """base.html の Services バーに渡すグローバルサービス一覧。
-
-    自ホストの **ルート URL** (= ランディング自身) のみ除外する。
-    同一ホストでも path 付き (例: `/tracks`) はランディング内の別ページへの
-    導線として Services バーに残す。
-    """
-    services, _ = _split_extensions(_processed_servers_from_cache())
-    out: list[dict] = []
-    for svc in services:
-        name = svc.get("name") or ""
-        if any(s in name for s in _SERVICES_EXCLUDED_NAME_SUBSTRINGS):
-            continue
-        try:
-            parsed = urlparse(svc["value"])
-            host = (parsed.hostname or "").lower()
-            path = (parsed.path or "").strip()
-        except Exception:
-            host, path = "", ""
-        if host in _SELF_HOSTS and path in ("", "/"):
-            continue
-        out.append(svc)
-    return out
-
-
 def _fmt_age(dt: datetime | None) -> str:
     if dt is None:
         return "no data yet"
@@ -279,7 +244,6 @@ async def home(request: Request):
         {
             "request": request,
             "stats": _home_stats(),
-            "external_services": _services_from_cache(),
         },
     )
 
@@ -291,7 +255,6 @@ async def status_page(request: Request):
         {
             "request": request,
             "poll_seconds": 15,
-            "external_services": _services_from_cache(),
         },
     )
 
@@ -469,7 +432,6 @@ async def tracks_page(request: Request):
             "error": error,
             "updated_at": _fmt_dt(cached.fetched_at),
             "age": _fmt_age(cached.fetched_at),
-            "external_services": _services_from_cache(),
         },
     )
 
@@ -528,6 +490,5 @@ async def leaderboard(request: Request):
             "period_label": "過去 30 日",
             "updated_at": _fmt_dt(cached.fetched_at),
             "age": _fmt_age(cached.fetched_at),
-            "external_services": _services_from_cache(),
         },
     )

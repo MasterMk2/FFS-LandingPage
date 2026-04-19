@@ -69,24 +69,6 @@
     </div>
     {% endif %}
 
-    {% set players = s.get("players") if s.get("players") is iterable and s.get("players") is not string else [] %}
-    <div class="player-list">
-      <div class="player-list-head">Players ({{ players|length }})</div>
-      {% if players %}
-        {% for p in players %}
-          {% set pname = p.get("nick") or p.get("name") or p.get("unit_display_name") or "?" %}
-          {% set pside = p.get("side") %}
-          {% set slot_label = p.get("unit_type") or p.get("slot") or p.get("unit_name") %}
-          <div class="player-chip side-{{ pside if pside is not none else 'u' }}" title="{{ pname }}{% if slot_label %} · {{ slot_label }}{% endif %}">
-            <span class="player-name">{{ pname }}</span>
-            {% if slot_label %}<span class="player-slot">{{ slot_label }}</span>{% endif %}
-          </div>
-        {% endfor %}
-      {% else %}
-        <div class="player-empty">No players connected</div>
-      {% endif %}
-    </div>
-
     {% set local_exts = (s.extensions or []) | rejectattr("name", "in", global_ext_names) | list %}
     {% if local_exts %}
     <div class="ext-list">
@@ -137,6 +119,24 @@
       </svg>
     </div>
     {% endif %}
+
+    {% set players = s.get("players") if s.get("players") is iterable and s.get("players") is not string else [] %}
+    <div class="player-list">
+      <div class="player-list-head">Players ({{ players|length }})</div>
+      {% if players %}
+        {% for p in players %}
+          {% set pname = p.get("nick") or p.get("name") or p.get("unit_display_name") or "?" %}
+          {% set pside = p.get("side") %}
+          {% set slot_label = p.get("unit_type") or p.get("slot") or p.get("unit_name") %}
+          <div class="player-chip side-{{ pside if pside is not none else 'u' }}" title="{{ pname }}{% if slot_label %} · {{ slot_label }}{% endif %}">
+            <span class="player-name">{{ pname }}</span>
+            {% if slot_label %}<span class="player-slot">{{ slot_label }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="player-empty">No players connected</div>
+      {% endif %}
+    </div>
   </article>
 {% endfor %}
 </div>

@@ -271,7 +271,6 @@ async def panel_servers(request: Request):
     error = cached.error
     if result is not None:
         if result.ok and isinstance(result.data, list):
-            # serverload パネル (DB 由来、name 昇順) と並びを揃えるため sort。
             servers = sorted(
                 _expand_extensions(result.data),
                 key=lambda s: s.get("name") or "",
@@ -279,6 +278,12 @@ async def panel_servers(request: Request):
         elif result.error:
             error = result.error
     _, global_ext_names = _split_extensions(servers)
+    # Server Load (FPS/CPU/Mem/Players の直近 60 分時系列) を同じカードに埋め込む。
+    # RestAPI (外形監視の真) の server name をキーに DB 時系列を合流させる。
+    load_cached = load_cache.get()
+    load_by_name: dict = {}
+    if load_cached.value and load_cached.value.ok and load_cached.value.series:
+        load_by_name = {s.name: s for s in load_cached.value.series}
     return templates.TemplateResponse(
         "servers_panel.html",
         {
@@ -288,29 +293,8 @@ async def panel_servers(request: Request):
             "updated_at": _fmt_dt(cached.fetched_at),
             "age": _fmt_age(cached.fetched_at),
             "global_ext_names": global_ext_names,
-        },
-    )
-
-
-@app.get("/panel/serverload", response_class=HTMLResponse)
-async def panel_serverload(request: Request):
-    cached = load_cache.get()
-    result = cached.value
-    series = []
-    error = cached.error
-    if result is not None:
-        series = result.series or []
-        if not result.ok and result.error:
-            error = result.error
-    return templates.TemplateResponse(
-        "serverload_panel.html",
-        {
-            "request": request,
-            "series": series,
-            "error": error,
-            "updated_at": _fmt_dt(cached.fetched_at),
-            "age": _fmt_age(cached.fetched_at),
-            "window_minutes": db.HISTORY_MINUTES,
+            "load_by_name": load_by_name,
+            "load_window_minutes": db.HISTORY_MINUTES,
         },
     )
 

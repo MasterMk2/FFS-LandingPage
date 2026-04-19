@@ -42,18 +42,6 @@
       {% endif %}
     </dl>
 
-    {% set local_exts = (s.extensions or []) | rejectattr("name", "in", global_ext_names) | list %}
-    {% if local_exts %}
-    <div class="ext-list">
-      {% for ext in local_exts %}
-        <div class="ext-chip" title="{{ ext.name }}{% if ext.version %} v{{ ext.version }}{% endif %}">
-          <span class="ext-name">{{ ext.name }}{% if ext.version %} v{{ ext.version }}{% endif %}</span>
-          {% if ext.value %}<span class="ext-value">{{ ext.value }}</span>{% endif %}
-        </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
     {% if s.get("weather") %}
     {% set w = s.weather %}
     {% set precip_map = {0: "none", 1: "rain", 2: "thunderstorm", 3: "snow"} %}
@@ -78,6 +66,86 @@
       {% endif %}
       <div><span class="wkey">🌫 Fog</span><span class="wval">{% if w.fog_enabled %}on{% if w.fog_visibility %} ({{ w.fog_visibility }} m){% endif %}{% else %}off{% endif %}</span></div>
       <div><span class="wkey">🏜 Dust</span><span class="wval">{% if w.dust_enabled %}on{% if w.dust_visibility %} ({{ w.dust_visibility }} m){% endif %}{% else %}off{% endif %}</span></div>
+    </div>
+    {% endif %}
+
+    {% set players = s.get("players") if s.get("players") is iterable and s.get("players") is not string else [] %}
+    <div class="player-list">
+      <div class="player-list-head">Players ({{ players|length }})</div>
+      {% if players %}
+        {% for p in players %}
+          {% set pname = p.get("nick") or p.get("name") or p.get("unit_display_name") or "?" %}
+          {% set pside = p.get("side") %}
+          {% set slot_label = p.get("unit_type") or p.get("slot") or p.get("unit_name") %}
+          <div class="player-chip side-{{ pside if pside is not none else 'u' }}" title="{{ pname }}{% if slot_label %} · {{ slot_label }}{% endif %}">
+            <span class="player-name">{{ pname }}</span>
+            {% if slot_label %}<span class="player-slot">{{ slot_label }}</span>{% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="player-empty">No players connected</div>
+      {% endif %}
+    </div>
+
+    {% set local_exts = (s.extensions or []) | rejectattr("name", "in", global_ext_names) | list %}
+    {% if local_exts %}
+    <div class="ext-list">
+      {% for ext in local_exts %}
+        <div class="ext-chip" title="{{ ext.name }}{% if ext.version %} v{{ ext.version }}{% endif %}">
+          <span class="ext-name">{{ ext.name }}{% if ext.version %} v{{ ext.version }}{% endif %}</span>
+          {% if ext.value %}<span class="ext-value">{{ ext.value }}</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% set load = load_by_name.get(s.get("server_name") or s.get("name")) %}
+    {% if load %}
+    <dl class="load-stats">
+      <div><dt>FPS</dt><dd>{{ "%.1f"|format(load.latest_fps) }}</dd></div>
+      <div><dt>Memory</dt><dd>{{ "%.2f"|format(load.latest_mem_gb) }} GB</dd></div>
+      <div><dt>CPU</dt><dd>{{ "%.1f"|format(load.latest_cpu) }}%</dd></div>
+      <div><dt>Players</dt><dd>{{ load.latest_users }}</dd></div>
+    </dl>
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">FPS ({{ load.fps_spark.n }}pt / {{ load_window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.0f"|format(load.fps_spark.vmin) }} – {{ "%.0f"|format(load.fps_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg fps-chart">
+        <path d="{{ load.fps_spark.area }}" class="spark-area"/>
+        <path d="{{ load.fps_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">CPU % ({{ load.cpu_spark.n }}pt / {{ load_window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.1f"|format(load.cpu_spark.vmin) }} – {{ "%.1f"|format(load.cpu_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg cpu-chart">
+        <path d="{{ load.cpu_spark.area }}" class="spark-area"/>
+        <path d="{{ load.cpu_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">Memory GB ({{ load.mem_spark.n }}pt / {{ load_window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.2f"|format(load.mem_spark.vmin) }} – {{ "%.2f"|format(load.mem_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg mem-chart">
+        <path d="{{ load.mem_spark.area }}" class="spark-area"/>
+        <path d="{{ load.mem_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+    <div class="chart-block">
+      <div class="chart-head">
+        <span class="chart-label">Players ({{ load.users_spark.n }}pt / {{ load_window_minutes }}min)</span>
+        <span class="chart-range">{{ "%.0f"|format(load.users_spark.vmin) }} – {{ "%.0f"|format(load.users_spark.vmax) }}</span>
+      </div>
+      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg players-chart">
+        <path d="{{ load.users_spark.area }}" class="spark-area"/>
+        <path d="{{ load.users_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
+      </svg>
     </div>
     {% endif %}
   </article>

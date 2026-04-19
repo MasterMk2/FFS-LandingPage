@@ -57,7 +57,7 @@ iyakusai / sneaker / lardoon は DCS サーバとは無関係のサイトだが�
 | URL | 役割 | 関連 handler / template |
 |---|---|---|
 | `https://freedomflight.jp/` | ランディング Home (intro + live stats + カード) | `home()` / [home.html](../../../app/templates/home.html) |
-| `https://freedomflight.jp/status` | サーバステータス (cards + Server Load graphs) | `status_page()` / [index.html](../../../app/templates/index.html) |
+| `https://freedomflight.jp/status` | サーバステータス (mission/weather/FPS/CPU/Mem を 1 カードに統合) | `status_page()` / [index.html](../../../app/templates/index.html) |
 | `https://freedomflight.jp/leaderboard` | 月次リーダーボード (飛行時間 / 撃墜 等) | `leaderboard()` / [leaderboard.html](../../../app/templates/leaderboard.html) |
 | `https://freedomflight.jp/tracks` | リプレイ (.trk) 一覧とダウンロード | `tracks_page()` / [tracks.html](../../../app/templates/tracks.html) |
 | `https://freedomflight.jp/healthz` | ヘルスチェック (JSON) | `healthz()` |
@@ -69,8 +69,8 @@ iyakusai / sneaker / lardoon は DCS サーバとは無関係のサイトだが�
 
 | URL | 用途 |
 |---|---|
-| `GET /panel/servers` | サーバカード HTML フラグメント。HTMX が Status ページで 15s 毎 polling |
-| `GET /panel/serverload` | Server Load カード (FPS/CPU/Memory/Players 時系列 SVG)。30s 毎 |
+| `GET /panel/servers` | サーバカード HTML フラグメント (RestAPI の mission/weather/extensions + DB 由来の FPS/CPU/Mem/Players 時系列 SVG を 1 カードに統合)。HTMX が Status ページで 15s 毎 polling |
+| `GET /panel/sysmon` | ホスト物理マシンの CPU/Mem/Swap/Load カード。15s 毎 |
 | `GET /proxy/tracks/{server}/{filename}` | .trk ダウンロードプロキシ (api_key を注入して DCSSB から取得) |
 
 ## 5. コード構成 (app/ 配下)
@@ -84,11 +84,10 @@ iyakusai / sneaker / lardoon は DCS サーバとは無関係のサイトだが�
 | [app/sysmon.py](../../../app/sysmon.py) | psutil でホスト CPU/mem/swap/loadavg/uptime を /host/proc 経由で取得 |
 | [app/templates/base.html](../../../app/templates/base.html) | 共通レイアウト。ヒーロー + Nav + footer |
 | [app/templates/home.html](../../../app/templates/home.html) | Home ページ (Welcome / quick stats / カード) |
-| [app/templates/index.html](../../../app/templates/index.html) | Status ページ (HTMX panel mount 2 枚) |
+| [app/templates/index.html](../../../app/templates/index.html) | Status ページ (HTMX panel mount: Host Load + Servers) |
 | [app/templates/leaderboard.html](../../../app/templates/leaderboard.html) | Leaderboard (カテゴリ別 top 10) |
 | [app/templates/tracks.html](../../../app/templates/tracks.html) | Replays (各サーバの .trk 一覧 + DL リンク) |
-| [app/templates/servers_panel.html](../../../app/templates/servers_panel.html) | HTMX: サーバカード (mission/weather/extensions) |
-| [app/templates/serverload_panel.html](../../../app/templates/serverload_panel.html) | HTMX: FPS/CPU/Memory/Players スパークライン |
+| [app/templates/servers_panel.html](../../../app/templates/servers_panel.html) | HTMX: 統合サーバカード (mission/weather/extensions + FPS/CPU/Mem/Players スパークライン) |
 | [app/templates/sysmon_panel.html](../../../app/templates/sysmon_panel.html) | HTMX: ホスト CPU/Mem/Swap/Load カード |
 | [app/static/style.css](../../../app/static/style.css) | ダークテーマ、全スタイル統合 |
 
@@ -100,8 +99,8 @@ F5 連打で upstream (DCSSB / postgres) に負荷を掛けないよう、HTTP h
 
 | cache 名 | データ元 | interval | 用途 |
 |---|---|---|---|
-| `servers_cache` | `dcssb.get_servers()` | **15s** | Status カード + Services バー + Home quick stats |
-| `load_cache` | `db.get_server_load_series()` | **60s** | Server Load graphs (DCSSB Monitoring が 1 分毎書き) |
+| `servers_cache` | `dcssb.get_servers()` | **15s** | 統合サーバカード (mission/weather/extensions) + Home quick stats |
+| `load_cache` | `db.get_server_load_series()` | **60s** | 統合サーバカード内の FPS/CPU/Mem/Players 時系列 (DCSSB Monitoring が 1 分毎 serverstats に書き込んだ履歴) |
 | `highscore_cache` | `dcssb.get_highscore(period='month', limit=10)` | **300s** | Leaderboard |
 | `tracks_cache` | summary + 各サーバ list をバッチで取得 | **60s** | Replays ページ + Home quick stats |
 

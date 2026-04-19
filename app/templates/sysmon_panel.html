@@ -23,7 +23,7 @@
       <path d="{{ m.mem_spark.area }}" class="spark-area"/>
       <path d="{{ m.mem_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
     </svg>
-    <div class="hostmon-sub">{{ m.mem_used_str }} / {{ m.mem_total_str }} · {{ "%.1f"|format(m.mem_spark.vmin) }}–{{ "%.1f"|format(m.mem_spark.vmax) }}%</div>
+    <div class="hostmon-sub">{{ m.mem_used_str }} / {{ m.mem_total_str }}</div>
   </div>
   <div class="hostmon-card {% if m.swap_percent >= 50 %}warn{% elif m.swap_percent >= 20 %}caution{% endif %}">
     <div class="hostmon-head">
@@ -34,7 +34,7 @@
       <path d="{{ m.swap_spark.area }}" class="spark-area"/>
       <path d="{{ m.swap_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
     </svg>
-    <div class="hostmon-sub">{{ m.swap_used_str }} / {{ m.swap_total_str }} · {{ "%.1f"|format(m.swap_spark.vmin) }}–{{ "%.1f"|format(m.swap_spark.vmax) }}%</div>
+    <div class="hostmon-sub">{{ m.swap_used_str }} / {{ m.swap_total_str }}</div>
   </div>
   <div class="hostmon-card {% if m.load_ratio1 >= 1.5 %}warn{% elif m.load_ratio1 >= 1.0 %}caution{% endif %}">
     <div class="hostmon-head">
@@ -47,13 +47,30 @@
     </svg>
     <div class="hostmon-sub">5m/15m: {{ m.load5 }} / {{ m.load15 }} · ratio1 {{ m.load_ratio1 }}× cores</div>
   </div>
-  <div class="hostmon-card hostmon-meta">
+  <div class="hostmon-card">
     <div class="hostmon-head">
-      <span class="hostmon-label">Uptime</span>
-      <span class="hostmon-value hostmon-value-sm">{{ m.uptime_str }}</span>
+      <span class="hostmon-label">Network</span>
+      <span class="net-values">
+        <span class="net-rx">↓ {{ m.net_rx_rate_str }}</span>
+        <span class="net-tx">↑ {{ m.net_tx_rate_str }}</span>
+      </span>
     </div>
-    <div class="hostmon-sub">history: {{ m.history_points }}pt / {{ m.history_minutes }}min</div>
-    <div class="hostmon-sub">updated {{ age }}</div>
+    <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg net-chart">
+      <title>Download (RX) / Upload (TX)</title>
+      <path d="{{ m.net_rx_spark.area }}" class="spark-area net-rx-area"/>
+      <path d="{{ m.net_rx_spark.path }}" class="spark-line net-rx-line" vector-effect="non-scaling-stroke"/>
+      <path d="{{ m.net_tx_spark.path }}" class="spark-line net-tx-line" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="net-legend">
+      <span class="net-legend-item"><span class="net-swatch net-swatch-rx"></span>↓ Download</span>
+      <span class="net-legend-item"><span class="net-swatch net-swatch-tx"></span>↑ Upload</span>
+    </div>
+    <div class="hostmon-sub" title="interfaces: {{ m.net_ifaces }}">total: ↓ {{ m.net_rx_total_str }} · ↑ {{ m.net_tx_total_str }}</div>
   </div>
+</div>
+<div class="hostmon-meta-row">
+  <span><span class="meta-k">Uptime</span> {{ m.uptime_str }}</span>
+  <span><span class="meta-k">History</span> {{ m.history_points }}pt / {{ m.history_minutes }}min</span>
+  <span><span class="meta-k">Updated</span> {{ age }}</span>
 </div>
 {% endif %}

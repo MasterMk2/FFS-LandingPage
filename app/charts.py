@@ -16,11 +16,9 @@ class Spark:
     n: int = 0
 
 
-def sparkline(values: list[float]) -> Spark:
+def _build_spark(values: list[float], vmin: float, vmax: float) -> Spark:
     if not values:
         return Spark()
-    vmin, vmax = min(values), max(values)
-    # 全サンプルが同値のときは視覚的に中央水平線になるよう ±0.5 のマージン。
     if vmax == vmin:
         vmin -= 0.5
         vmax += 0.5
@@ -42,3 +40,23 @@ def sparkline(values: list[float]) -> Spark:
         f"L {coords[0][0]:.1f} {SPARK_HEIGHT} Z"
     )
     return Spark(path=path, area=area, vmin=vmin, vmax=vmax, n=n)
+
+
+def sparkline(values: list[float]) -> Spark:
+    if not values:
+        return Spark()
+    return _build_spark(values, min(values), max(values))
+
+
+def sparkline_pair(a: list[float], b: list[float]) -> tuple[Spark, Spark]:
+    """RX/TX のように 2 系列を同一 y スケールで比較可能にする。
+
+    それぞれ `sparkline()` すると各系列の max で個別正規化され、RX >> TX の
+    ようなケースで小さい側が過大表示される。両系列を合算した vmin/vmax で
+    共通正規化し、相対的な大きさを維持する。
+    """
+    combined = (a or []) + (b or [])
+    if not combined:
+        return Spark(), Spark()
+    vmin, vmax = min(combined), max(combined)
+    return _build_spark(a, vmin, vmax), _build_spark(b, vmin, vmax)

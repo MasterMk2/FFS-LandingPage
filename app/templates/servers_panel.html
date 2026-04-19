@@ -105,7 +105,6 @@
       <div><dt>FPS</dt><dd>{{ "%.1f"|format(load.latest_fps) }}</dd></div>
       <div><dt>Memory</dt><dd>{{ "%.2f"|format(load.latest_mem_gb) }} GB</dd></div>
       <div><dt>CPU</dt><dd>{{ "%.1f"|format(load.latest_cpu) }}%</dd></div>
-      <div><dt>Players</dt><dd>{{ load.latest_users }}</dd></div>
     </dl>
     <div class="chart-block">
       <div class="chart-head">
@@ -135,16 +134,6 @@
       <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg mem-chart">
         <path d="{{ load.mem_spark.area }}" class="spark-area"/>
         <path d="{{ load.mem_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
-      </svg>
-    </div>
-    <div class="chart-block">
-      <div class="chart-head">
-        <span class="chart-label">Players ({{ load.users_spark.n }}pt / {{ load_window_minutes }}min)</span>
-        <span class="chart-range">{{ "%.0f"|format(load.users_spark.vmin) }} – {{ "%.0f"|format(load.users_spark.vmax) }}</span>
-      </div>
-      <svg viewBox="0 0 180 36" preserveAspectRatio="none" class="chart-svg players-chart">
-        <path d="{{ load.users_spark.area }}" class="spark-area"/>
-        <path d="{{ load.users_spark.path }}" class="spark-line" vector-effect="non-scaling-stroke"/>
       </svg>
     </div>
     {% endif %}

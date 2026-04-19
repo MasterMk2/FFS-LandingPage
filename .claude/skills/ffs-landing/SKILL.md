@@ -70,7 +70,7 @@ iyakusai / sneaker / lardoon は DCS サーバとは無関係のサイトだが�
 | URL | 用途 |
 |---|---|
 | `GET /panel/servers` | サーバカード HTML フラグメント (RestAPI の mission/weather/extensions + DB 由来の FPS/CPU/Mem/Players 時系列 SVG を 1 カードに統合)。HTMX が Status ページで 15s 毎 polling |
-| `GET /panel/sysmon` | ホスト物理マシンの CPU/Mem/Swap/Load カード。15s 毎 |
+| `GET /panel/sysmon` | ホスト物理マシンの CPU/Mem/Swap/Load/Network カード + Uptime フッター。15s 毎 |
 | `GET /proxy/tracks/{server}/{filename}` | .trk ダウンロードプロキシ (api_key を注入して DCSSB から取得) |
 
 ## 5. コード構成 (app/ 配下)
@@ -81,14 +81,14 @@ iyakusai / sneaker / lardoon は DCS サーバとは無関係のサイトだが�
 | [app/cache.py](../../../app/cache.py) | `Fetcher[T]` — 周期リフレッシュ付き in-memory cache |
 | [app/dcssb.py](../../../app/dcssb.py) | DCSSB WebService クライアント (RestAPI + /tracks) |
 | [app/db.py](../../../app/db.py) | postgres `serverstats` を RO で SELECT、時系列と SVG スパークライン生成 |
-| [app/sysmon.py](../../../app/sysmon.py) | psutil でホスト CPU/mem/swap/loadavg/uptime を /host/proc 経由で取得 |
+| [app/sysmon.py](../../../app/sysmon.py) | psutil でホスト CPU/mem/swap/loadavg/uptime を /host/proc 経由で取得。ネットワーク I/O は `/host/proc/1/net/dev` (PID1 = init = host netns) を直読み、物理 NIC のみ合算して rx/tx rate 化 |
 | [app/templates/base.html](../../../app/templates/base.html) | 共通レイアウト。ヒーロー + Nav + footer |
 | [app/templates/home.html](../../../app/templates/home.html) | Home ページ (Welcome / quick stats / カード) |
 | [app/templates/index.html](../../../app/templates/index.html) | Status ページ (HTMX panel mount: Host Load + Servers) |
 | [app/templates/leaderboard.html](../../../app/templates/leaderboard.html) | Leaderboard (カテゴリ別 top 10) |
 | [app/templates/tracks.html](../../../app/templates/tracks.html) | Replays (各サーバの .trk 一覧 + DL リンク) |
 | [app/templates/servers_panel.html](../../../app/templates/servers_panel.html) | HTMX: 統合サーバカード (mission/weather/extensions + FPS/CPU/Mem/Players スパークライン) |
-| [app/templates/sysmon_panel.html](../../../app/templates/sysmon_panel.html) | HTMX: ホスト CPU/Mem/Swap/Load カード |
+| [app/templates/sysmon_panel.html](../../../app/templates/sysmon_panel.html) | HTMX: ホスト CPU/Mem/Swap/Load/Network カード (RX/TX 同一スケール 2 系列スパークライン) + Uptime/history メタフッター |
 | [app/static/style.css](../../../app/static/style.css) | ダークテーマ、全スタイル統合 |
 
 ## 6. バックグラウンドキャッシュ ([app/cache.py](../../../app/cache.py))

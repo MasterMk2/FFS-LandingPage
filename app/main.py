@@ -71,7 +71,14 @@ sysmon_cache = cache.Fetcher(
 fitbit_cache = cache.Fetcher(
     fetch=_fitbit.get_fitbit_data, interval=60, name="fitbit"
 )
-ALL_CACHES = [servers_cache, load_cache, highscore_cache, tracks_cache, sysmon_cache, fitbit_cache]
+# 7 日 HR 履歴は日別分割フェッチで重い + ほぼ変化しないので別 cache で 10 分毎。
+fitbit7d_cache = cache.Fetcher(
+    fetch=_fitbit.get_fitbit_7d, interval=600, name="fitbit7d"
+)
+ALL_CACHES = [
+    servers_cache, load_cache, highscore_cache, tracks_cache,
+    sysmon_cache, fitbit_cache, fitbit7d_cache,
+]
 
 
 @asynccontextmanager
@@ -359,19 +366,25 @@ async def health_page(request: Request):
 
 @app.get("/panel/fitbit", response_class=HTMLResponse)
 async def panel_fitbit(request: Request):
-    cached = fitbit_cache.get()
-    data = cached.value
-    error = cached.error
-    if data and data.get("error"):
-        error = data["error"]
-        data = None
+    c_live = fitbit_cache.get()       # 現在値 + 24h chart (60s)
+    c_7d = fitbit7d_cache.get()       # 7 日 chart + 睡眠バー (600s)
+    live = c_live.value if (c_live.value and not c_live.value.get("error")) else None
+    seven = c_7d.value if (c_7d.value and not c_7d.value.get("error")) else None
+    # error は live を優先 (認証エラー等は両者共通)
+    error = c_live.error
+    if c_live.value and c_live.value.get("error"):
+        error = c_live.value["error"]
+    # live を後勝ちで merge (window_end / current_hr は live が正)
+    data = None
+    if live or seven:
+        data = {**(seven or {}), **(live or {})}
     return templates.TemplateResponse(
         "fitbit_panel.html",
         {
             "request": request,
             "d": data,
             "error": error,
-            "age": _fmt_age(cached.fetched_at),
+            "age": _fmt_age(c_live.fetched_at),
         },
     )
 

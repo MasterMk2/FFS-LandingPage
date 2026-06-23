@@ -217,12 +217,33 @@ def _downsample(
     return out
 
 
-async def get_fitbit_data() -> dict:
-    """7 日分の心拍 + 睡眠ログを取得し、7 日スケールと直近 24h スケールの 2 つの
-    HR チャートを生成する。cache.Fetcher が 60 秒毎に呼ぶ。"""
+async def _fetch_hr_sampled_chunked(
+    start: datetime,
+    end: datetime,
+    chunk: timedelta,
+    min_interval_sec: float,
+) -> list[tuple[datetime, float]]:
+    """[start, end) を chunk 毎に分割して HR を取得し、各 chunk を即ダウンサンプルして
+    連結する。
+
+    Google Health API は 1 クエリあたり約 100k dataPoint で結果を打ち切るため、
+    Charge 6 の高密度 HR (約 25 点/分 → 1 日 ~36k 点) を 7 日分まとめて 1 クエリで
+    取ると古い側が約 3 日で切れる。日単位で分割すれば各クエリが cap 未満に収まり、
+    全期間の履歴が取得できる。chunk 毎に downsample するのでメモリも増えない。"""
+    out: list[tuple[datetime, float]] = []
+    cur = start
+    while cur < end:
+        nxt = min(cur + chunk, end)
+        pts = await _fetch_hr(cur, nxt)
+        pts.sort(key=lambda x: x[0])
+        out.extend(_downsample(pts, min_interval_sec))
+        cur = nxt
+    return out
+
+
+def _auth_error() -> dict | None:
     if not CLIENT_ID or not CLIENT_SECRET:
         return {"error": "FITBIT_CLIENT_ID / FITBIT_CLIENT_SECRET が未設定"}
-
     if not _refresh_token:
         _load_tokens()
     if not _refresh_token:
@@ -232,34 +253,97 @@ async def get_fitbit_data() -> dict:
                 " FITBIT_REFRESH_TOKEN を .env に設定してください"
             )
         }
+    return None
+
+
+async def get_fitbit_data() -> dict:
+    """直近 24h の心拍 + 現在値 + 睡眠ステータスを取得。cache.Fetcher が 60 秒毎に呼ぶ
+    (軽量: 単一クエリ ~26h)。7 日チャートは get_fitbit_7d() が別途担当。"""
+    err = _auth_error()
+    if err:
+        return err
+
+    now = datetime.now(_JST)
+    window_end = now
+    window_start_24h = now - timedelta(hours=24)
+
+    # 24h チャート用に直近 26h を取得 (cap 未満)。2 分毎にダウンサンプル (~720 点)。
+    hr_recent = await _fetch_hr(now - timedelta(hours=26), window_end)
+    hr_recent.sort(key=lambda x: x[0])
+    hr_24h = [(ts, v) for ts, v in hr_recent if ts >= window_start_24h]
+    sampled_24h = _downsample(hr_24h, 2 * 60)
+
+    # 睡眠は直近 2 日分だけ (ステータス + 24h バンド + サマリ用)
+    sleep_recent = await _fetch_sleep(now - timedelta(days=2), window_end)
+    sleep_24h_bands = [
+        (s, e) for s, e in sleep_recent
+        if e >= window_start_24h and s <= window_end
+    ]
+
+    # 現在の心拍 (直近 30 分以内)
+    current_hr: int | None = None
+    if hr_recent:
+        last_dt, last_v = hr_recent[-1][0], hr_recent[-1][1]
+        if (now - last_dt).total_seconds() < 30 * 60:
+            current_hr = int(last_v)
+
+    # 睡眠ステータス
+    sleep_status = "awake"
+    for s_start, s_end in sleep_24h_bands:
+        if s_start <= now <= s_end:
+            sleep_status = "sleeping"
+            break
+    if sleep_status == "awake" and sleep_24h_bands:
+        latest_end = max(e for _, e in sleep_24h_bands)
+        if (now - latest_end).total_seconds() < 2 * 3600:
+            sleep_status = "recent"
+
+    chart_24h = build_hr_chart(
+        sampled_24h, sleep_24h_bands, window_start_24h, window_end, gap_minutes=15
+    )
+
+    sleep_summary = []
+    for s, e in sorted(sleep_24h_bands, key=lambda x: x[0]):
+        dur_min = int((e - s).total_seconds() / 60)
+        sleep_summary.append({
+            "start": s.strftime("%m/%d %H:%M"),
+            "end": e.strftime("%m/%d %H:%M"),
+            "duration": f"{dur_min // 60}h {dur_min % 60:02d}m",
+        })
+
+    return {
+        "error": None,
+        "current_hr": current_hr,
+        "sleep_status": sleep_status,
+        "sleep_summary": sleep_summary,
+        "chart_24h": chart_24h,
+        "win24h_start": window_start_24h.strftime("%m/%d %H:%M"),
+        "window_end": window_end.strftime("%m/%d %H:%M"),
+    }
+
+
+async def get_fitbit_7d() -> dict:
+    """7 日スケールの HR チャート + 7 日睡眠バーチャートを生成。
+    日単位の分割フェッチで API の 100k cap を回避する。履歴はほぼ変化しないので
+    cache.Fetcher が 10 分毎に呼べば十分 (負荷・quota 配慮)。"""
+    err = _auth_error()
+    if err:
+        return err
 
     now = datetime.now(_JST)
     window_end = now
     window_start_7d = now - timedelta(days=7)
-    window_start_24h = now - timedelta(hours=24)
 
-    # 7 日分を 1 回で取得し、両チャートで使い回す。
-    hr_all = await _fetch_hr(window_start_7d, window_end)
-    hr_all.sort(key=lambda x: x[0])
+    # 7 日分を日別チャンクで取得 → 15 分毎ダウンサンプルで連結 (~672 点)。
+    sampled_7d = await _fetch_hr_sampled_chunked(
+        window_start_7d, window_end, timedelta(days=1), 15 * 60
+    )
 
-    # 7 日チャート: 点が多すぎるので 15 分毎にダウンサンプル (~672 点)。
-    sampled_7d = _downsample(hr_all, 15 * 60)
-    # 24h チャート: 直近 24h のみに絞って 2 分毎にダウンサンプル (~720 点)。
-    hr_24h = [(ts, v) for ts, v in hr_all if ts >= window_start_24h]
-    sampled_24h = _downsample(hr_24h, 2 * 60)
-
-    # 7 日分の睡眠を取得 (HR チャートの睡眠バンドと 7 日バーチャート共用)
     sleep_all = await _fetch_sleep(window_start_7d, window_end)
     sleep_7d_bands = [
         (s, e) for s, e in sleep_all
         if e >= window_start_7d and s <= window_end
     ]
-    sleep_24h_bands = [
-        (s, e) for s, e in sleep_all
-        if e >= window_start_24h and s <= window_end
-    ]
-    # 睡眠ステータス判定は直近 (24h バンド) を使う。
-    sleep_in_window = sleep_24h_bands
 
     # 7 日バーチャート用: 日毎の合計睡眠時間 (起床日付 = end の JST 日付)
     sleep_7day: list[dict] = []
@@ -277,51 +361,14 @@ async def get_fitbit_data() -> dict:
             "is_today": day == today,
         })
 
-    # 現在の心拍 (直近 30 分以内)
-    current_hr: int | None = None
-    if hr_all:
-        last_dt, last_v = hr_all[-1][0], hr_all[-1][1]
-        if (now - last_dt).total_seconds() < 30 * 60:
-            current_hr = int(last_v)
-
-    # 睡眠ステータス
-    sleep_status = "awake"
-    for s_start, s_end in sleep_in_window:
-        if s_start <= now <= s_end:
-            sleep_status = "sleeping"
-            break
-    if sleep_status == "awake" and sleep_in_window:
-        latest_end = max(e for _, e in sleep_in_window)
-        if (now - latest_end).total_seconds() < 2 * 3600:
-            sleep_status = "recent"
-
-    # gap_minutes はダウンサンプル間隔より大きく: 7d=15分間隔→45分、24h=2分間隔→15分。
     chart_7d = build_hr_chart(
         sampled_7d, sleep_7d_bands, window_start_7d, window_end, gap_minutes=45
     )
-    chart_24h = build_hr_chart(
-        sampled_24h, sleep_24h_bands, window_start_24h, window_end, gap_minutes=15
-    )
-
-    # 直近 24h の睡眠サマリ (バンド表示と整合)
-    sleep_summary = []
-    for s, e in sorted(sleep_24h_bands, key=lambda x: x[0]):
-        dur_min = int((e - s).total_seconds() / 60)
-        sleep_summary.append({
-            "start": s.strftime("%m/%d %H:%M"),
-            "end": e.strftime("%m/%d %H:%M"),
-            "duration": f"{dur_min // 60}h {dur_min % 60:02d}m",
-        })
 
     return {
         "error": None,
-        "current_hr": current_hr,
-        "sleep_status": sleep_status,
-        "sleep_summary": sleep_summary,
-        "sleep_7day": sleep_7day,
         "chart_7d": chart_7d,
-        "chart_24h": chart_24h,
+        "sleep_7day": sleep_7day,
         "win7d_start": window_start_7d.strftime("%m/%d %H:%M"),
-        "win24h_start": window_start_24h.strftime("%m/%d %H:%M"),
         "window_end": window_end.strftime("%m/%d %H:%M"),
     }

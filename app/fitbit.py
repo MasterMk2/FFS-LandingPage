@@ -295,8 +295,13 @@ async def get_fitbit_data() -> dict:
         if (now - latest_end).total_seconds() < 2 * 3600:
             sleep_status = "recent"
 
-    chart_7d = build_hr_chart(sampled_7d, sleep_7d_bands, window_start_7d, window_end)
-    chart_24h = build_hr_chart(sampled_24h, sleep_24h_bands, window_start_24h, window_end)
+    # gap_minutes はダウンサンプル間隔より大きく: 7d=15分間隔→45分、24h=2分間隔→15分。
+    chart_7d = build_hr_chart(
+        sampled_7d, sleep_7d_bands, window_start_7d, window_end, gap_minutes=45
+    )
+    chart_24h = build_hr_chart(
+        sampled_24h, sleep_24h_bands, window_start_24h, window_end, gap_minutes=15
+    )
 
     # 直近 24h の睡眠サマリ (バンド表示と整合)
     sleep_summary = []

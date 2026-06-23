@@ -70,9 +70,13 @@ def build_hr_chart(
     sleep_periods: list,   # [(datetime, datetime)]
     window_start: _dt,
     window_end: _dt,
+    gap_minutes: float = 15,  # この間隔超で線を分断 (欠測 = 外し時)。
 ) -> HrChart:
     """任意ウィンドウの HR + 睡眠帯を SVG パスデータに変換する
-    (7 日 / 直近 24h など window_start〜window_end で汎用化)。"""
+    (7 日 / 直近 24h など window_start〜window_end で汎用化)。
+
+    gap_minutes はダウンサンプル間隔より十分大きく取ること。等しいと
+    実データ間隔が僅かに超えるたびに線が分断され断片化する。"""
     total_secs = (window_end - window_start).total_seconds()
     if total_secs <= 0 or not hr_points:
         return HrChart()
@@ -84,16 +88,17 @@ def build_hr_chart(
         v = max(_HR_DISPLAY_MIN, min(_HR_DISPLAY_MAX, v))
         return HR_CHART_H - (v - _HR_DISPLAY_MIN) / (_HR_DISPLAY_MAX - _HR_DISPLAY_MIN) * HR_CHART_H
 
-    # ウィンドウ内データを時刻順で SVG パスに変換 (ギャップ > 15 分は M でリセット)
+    # ウィンドウ内データを時刻順で SVG パスに変換 (ギャップ > gap_minutes は M でリセット)
     filtered = [(dt, v) for dt, v in hr_points if window_start <= dt <= window_end]
     if not filtered:
         return HrChart()
 
+    gap = _td(minutes=gap_minutes)
     path_parts: list[str] = []
     prev_dt: _dt | None = None
     for dt, v in filtered:
         x, y = ts_x(dt), hr_y(v)
-        if prev_dt is None or (dt - prev_dt) > _td(minutes=15):
+        if prev_dt is None or (dt - prev_dt) > gap:
             path_parts.append(f"M {x:.1f} {y:.1f}")
         else:
             path_parts.append(f"L {x:.1f} {y:.1f}")

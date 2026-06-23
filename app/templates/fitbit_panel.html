@@ -83,10 +83,10 @@
   </div>
   {% endif %}
 
-  {# ── 睡眠バーチャート (7日) ── #}
+  {# ── 睡眠バーチャート (7日・実睡眠) ── #}
   {% if d.sleep_7day %}
   <div class="ph-section">
-    <div class="ph-section-label">Sleep · Last 7 Days</div>
+    <div class="ph-section-label">Sleep · Last 7 Days <span class="ph-section-note">実睡眠 (覚醒除く)</span></div>
     {%- set ns = namespace(max_min=480) %}
     {%- for day in d.sleep_7day %}
       {%- if day.minutes > ns.max_min %}{% set ns.max_min = day.minutes %}{% endif %}
@@ -96,7 +96,7 @@
       {%- for day in d.sleep_7day %}
       {%- set raw_h = (day.minutes / scale_max * 72) %}
       {%- set bar_h = [raw_h, 72] | min | round(1) %}
-      <div class="ph-sleep-col">
+      <div class="ph-sleep-col" title="{{ day.tip }}">
         {%- if day.minutes > 0 %}
         <div class="ph-sleep-val">{{ day.hours_str }}</div>
         <div class="ph-sleep-bar{% if day.is_today %} today{% endif %}" style="height:{{ bar_h }}px"></div>

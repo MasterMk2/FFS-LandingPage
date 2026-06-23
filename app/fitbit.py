@@ -168,9 +168,20 @@ async def _fetch_hr(window_start: datetime, window_end: datetime) -> list[tuple[
     return result
 
 
-async def _fetch_sleep(window_start: datetime, window_end: datetime) -> list[tuple[datetime, datetime]]:
-    """指定ウィンドウの睡眠データを取得。sleep はフィルタ非対応のため全取得してクライアント側でフィルタ。"""
-    periods: list[tuple[datetime, datetime]] = []
+async def _fetch_sleep(window_start: datetime, window_end: datetime) -> list[dict]:
+    """指定ウィンドウの睡眠セッションを取得。sleep はフィルタ非対応のため全取得して
+    クライアント側でフィルタ。
+
+    各セッションは dict で返す:
+      start / end       : 就床〜起床 (time in bed の区間 = HR チャートの睡眠帯用)
+      in_bed_min        : 就床時間 (summary.minutesInSleepPeriod)
+      asleep_min        : 実睡眠 (summary.minutesAsleep = 覚醒を除いた実際の睡眠)
+      deep/light/rem/awake : ステージ別分数 (stagesSummary、CLASSIC 記録では 0)
+
+    Charge 6 は STAGES (深い/浅い/REM/覚醒) と CLASSIC (覚醒判定のみ) の 2 種を返す。
+    実睡眠 (asleep_min) は就床時間より短く、覚醒帯を除いた値。
+    """
+    sessions: list[dict] = []
     page_token: str | None = None
     cutoff = window_start - timedelta(days=1)
 
@@ -193,15 +204,47 @@ async def _fetch_sleep(window_start: datetime, window_end: datetime) -> list[tup
                 continue
             s_dt = _parse_physical_time(start_ts)
             e_dt = _parse_physical_time(end_ts)
-            if s_dt and e_dt and e_dt >= cutoff:
-                periods.append((s_dt, e_dt))
+            if not (s_dt and e_dt and e_dt >= cutoff):
+                continue
+
+            summary = sleep.get("summary") or {}
+
+            def _imin(key: str) -> int:
+                try:
+                    return int(summary.get(key) or 0)
+                except (ValueError, TypeError):
+                    return 0
+
+            stages: dict[str, int] = {}
+            for st in summary.get("stagesSummary") or []:
+                t = (st.get("type") or "").upper()
+                try:
+                    stages[t] = stages.get(t, 0) + int(st.get("minutes") or 0)
+                except (ValueError, TypeError):
+                    pass
+
+            in_bed = _imin("minutesInSleepPeriod") or int((e_dt - s_dt).total_seconds() / 60)
+            asleep = _imin("minutesAsleep")
+            if asleep <= 0:  # CLASSIC 等で minutesAsleep が無い場合のフォールバック
+                asleep = stages.get("ASLEEP", 0) or in_bed
+
+            sessions.append({
+                "start": s_dt,
+                "end": e_dt,
+                "in_bed_min": in_bed,
+                "asleep_min": asleep,
+                "deep": stages.get("DEEP", 0),
+                "light": stages.get("LIGHT", 0),
+                "rem": stages.get("REM", 0),
+                "awake": stages.get("AWAKE", 0),
+            })
 
         page_token = data.get("nextPageToken")
         if not page_token:
             break
 
-    log.info("fitbit: fetched %d sleep periods", len(periods))
-    return periods
+    log.info("fitbit: fetched %d sleep sessions", len(sessions))
+    return sessions
 
 
 def _downsample(
@@ -275,10 +318,11 @@ async def get_fitbit_data() -> dict:
 
     # 睡眠は直近 2 日分だけ (ステータス + 24h バンド + サマリ用)
     sleep_recent = await _fetch_sleep(now - timedelta(days=2), window_end)
-    sleep_24h_bands = [
-        (s, e) for s, e in sleep_recent
-        if e >= window_start_24h and s <= window_end
+    sleep_24h = [
+        r for r in sleep_recent
+        if r["end"] >= window_start_24h and r["start"] <= window_end
     ]
+    sleep_24h_bands = [(r["start"], r["end"]) for r in sleep_24h]
 
     # 現在の心拍 (直近 30 分以内)
     current_hr: int | None = None
@@ -302,13 +346,16 @@ async def get_fitbit_data() -> dict:
         sampled_24h, sleep_24h_bands, window_start_24h, window_end, gap_minutes=15
     )
 
+    # 直近 24h の睡眠サマリ (実睡眠 + 就床 + ステージ内訳)
     sleep_summary = []
-    for s, e in sorted(sleep_24h_bands, key=lambda x: x[0]):
-        dur_min = int((e - s).total_seconds() / 60)
+    for r in sorted(sleep_24h, key=lambda x: x["start"]):
+        a, b = r["asleep_min"], r["in_bed_min"]
         sleep_summary.append({
-            "start": s.strftime("%m/%d %H:%M"),
-            "end": e.strftime("%m/%d %H:%M"),
-            "duration": f"{dur_min // 60}h {dur_min % 60:02d}m",
+            "start": r["start"].strftime("%m/%d %H:%M"),
+            "end": r["end"].strftime("%m/%d %H:%M"),
+            "asleep": f"{a // 60}h {a % 60:02d}m",
+            "in_bed": f"{b // 60}h {b % 60:02d}m",
+            "deep": r["deep"], "rem": r["rem"], "light": r["light"], "awake": r["awake"],
         })
 
     return {
@@ -341,23 +388,33 @@ async def get_fitbit_7d() -> dict:
 
     sleep_all = await _fetch_sleep(window_start_7d, window_end)
     sleep_7d_bands = [
-        (s, e) for s, e in sleep_all
-        if e >= window_start_7d and s <= window_end
+        (r["start"], r["end"]) for r in sleep_all
+        if r["end"] >= window_start_7d and r["start"] <= window_end
     ]
 
-    # 7 日バーチャート用: 日毎の合計睡眠時間 (起床日付 = end の JST 日付)
+    # 7 日バーチャート用: 日毎の合計「実睡眠」時間 (起床日付 = end の JST 日付)。
+    # 就床時間 (in_bed) ではなく覚醒を除いた asleep を集計する。ステージ内訳も合算。
     sleep_7day: list[dict] = []
     today = now.date()
     for i in range(7):
         day = today - timedelta(days=6 - i)
-        total_min = 0
-        for s_start, s_end in sleep_all:
-            if s_end.astimezone(_JST).date() == day:
-                total_min += int((s_end - s_start).total_seconds() / 60)
+        asleep = in_bed = deep = light = rem = 0
+        for r in sleep_all:
+            if r["end"].astimezone(_JST).date() == day:
+                asleep += r["asleep_min"]
+                in_bed += r["in_bed_min"]
+                deep += r["deep"]
+                light += r["light"]
+                rem += r["rem"]
+        tip = f"実睡眠 {asleep // 60}h{asleep % 60:02d}m / 就床 {in_bed // 60}h{in_bed % 60:02d}m"
+        if deep or rem or light:
+            tip += f" · 深い{deep}m REM{rem}m 浅い{light}m"
         sleep_7day.append({
             "label": f"{day.month}/{day.day}",
-            "minutes": total_min,
-            "hours_str": f"{total_min // 60}h {total_min % 60:02d}m" if total_min else "",
+            "minutes": asleep,  # バー高さ = 実睡眠
+            "hours_str": f"{asleep // 60}h {asleep % 60:02d}m" if asleep else "",
+            "in_bed_str": f"{in_bed // 60}h {in_bed % 60:02d}m" if in_bed else "",
+            "tip": tip,
             "is_today": day == today,
         })
 

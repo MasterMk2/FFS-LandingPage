@@ -1,0 +1,115 @@
+{# Pilot Health パネル — Google Health API (Fitbit Charge 6) #}
+{% if error %}
+  <p class="error">{{ error }}</p>
+{% elif d is none %}
+  <p class="loading">loading…</p>
+{% else %}
+<div class="ph-card">
+
+  {# ── ヘッダ: 心拍 + ステータス ── #}
+  <div class="ph-header">
+    <div class="ph-hr-block">
+      <div class="ph-hr-num">
+        {%- if d.current_hr -%}
+          <span class="ph-bpm">{{ d.current_hr }}</span><span class="ph-bpm-unit">bpm</span>
+        {%- else -%}
+          <span class="ph-bpm ph-na">—</span>
+        {%- endif -%}
+      </div>
+      <div class="ph-hr-label">Heart Rate</div>
+    </div>
+    <span class="ph-chip ph-chip--{{ d.sleep_status }}">
+      {%- if d.sleep_status == "sleeping" -%}💤 Sleeping
+      {%- elif d.sleep_status == "recent" -%}☀️ Just Woke Up
+      {%- else -%}✈️ Awake{%- endif -%}
+    </span>
+  </div>
+
+  {# ── HR トレンドチャート (直近24時間) ── #}
+  {% if d.chart_24h.points > 0 %}
+  <div class="ph-section">
+    <div class="ph-section-label">Heart Rate · Last 24 Hours</div>
+    <div class="ph-chart-wrap">
+      <svg viewBox="0 0 720 80" preserveAspectRatio="none" width="100%" height="80">
+        {%- for r in d.chart_24h.sleep_rects %}
+        <rect x="{{ r.x }}" y="0" width="{{ r.w }}" height="80" class="ph-sleep-band"/>
+        {%- endfor %}
+        {%- for m in d.chart_24h.day_markers %}
+        <line x1="{{ m.x }}" y1="0" x2="{{ m.x }}" y2="80" class="ph-day-sep" vector-effect="non-scaling-stroke"/>
+        {%- endfor %}
+        <path d="{{ d.chart_24h.hr_path }}" class="ph-hr-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+      {%- if d.chart_24h.day_markers %}
+      <div class="ph-day-labels">
+        {%- for m in d.chart_24h.day_markers %}
+        <span class="ph-day-label" style="left:{{ (m.x / 720 * 100) | round(1) }}%">{{ m.label }}</span>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+    </div>
+    <div class="ph-chart-meta">
+      <span>{{ d.win24h_start }} – {{ d.window_end }} JST</span>
+      <span>{{ d.chart_24h.vmin | int }}–{{ d.chart_24h.vmax | int }} bpm</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── HR トレンドチャート (7日) ── #}
+  {% if d.chart_7d.points > 0 %}
+  <div class="ph-section">
+    <div class="ph-section-label">Heart Rate · 7 Days</div>
+    <div class="ph-chart-wrap">
+      <svg viewBox="0 0 720 80" preserveAspectRatio="none" width="100%" height="80">
+        {%- for r in d.chart_7d.sleep_rects %}
+        <rect x="{{ r.x }}" y="0" width="{{ r.w }}" height="80" class="ph-sleep-band"/>
+        {%- endfor %}
+        {%- for m in d.chart_7d.day_markers %}
+        <line x1="{{ m.x }}" y1="0" x2="{{ m.x }}" y2="80" class="ph-day-sep" vector-effect="non-scaling-stroke"/>
+        {%- endfor %}
+        <path d="{{ d.chart_7d.hr_path }}" class="ph-hr-line" vector-effect="non-scaling-stroke"/>
+      </svg>
+      {%- if d.chart_7d.day_markers %}
+      <div class="ph-day-labels">
+        {%- for m in d.chart_7d.day_markers %}
+        <span class="ph-day-label" style="left:{{ (m.x / 720 * 100) | round(1) }}%">{{ m.label }}</span>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+    </div>
+    <div class="ph-chart-meta">
+      <span>{{ d.win7d_start }} – {{ d.window_end }} JST</span>
+      <span>{{ d.chart_7d.vmin | int }}–{{ d.chart_7d.vmax | int }} bpm</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── 睡眠バーチャート (7日) ── #}
+  {% if d.sleep_7day %}
+  <div class="ph-section">
+    <div class="ph-section-label">Sleep · Last 7 Days</div>
+    {%- set ns = namespace(max_min=480) %}
+    {%- for day in d.sleep_7day %}
+      {%- if day.minutes > ns.max_min %}{% set ns.max_min = day.minutes %}{% endif %}
+    {%- endfor %}
+    {%- set scale_max = ns.max_min * 1.15 %}
+    <div class="ph-sleep-bars">
+      {%- for day in d.sleep_7day %}
+      {%- set raw_h = (day.minutes / scale_max * 72) %}
+      {%- set bar_h = [raw_h, 72] | min | round(1) %}
+      <div class="ph-sleep-col">
+        {%- if day.minutes > 0 %}
+        <div class="ph-sleep-val">{{ day.hours_str }}</div>
+        <div class="ph-sleep-bar{% if day.is_today %} today{% endif %}" style="height:{{ bar_h }}px"></div>
+        {%- else %}
+        <div class="ph-sleep-bar ph-sleep-bar--none"></div>
+        {%- endif %}
+        <div class="ph-sleep-lbl{% if day.is_today %} today{% endif %}">{{ day.label }}</div>
+      </div>
+      {%- endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="ph-footer">Updated {{ age }}</div>
+</div>
+{% endif %}

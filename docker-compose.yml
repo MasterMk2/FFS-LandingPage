@@ -43,9 +43,18 @@ services:
       # psutil にホスト側 /proc を読ませて、コンテナ namespace でなく
       # ホスト全体の CPU / mem / loadavg を計測する。
       HOST_PROC: "/host/proc"
+      # Fitbit Web API / Pilot Health パネル
+      # Client ID/Secret は Google Cloud Console の Google Health API のもの。
+      # fitbit_auth.py で取得した FITBIT_REFRESH_TOKEN を .env に設定。
+      FITBIT_CLIENT_ID: "${FITBIT_CLIENT_ID:-}"
+      FITBIT_CLIENT_SECRET: "${FITBIT_CLIENT_SECRET:-}"
+      FITBIT_REFRESH_TOKEN: "${FITBIT_REFRESH_TOKEN:-}"
+      FITBIT_TOKEN_FILE: "/data/fitbit_tokens.json"
     volumes:
       # ホストリソース監視用。read-only で /proc だけ露出 (/sys や / は不要)。
       - /proc:/host/proc:ro
+      # Fitbit refresh token 永続化用 (コンテナ再起動でも token が消えない)。
+      - ./data:/data
     networks:
       - dcs_network
       - db_network   # ffs-postgres 読み取り専用 SELECT (FPS/CPU/メモリ)

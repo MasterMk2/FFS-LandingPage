@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Known Issues &amp; Fixes — FFS DCS{% endblock %}
+{% block content %}
+<section class="fixes-page">
+  <header class="fixes-header">
+    <h2>Known Issues &amp; Fixes</h2>
+    <p class="subtle">サーバ運用中に発見された既知の問題と修正方法をまとめています。</p>
+  </header>
+
+  <article class="fix-article" id="wine-stub-crash">
+    <h3>[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</h3>
+
+    <div class="fix-meta">
+      <span class="fix-tag">Wine / Linux</span>
+      <span class="fix-tag">DCS 2.9.27.24969</span>
+      <span class="fix-tag">msvcp140_atomic_wait.dll</span>
+    </div>
+
+    <section class="fix-section">
+      <h4>Environment</h4>
+      <ul>
+        <li>DCS World Server <code>2.9.27.24969</code> (2026-06 時点の最新)</li>
+        <li>Linux 上で Wine + Docker (<code>aterfax/dcs-world-dedicated-server</code>) を使用して起動</li>
+        <li>影響範囲: Wine ベースの Linux DCS サーバ全般 (DCSSB Option C / Linux-native 含む)</li>
+        <li>影響 Wine バージョン: wine-8.0 (Debian bookworm デフォルト)、wine-11.0 upstream も初期は未修正</li>
+      </ul>
+    </section>
+
+    <section class="fix-section">
+      <h4>Symptom</h4>
+      <p>DCS 専用サーバ (<code>DCS_server.exe</code>) がログ出力なしに起動直後クラッシュ。Wine が以下を報告:</p>
+<pre class="fix-pre"><code>EXCEPTION_WINE_STUB: 0x80000100</code></pre>
+      <p><code>WINEDEBUG=err+module</code> を設定すると:</p>
+<pre class="fix-pre"><code>err:module:import_dll Library MSVCP140_ATOMIC_WAIT.dll (which is needed by DCS_server.exe) not found
+err:module:loader_init Importing dlls for DCS_server.exe failed, status c0000135</code></pre>
+      <p>サーバは <code>dcs.log</code> を書かず、<code>Listening on port XXXXX</code> にも到達しない。</p>
+    </section>
+
+    <section class="fix-section">
+      <h4>Root Cause</h4>
+      <p>DCS <code>2.9.27.24969</code> で <code>msvcp140.dll</code> の依存関係が更新され、<code>msvcp140_atomic_wait.dll</code> から
+      <code>__std_tzdb_get_sys_info</code> と <code>__std_tzdb_delete_sys_info</code> を <strong>静的インポート</strong> するようになった。</p>
+      <p>これらは C++ STL の chrono タイムスタンプ書式化で使用するタイムゾーン DB クエリ関数。
+      wine-8.0 および wine-11.0 の <code>msvcp140_atomic_wait.dll</code> はこれらのエクスポートが <code>@ stub</code> のみで、
+      DCS が DLL ロード時に呼び出そうとすると <code>EXCEPTION_WINE_STUB (0x80000100)</code> が発生してアボートする。</p>
+      <p>関連する Microsoft STL ABI (<code>_Sys_info</code> 構造体):</p>
+<pre class="fix-pre"><code>struct tzdb_sys_info {
+    int32_t error;      // offset 0 (0=success)
+    // 4 bytes padding
+    double begin;       // offset 8  — range start (epoch ms)
+    double end;         // offset 16 — range end   (epoch ms)
+    int32_t offset;     // offset 24 — UTC offset in ms
+    int32_t save;       // offset 28 — DST offset in ms
+    char   *abbrev;     // offset 32 — timezone abbreviation
+};                      // total: 40 bytes (_CRT_PACKING=8)</code></pre>
+    </section>
+
+    <section class="fix-section">
+      <h4>Fix</h4>
+      <p>wine-11.0 ソースから、問題の 2 関数を最小限実装したパッチ済み <code>msvcp140_atomic_wait.dll</code> をビルドして置き換える。</p>
+
+      <h5>1. spec ファイルの編集 (<code>dlls/msvcp140_atomic_wait/msvcp140_atomic_wait.spec</code>)</h5>
+      <p>2 つの stub エントリを実エクスポートに変更:</p>
+<pre class="fix-pre"><code>@ stdcall __std_tzdb_get_sys_info(ptr long double)
+@ stdcall __std_tzdb_delete_sys_info(ptr)</code></pre>
+      <p>また <code>__std_atomic_*_indirect</code> / <code>__std_atomic_*_cmpxchg16b</code> の <code>@ stub</code> エントリがあれば合わせて削除 (別のクラッシュ源)。</p>
+
+      <h5>2. <code>main.c</code> に実装を追加</h5>
+<pre class="fix-pre"><code>struct tzdb_sys_info {
+    enum tzdb_error error;
+    double begin;
+    double end;
+    int32_t offset;
+    int32_t save;
+    char *abbrev;
+};
+
+struct tzdb_sys_info * __stdcall __std_tzdb_get_sys_info(const char *name, size_t len, double sys)
+{
+    struct tzdb_sys_info *info = calloc(1, sizeof(*info));
+    if (!info) return NULL;
+    info->error  = TZDB_ERROR_SUCCESS;
+    info->begin  = -1e15;
+    info->end    =  1e15;
+    info->offset = 0;
+    info->save   = 0;
+    info->abbrev = malloc(4);
+    if (info->abbrev) {
+        info->abbrev[0] = 'U';
+        info->abbrev[1] = 'T';
+        info->abbrev[2] = 'C';
+        info->abbrev[3] = 0;
+    }
+    return info;
+}
+
+void __stdcall __std_tzdb_delete_sys_info(struct tzdb_sys_info *info)
+{
+    if (!info) return;
+    free(info->abbrev);
+    free(info);
+}</code></pre>
+
+      <h5>3. ビルドとインストール</h5>
+<pre class="fix-pre"><code># Debian bookworm コンテナ内 (winehq-stable インストール済み):
+apt-get source winehq-stable   # または wine-11.0 ソースを tarball で取得
+# 上記の編集を適用後:
+./configure --without-x --without-freetype --enable-win64
+cd dlls/msvcp140_atomic_wait && make
+
+# インストール
+cp .libs/msvcp140_atomic_wait.dll     /opt/wine-stable/lib/wine/x86_64-windows/
+cp .libs/msvcp140_atomic_wait.dll.so  /opt/wine-stable/lib/wine/x86_64-unix/</code></pre>
+
+      <h5>4. Wine prefix の修正 (wine-8.0 から移行した場合)</h5>
+      <p>wine-8.0 で初期化した prefix があるときは追加で 2 点の対処が必要:</p>
+<pre class="fix-pre"><code># a) system32 内の旧 128KB native PE stub を wine-11.0 の 2KB fake PE stub に置換
+cp /opt/wine-stable/lib/wine/x86_64-windows/msvcp140_atomic_wait.dll \
+   "$WINEPREFIX/drive_c/windows/system32/msvcp140_atomic_wait.dll"
+
+# b) user.reg を修正 — wine-8.0 は DLL を "native" 登録しておりロードが壊れる
+sed -i 's/"[*]msvcp140_atomic_wait"="native"/"*msvcp140_atomic_wait"="builtin"/' \
+   "$WINEPREFIX/user.reg"</code></pre>
+    </section>
+
+    <section class="fix-section">
+      <h4>Known Side Effect</h4>
+      <p>DCS ログのタイムスタンプが UTC 固定になる (実装は常に UTC offset=0 を返す)。表示上のみの問題でゲームプレイへの影響なし。</p>
+    </section>
+
+    <section class="fix-section">
+      <h4>Tested on</h4>
+      <ul>
+        <li>DCS <code>2.9.27.24969</code>、wine-stable <code>11.0.0.0~bookworm-1</code></li>
+        <li>Linux、Docker、DCSSB Option C (Linux-native bot が Wine DCS を管理)</li>
+        <li>3 サーバインスタンス全て <code>simulation started, state=ssRunning</code> に到達することを確認</li>
+      </ul>
+    </section>
+  </article>
+</section>
+{% endblock %}

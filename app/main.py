@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import cache, db, dcssb, sysmon
+from . import cache, db, dcssb, fitbit as _fitbit, sysmon
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,7 +68,10 @@ tracks_cache = cache.Fetcher(
 sysmon_cache = cache.Fetcher(
     fetch=sysmon.sample, interval=15, name="sysmon"
 )
-ALL_CACHES = [servers_cache, load_cache, highscore_cache, tracks_cache, sysmon_cache]
+fitbit_cache = cache.Fetcher(
+    fetch=_fitbit.get_fitbit_data, interval=60, name="fitbit"
+)
+ALL_CACHES = [servers_cache, load_cache, highscore_cache, tracks_cache, sysmon_cache, fitbit_cache]
 
 
 @asynccontextmanager
@@ -199,6 +202,39 @@ def _processed_servers_from_cache() -> list:
     return _expand_extensions(result.data)
 
 
+def _filter_ghost_players(servers: list) -> list:
+    """players から実際に飛んでないエントリを除去する。
+
+    DCSSB RestAPI `/servers` は内部の `server.players.values()` をそのまま
+    返すため、以下が混在する:
+      - DCS 本体の Server エントリ (id=1, nick='Server', unit_type='')
+      - 退出後に dict から消え切ってない切断プレイヤー (unit_type='')
+      - ブリーフィング / slot-select 画面の Spectator (unit_type='')
+
+    PlayerEntry スキーマには active/connected が含まれないので、
+    `unit_type` が非空 (= 実スロットに座っている) なものだけ残す。
+    副作用として "接続中だが slot 未選択" も非表示になるが、ランディング用途
+    としては "誰が今飛んでるか" の方が欲しい情報なので許容する。
+    """
+    out: list = []
+    for s in servers:
+        players = s.get("players")
+        if isinstance(players, list):
+            filtered = [
+                p
+                for p in players
+                if isinstance(p, dict) and (p.get("unit_type") or "").strip()
+            ]
+            s2 = dict(s)
+            s2["players"] = filtered
+            if s.get("num_players") is not None:
+                s2["num_players"] = len(filtered)
+            out.append(s2)
+        else:
+            out.append(s)
+    return out
+
+
 def _fmt_age(dt: datetime | None) -> str:
     if dt is None:
         return "no data yet"
@@ -225,7 +261,14 @@ def _home_stats() -> dict:
     running = sum(
         1 for s in servers if (s.get("status") or "").lower() == "running"
     )
-    total_players = sum(len(s.get("players") or []) for s in servers)
+    total_players = sum(
+        sum(
+            1
+            for p in (s.get("players") or [])
+            if isinstance(p, dict) and (p.get("unit_type") or "").strip()
+        )
+        for s in servers
+    )
     # tracks cache から総数を合算。unavailable サーバは 0 として扱う。
     tracks_c = tracks_cache.get()
     tracks_total = 0
@@ -252,6 +295,16 @@ async def home(request: Request):
     )
 
 
+@app.get("/guide", response_class=HTMLResponse)
+async def guide_page(request: Request):
+    return templates.TemplateResponse("guide.html", {"request": request})
+
+
+@app.get("/known-issues", response_class=HTMLResponse)
+async def known_issues(request: Request):
+    return templates.TemplateResponse("known_issues.html", {"request": request})
+
+
 @app.get("/status", response_class=HTMLResponse)
 async def status_page(request: Request):
     return templates.TemplateResponse(
@@ -272,7 +325,7 @@ async def panel_servers(request: Request):
     if result is not None:
         if result.ok and isinstance(result.data, list):
             servers = sorted(
-                _expand_extensions(result.data),
+                _filter_ghost_players(_expand_extensions(result.data)),
                 key=lambda s: s.get("name") or "",
             )
         elif result.error:
@@ -295,6 +348,30 @@ async def panel_servers(request: Request):
             "global_ext_names": global_ext_names,
             "load_by_name": load_by_name,
             "load_window_minutes": db.HISTORY_MINUTES,
+        },
+    )
+
+
+@app.get("/health", response_class=HTMLResponse)
+async def health_page(request: Request):
+    return templates.TemplateResponse("health.html", {"request": request})
+
+
+@app.get("/panel/fitbit", response_class=HTMLResponse)
+async def panel_fitbit(request: Request):
+    cached = fitbit_cache.get()
+    data = cached.value
+    error = cached.error
+    if data and data.get("error"):
+        error = data["error"]
+        data = None
+    return templates.TemplateResponse(
+        "fitbit_panel.html",
+        {
+            "request": request,
+            "d": data,
+            "error": error,
+            "age": _fmt_age(cached.fetched_at),
         },
     )
 

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Player Guide — FFS DCS{% endblock %}
+{% block content %}
+<section class="guide-page">
+  <header class="guide-header">
+    <h2>Player Guide</h2>
+    <p class="subtle">
+      FFS DCS サーバへの参加・SRS/Tacview/LotATC 設定・Discord bot 連動・Sneaker/Lardoon の使い方をまとめたプレイヤー向けガイドです。
+    </p>
+    <p class="guide-actions">
+      <a class="guide-btn" href="{{ url_for('static', path='guide/player-guide.pdf') }}" download>PDF をダウンロード</a>
+      <a class="guide-btn guide-btn-secondary" href="{{ url_for('static', path='guide/player-guide.pdf') }}" target="_blank" rel="noopener">別タブで開く</a>
+    </p>
+  </header>
+  <div class="guide-embed">
+    <iframe src="{{ url_for('static', path='guide/player-guide.pdf') }}#view=FitH" title="FFS DCS Player Guide"></iframe>
+  </div>
+  <p class="guide-fallback subtle">
+    ブラウザで PDF が表示されない場合は上のダウンロードボタンから取得してください。
+  </p>
+</section>
+{% endblock %}

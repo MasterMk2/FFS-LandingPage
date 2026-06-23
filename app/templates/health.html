@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Pilot Health — FFS{% endblock %}
+{% block content %}
+<h2 class="section-title">Owner's Health</h2>
+<section
+  id="fitbit"
+  hx-get="/panel/fitbit"
+  hx-trigger="load, every 60s"
+  hx-swap="innerHTML">
+  <p class="loading">loading...</p>
+</section>
+{% endblock %}

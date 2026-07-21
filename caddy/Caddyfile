@@ -32,7 +32,10 @@
 (iyakusai_common) {
 	root * /srv/iyakusai
 	encode zstd gzip
-	file_server
+
+	handle {
+		file_server
+	}
 	log
 }
 

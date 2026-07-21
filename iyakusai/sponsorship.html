@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ご協賛のお願い - 医薬祭2026 - 富山大学</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --c-bg: #faf6ec;
+      --c-bg-warm: #f4ead2;
+      --c-surface: #ffffff;
+      --c-surface-soft: #fbf5e1;
+      --c-accent: #4CAF50;
+      --c-accent-deep: #2E7D32;
+      --c-accent-soft: #C8E6C9;
+      --c-leaf-pale: #e8f3e1;
+      --c-text: #3a4a31;
+      --c-text-soft: #5b6b50;
+      --c-text-muted: #87937a;
+      --c-border: #ece1c4;
+      --c-border-strong: #d8caa3;
+      --shadow-sm: 0 2px 6px rgba(80, 100, 50, 0.06);
+      --shadow-md: 0 10px 28px rgba(80, 100, 50, 0.08);
+      --font-display: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif;
+      --font-body: 'Noto Sans JP', 'Zen Maru Gothic', sans-serif;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100vh;
+      line-height: 1.85;
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+
+    /* ─── Soft decorative blobs ─── */
+    .deco { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+    .deco .blob { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.45; }
+    .deco .blob-1 { width: 460px; height: 460px; background: var(--c-leaf-pale); top: -10%; left: -8%; }
+    .deco .blob-2 { width: 380px; height: 380px; background: #ffe8c0; bottom: -10%; right: -10%; }
+
+    /* ─── Top nav ─── */
+    .top-nav {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(250, 246, 236, 0.85);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--c-border);
+    }
+    .nav-logo {
+      font-family: var(--font-display); font-weight: 900; font-size: 1rem;
+      letter-spacing: 0.06em; color: var(--c-text); text-decoration: none;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .nav-logo .nav-leaf {
+      display: inline-block; width: 14px; height: 14px;
+      background: var(--c-accent); border-radius: 50% 0 50% 50%; transform: rotate(-25deg);
+    }
+    .nav-tabs { list-style: none; display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }
+    .nav-tabs a {
+      display: inline-block; min-width: 5.4em; text-align: center;
+      font-size: 0.9rem; font-weight: 500; color: var(--c-text-soft);
+      text-decoration: none; padding: 0.5rem 0.95rem; border-radius: 999px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-tabs a:hover { color: var(--c-accent-deep); background: var(--c-leaf-pale); }
+    .nav-tabs a.active {
+      color: #fff; background: var(--c-accent);
+      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.25);
+    }
+
+    .content { position: relative; z-index: 2; }
+
+    /* ─── Page header ─── */
+    .page-header { max-width: 920px; margin: 0 auto; padding: 5rem 2rem 2rem; text-align: center; }
+    .page-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 16px; background: #fff; border: 1px solid var(--c-border);
+      border-radius: 999px; font-size: 0.78rem; font-weight: 700;
+      color: var(--c-accent-deep); letter-spacing: 0.06em;
+      margin-bottom: 1.6rem; box-shadow: var(--shadow-sm);
+    }
+    .page-badge .dot { width: 7px; height: 7px; background: var(--c-accent); border-radius: 50%; }
+    .page-title {
+      font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900; line-height: 1.4; color: var(--c-text); margin-bottom: 0.6rem;
+    }
+    .page-title .accent { color: var(--c-accent-deep); }
+    .page-subtitle {
+      font-size: clamp(0.85rem, 1.5vw, 1rem); font-weight: 500;
+      letter-spacing: 0.12em; color: var(--c-text-muted);
+    }
+
+    /* ─── Section ─── */
+    .section { max-width: 920px; margin: 0 auto; padding: 2.5rem 2rem; }
+    .section-label {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: var(--font-display); font-size: 0.85rem; font-weight: 700;
+      color: var(--c-accent-deep); margin-bottom: 0.8rem;
+    }
+    .section-label::before {
+      content: ''; display: inline-block; width: 12px; height: 12px;
+      background: var(--c-accent); border-radius: 50% 0 50% 50%; transform: rotate(-25deg);
+    }
+    .section-heading {
+      font-family: var(--font-display); font-size: clamp(1.4rem, 3vw, 1.85rem);
+      font-weight: 900; margin-bottom: 1.2rem; line-height: 1.5; color: var(--c-text);
+    }
+    .section-body { color: var(--c-text-soft); font-size: 1rem; line-height: 2; }
+    .section-body strong { color: var(--c-accent-deep); font-weight: 700; }
+
+    /* ─── ごあいさつ ─── */
+    .greeting-card {
+      margin-top: 1.4rem; padding: 2rem;
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: 20px; box-shadow: var(--shadow-sm);
+      color: var(--c-text-soft); font-size: 0.95rem; line-height: 2;
+    }
+    .greeting-card .salutation { font-weight: 700; color: var(--c-text); }
+    .greeting-card .closing { text-align: right; margin-top: 1rem; color: var(--c-text); }
+    .greeting-sign {
+      margin-top: 1.4rem; padding-top: 1.2rem; border-top: 1px dashed var(--c-border-strong);
+      text-align: right; font-size: 0.88rem; color: var(--c-text); line-height: 1.9;
+    }
+    .greeting-sign .org { font-family: var(--font-display); font-weight: 700; }
+
+    /* ─── 汎用テーブル ─── */
+    .table-wrap {
+      margin-top: 1.6rem; overflow-x: auto;
+      border-radius: 16px; box-shadow: var(--shadow-sm);
+      border: 1px solid var(--c-border); background: var(--c-surface);
+    }
+    table.t {
+      width: 100%; border-collapse: collapse; font-size: 0.92rem; min-width: 520px;
+    }
+    table.t th, table.t td {
+      border-bottom: 1px solid var(--c-border); padding: 0.9rem 1.1rem;
+      text-align: left; vertical-align: top;
+    }
+    table.t thead th {
+      font-family: var(--font-display); font-size: 0.82rem; font-weight: 900;
+      color: #fff; background: var(--c-accent); border-bottom: none;
+      white-space: nowrap;
+    }
+    table.t tbody th {
+      font-family: var(--font-display); font-weight: 700; color: var(--c-text);
+      background: var(--c-surface-soft); white-space: nowrap; width: 1%;
+    }
+    table.t tbody td { color: var(--c-text-soft); }
+    table.t tbody tr:last-child th, table.t tbody tr:last-child td { border-bottom: none; }
+    table.t tbody tr:hover th, table.t tbody tr:hover td { background: var(--c-leaf-pale); }
+    .t-num { font-family: var(--font-display); font-weight: 900; color: var(--c-accent-deep); white-space: nowrap; }
+    .t-note { margin-top: 0.9rem; font-size: 0.82rem; color: var(--c-text-muted); line-height: 1.8; }
+
+    /* ─── パッケージプランのハイライト行 ─── */
+    tr.plan-row th { font-size: 0.95rem; }
+    .plan-price { font-family: var(--font-display); font-weight: 900; color: var(--c-accent-deep); white-space: nowrap; }
+
+    /* ─── HP掲載の導線カード ─── */
+    .hp-callout {
+      margin-top: 1.6rem; padding: 1.7rem 1.9rem;
+      background: linear-gradient(135deg, #ffffff, var(--c-leaf-pale));
+      border: 1px solid var(--c-accent-soft); border-radius: 20px;
+      box-shadow: var(--shadow-sm);
+      display: flex; align-items: center; gap: 1.4rem; flex-wrap: wrap;
+    }
+    .hp-callout-body { flex: 1 1 260px; min-width: 240px; }
+    .hp-callout h3 {
+      font-family: var(--font-display); font-size: 1.05rem; font-weight: 900;
+      color: var(--c-text); margin-bottom: 0.4rem;
+    }
+    .hp-callout p { font-size: 0.9rem; color: var(--c-text-soft); line-height: 1.9; }
+    .hp-sizes { display: flex; align-items: flex-end; gap: 0.9rem; flex: 0 0 auto; }
+    .hp-size-chip { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .hp-size-box {
+      background: #fff; border: 2px solid var(--c-accent);
+      border-radius: 8px; box-shadow: var(--shadow-sm);
+    }
+    .hp-size-box.lg { width: 62px; height: 62px; }
+    .hp-size-box.md { width: 44px; height: 44px; }
+    .hp-size-box.sm { width: 28px; height: 28px; }
+    .hp-size-cap { font-size: 0.68rem; color: var(--c-text-muted); font-weight: 700; }
+
+    /* ─── CTA ─── */
+    .pill-cta {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-top: 1.4rem; padding: 0.85rem 1.7rem;
+      background: var(--c-accent); color: #fff;
+      font-family: var(--font-display); font-weight: 700; font-size: 0.95rem;
+      letter-spacing: 0.04em; text-decoration: none; border-radius: 999px;
+      box-shadow: 0 8px 20px rgba(76, 175, 80, 0.25);
+      transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .pill-cta:hover {
+      transform: translateY(-2px); background: var(--c-accent-deep);
+      box-shadow: 0 12px 26px rgba(76, 175, 80, 0.34);
+    }
+    .pill-cta.ghost {
+      background: #fff; color: var(--c-accent-deep);
+      border: 1px solid var(--c-accent); box-shadow: var(--shadow-sm);
+    }
+    .pill-cta.ghost:hover { background: var(--c-leaf-pale); }
+
+    /* ─── 資料ダウンロード ─── */
+    .dl-card {
+      margin-top: 1.6rem; padding: 1.6rem 1.8rem;
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: 20px; box-shadow: var(--shadow-sm);
+      display: flex; align-items: center; gap: 1.3rem; flex-wrap: wrap;
+    }
+    .dl-icon {
+      width: 52px; height: 52px; flex: 0 0 auto;
+      border-radius: 14px; background: var(--c-leaf-pale);
+      display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+    }
+    .dl-body { flex: 1 1 240px; min-width: 200px; }
+    .dl-body h3 {
+      font-family: var(--font-display); font-size: 1rem; font-weight: 900;
+      color: var(--c-text); margin-bottom: 0.2rem;
+    }
+    .dl-meta { font-size: 0.8rem; color: var(--c-text-muted); }
+    .dl-card .pill-cta { margin-top: 0; flex: 0 0 auto; }
+
+    /* ─── 注意カード ─── */
+    .note-card {
+      margin-top: 1.4rem; padding: 1.5rem 1.7rem;
+      background: var(--c-surface-soft); border: 1px solid var(--c-border);
+      border-radius: 16px; font-size: 0.92rem; color: var(--c-text-soft); line-height: 1.95;
+    }
+    .note-card h3 {
+      font-family: var(--font-display); font-size: 0.98rem; font-weight: 700;
+      color: var(--c-accent-deep); margin-bottom: 0.5rem;
+    }
+
+    /* ─── お問い合わせカード ─── */
+    .contact-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.3rem; margin-top: 1.7rem;
+    }
+    .contact-card {
+      background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: 20px; padding: 1.6rem; box-shadow: var(--shadow-sm);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .contact-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .contact-icon {
+      width: 44px; height: 44px; border-radius: 12px; background: var(--c-leaf-pale);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 0.9rem; font-size: 1.15rem;
+    }
+    .contact-label {
+      font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em;
+      color: var(--c-text-muted); margin-bottom: 0.4rem;
+    }
+    .contact-value { font-size: 1rem; color: var(--c-text); line-height: 1.7; font-weight: 500; word-break: break-word; }
+    .contact-value a { text-decoration: none; color: var(--c-accent-deep); font-weight: 700; }
+    .contact-value a:hover { text-decoration: underline; }
+
+    /* ─── Footer ─── */
+    footer {
+      text-align: center; padding: 3.5rem 2rem 2.5rem;
+      font-size: 0.82rem; color: var(--c-text-muted);
+      border-top: 1px solid var(--c-border); background: var(--c-surface-soft);
+      margin-top: 3rem;
+    }
+    .footer-sns { display: inline-flex; gap: 10px; margin-bottom: 1.2rem; }
+    .footer-sns-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; color: #fff; text-decoration: none; font-weight: 900;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .footer-sns-icon.ig { background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%); }
+    .footer-sns-icon.x { background: #0f1419; font-family: var(--font-display); }
+    .footer-sns-icon:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(80, 100, 50, 0.2); }
+    footer .footer-logo {
+      font-family: var(--font-display); font-weight: 900; font-size: 1.05rem;
+      margin-bottom: 0.5rem; color: var(--c-text); letter-spacing: 0.04em;
+    }
+
+    @media (max-width: 600px) {
+      .top-nav { padding: 0.7rem 1rem; }
+      .nav-logo { font-size: 0.85rem; }
+      .nav-tabs { gap: 0.2rem; }
+      .nav-tabs a { font-size: 0.78rem; padding: 0.35rem 0.6rem; min-width: 0; }
+      .page-header { padding: 3rem 1.5rem 1.5rem; }
+      .section { padding: 2rem 1.5rem; }
+      .greeting-card { padding: 1.5rem 1.3rem; }
+      .hp-callout { padding: 1.5rem 1.3rem; }
+      .contact-card { padding: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top nav -->
+  <nav class="top-nav">
+    <a class="nav-logo" href="index.html">
+      <span class="nav-leaf"></span>
+      IYAKUSAI 2026
+    </a>
+    <ul class="nav-tabs">
+      <li><a href="index.html">ホーム</a></li>
+      <li><a href="recruitment.html">新歓募集</a></li>
+      <li><a href="exhibitor-briefing.html">出展説明会</a></li>
+      <li><a href="sponsorship.html" class="active">ご協賛</a></li>
+      <li><a href="contact.html">お問い合わせ</a></li>
+    </ul>
+  </nav>
+
+  <!-- Soft decorative blobs -->
+  <div class="deco">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <div class="content">
+
+    <header class="page-header">
+      <div class="page-badge">
+        <span class="dot"></span>
+        Sponsorship — ご協賛のお願い
+      </div>
+      <h1 class="page-title">ご協賛の<span class="accent">お願い</span></h1>
+      <p class="page-subtitle">Call for Sponsorship — 医学薬学祭 2026</p>
+    </header>
+
+    <!-- ごあいさつ -->
+    <section class="section">
+      <div class="section-label">Greeting</div>
+      <h2 class="section-heading">ごあいさつ</h2>
+      <div class="greeting-card">
+        <p class="salutation">拝啓　時下ますますご清栄のこととお慶び申し上げます。</p>
+        <p>
+          平素より、富山大学医学部・薬学部の学生活動に格別のご理解とご支援を賜り、厚く御礼申し上げます。<br>
+          このたび、学生が主体となって企画・運営する「医学薬学祭」を開催する運びとなりました。本祭は、地域の皆様、企業・団体の皆様、学生・教職員が交流する機会を創出し、医療・薬学分野を学ぶ学生の活動を地域へ発信することを目的としております。<br>
+          つきましては、本祭の趣旨にご賛同いただき、協賛金または広告掲載等の形でご支援を賜りたく、下記のとおりご案内申し上げます。何卒ご検討のほどよろしくお願い申し上げます。
+        </p>
+        <p class="closing">敬具</p>
+        <div class="greeting-sign">
+          令和8年7月吉日<br>
+          <span class="org">富山大学 医学薬学祭実行委員会</span><br>
+          委員長　西野 耀史<br>
+          渉外課長　平野 匠人
+        </div>
+      </div>
+    </section>
+
+    <!-- 開催概要 -->
+    <section class="section">
+      <div class="section-label">Overview</div>
+      <h2 class="section-heading">開催概要</h2>
+      <div class="table-wrap">
+        <table class="t">
+          <tbody>
+            <tr><th>名称</th><td>医学薬学祭</td></tr>
+            <tr><th>主催</th><td>富山大学医学薬学祭実行委員会</td></tr>
+            <tr><th>開催日</th><td>令和8年10月17日（土）10:00〜18:00　〜　10月18日（日）10:00〜17:00</td></tr>
+            <tr><th>会場</th><td>富山大学 杉谷キャンパス</td></tr>
+            <tr><th>内容</th><td>模擬店、ステージ企画、展示、地域交流企画、学生企画等</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 協賛金について -->
+    <section class="section">
+      <div class="section-label">About</div>
+      <h2 class="section-heading">協賛金について</h2>
+      <p class="section-body">
+        協賛金は<strong>1口 1,000円</strong>とし、口数に応じて広告掲載・ロゴ掲載等の協賛特典をご用意しております。
+        協賛特典の最低金額の口数は、下記の協賛メニューに記載しております。<br>
+        協賛金は、会場運営、広報物制作、備品、企画運営その他医学薬学祭の開催に必要な費用に充当いたします。
+      </p>
+    </section>
+
+    <!-- パッケージ協賛メニュー -->
+    <section class="section">
+      <div class="section-label">Package</div>
+      <h2 class="section-heading">パッケージ協賛メニュー</h2>
+      <p class="section-body">
+        パンフレット広告・HP掲載・ユニフォームロゴを組み合わせたおすすめのプランです。
+      </p>
+      <div class="table-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>プラン</th>
+              <th>口数</th>
+              <th>金額</th>
+              <th>内容</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="plan-row">
+              <th>応援協賛</th>
+              <td class="t-num">10口</td>
+              <td class="plan-price">10,000円</td>
+              <td>パンフレットへ企業名のみを掲載 ＋ HP小アイコン掲載</td>
+            </tr>
+            <tr class="plan-row">
+              <th>スタンダード</th>
+              <td class="t-num">30口</td>
+              <td class="plan-price">30,000円</td>
+              <td>パンフレット1/2ページ広告（モノクロ） ＋ HP小アイコン掲載</td>
+            </tr>
+            <tr class="plan-row">
+              <th>PR協賛</th>
+              <td class="t-num">50口</td>
+              <td class="plan-price">50,000円</td>
+              <td>パンフレット1/2ページ広告（カラー） ＋ HP中アイコン掲載</td>
+            </tr>
+            <tr class="plan-row">
+              <th>プレミアム</th>
+              <td class="t-num">100口</td>
+              <td class="plan-price">100,000円</td>
+              <td>パンフレット1ページ広告（カラー） ＋ HP大アイコン掲載</td>
+            </tr>
+            <tr class="plan-row">
+              <th>ユニフォーム小</th>
+              <td class="t-num">150口</td>
+              <td class="plan-price">150,000円</td>
+              <td>ユニフォーム小ロゴ ＋ 1/2ページ広告（カラー） ＋ HP中アイコン掲載</td>
+            </tr>
+            <tr class="plan-row">
+              <th>ユニフォーム大</th>
+              <td class="t-num">300口</td>
+              <td class="plan-price">300,000円</td>
+              <td>ユニフォーム大ロゴ ＋ 1ページ広告（カラー） ＋ HP大アイコン掲載</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 単品協賛メニュー -->
+    <section class="section">
+      <div class="section-label">Single</div>
+      <h2 class="section-heading">単品協賛メニュー</h2>
+      <p class="section-body">
+        ご希望の特典を単品でお選びいただくこともできます。
+      </p>
+      <div class="table-wrap">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>区分</th>
+              <th>内容</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>パンフレット広告<br>モノクロ<span class="contact-sub">※1</span></th>
+              <td>1ページ広告 40口 ・ 1/2ページ広告 25口<br>1/4ページ広告 15口 ・ 1/8ページ広告 8口 ・ 企業名のみ掲載 5口</td>
+            </tr>
+            <tr>
+              <th>パンフレット広告<br>カラー<span class="contact-sub">※1</span></th>
+              <td>1ページ広告 60口 ・ 1/2ページ広告 35口<br>1/4ページ広告 20口 ・ 1/8ページ広告 10口</td>
+            </tr>
+            <tr>
+              <th>HP掲載<span class="contact-sub">※2</span></th>
+              <td>大アイコン 50口 ・ 中アイコン 30口 ・ 小アイコン 10口</td>
+            </tr>
+            <tr>
+              <th>ユニフォーム協賛</th>
+              <td>大ロゴ 200口 ・ 小ロゴ 100口（掲載枠に上限があります）</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="t-note">
+        ※1　パンフレット広告は1ページ広告で約A5サイズです。<br>
+        ※2　HP掲載サイズのサンプルは下記の確認ページに掲載しております。
+      </p>
+
+      <!-- HP掲載サイズ確認ページへの導線 -->
+      <div class="hp-callout">
+        <div class="hp-callout-body">
+          <h3>HP掲載アイコンの大きさを確認できます</h3>
+          <p>
+            大・中・小それぞれの実際の掲載サイズや、他社アイコンと並んだ際の見え方を、
+            御社のアイコン画像をアップロードしてその場でご確認いただけます。
+          </p>
+          <a class="pill-cta" href="prsample.html">
+            HP掲載アイコン サイズ確認ページへ
+            <span class="arrow">→</span>
+          </a>
+        </div>
+        <div class="hp-sizes" aria-hidden="true">
+          <div class="hp-size-chip"><div class="hp-size-box lg"></div><span class="hp-size-cap">大</span></div>
+          <div class="hp-size-chip"><div class="hp-size-box md"></div><span class="hp-size-cap">中</span></div>
+          <div class="hp-size-chip"><div class="hp-size-box sm"></div><span class="hp-size-cap">小</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 申込方法 -->
+    <section class="section">
+      <div class="section-label">Application</div>
+      <h2 class="section-heading">申込方法・締切</h2>
+      <div class="table-wrap">
+        <table class="t">
+          <tbody>
+            <tr>
+              <th>申込方法</th>
+              <td>別紙申込書に必要事項をご記入のうえ、FAXまたはメールにて実行委員会までご提出ください。</td>
+            </tr>
+            <tr>
+              <th>申込締切</th>
+              <td class="t-num">令和8年9月15日（火）</td>
+            </tr>
+            <tr>
+              <th>データ入稿締切<br><span class="contact-sub">※HP協賛</span></th>
+              <td class="t-num">令和8年10月9日（金）</td>
+            </tr>
+            <tr>
+              <th>データ入稿締切<br><span class="contact-sub">※パンフレット・ユニフォーム協賛</span></th>
+              <td class="t-num">令和8年9月15日（火）</td>
+            </tr>
+            <tr>
+              <th>データ入稿形式</th>
+              <td>ai、pdf、png、jpg 等<br>※可能な限り高解像度データをご提出ください。</td>
+            </tr>
+            <tr>
+              <th>支払方法</th>
+              <td>銀行振込<br>※その他のお支払方法をご希望の場合、事前にご相談ください。</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="dl-card">
+        <div class="dl-icon">📄</div>
+        <div class="dl-body">
+          <h3>協賛のご案内（PDF）</h3>
+          <div class="dl-meta">本ページの内容をまとめた資料です／PDF・A4・全3ページ</div>
+        </div>
+        <a class="pill-cta" href="doc/2026-sponsorship-guide.pdf" target="_blank" rel="noopener">
+          資料をダウンロード
+          <span class="arrow">→</span>
+        </a>
+      </div>
+
+      <div class="note-card">
+        <h3>中止時の取扱い</h3>
+        <p>
+          天災、感染症の拡大、大学の判断その他やむを得ない事情により医学薬学祭の開催が中止となった場合、
+          協賛金額の8割を返金いたします。ただし、パンフレットやTシャツロゴ等で既に発生した制作費・準備費等については
+          返金対象外となる場合がございます。ご了承ください。
+        </p>
+      </div>
+    </section>
+
+    <!-- お問い合わせ先 -->
+    <section class="section">
+      <div class="section-label">Contact</div>
+      <h2 class="section-heading">ご協賛に関するお問い合わせ</h2>
+      <p class="section-body">
+        ご不明な点やご相談は、外務部 渉外課までお気軽にご連絡ください。
+      </p>
+
+      <div class="contact-grid">
+        <div class="contact-card">
+          <div class="contact-icon">✉️</div>
+          <div class="contact-label">メール</div>
+          <div class="contact-value"><a href="mailto:sponsorship@iyakusai.com">sponsorship@iyakusai.com</a></div>
+        </div>
+        <div class="contact-card">
+          <div class="contact-icon">📞</div>
+          <div class="contact-label">電話</div>
+          <div class="contact-value"><a href="tel:08078063171">080-7806-3171</a></div>
+        </div>
+        <div class="contact-card">
+          <div class="contact-icon">🏛️</div>
+          <div class="contact-label">担当</div>
+          <div class="contact-value">富山大学医学薬学祭実行委員会<br>外務部 渉外課</div>
+        </div>
+        <div class="contact-card">
+          <div class="contact-icon">📮</div>
+          <div class="contact-label">住所</div>
+          <div class="contact-value">〒930-0194<br>富山市杉谷2630番地<br>富山大学杉谷キャンパス<br>医学薬学祭実行委員会</div>
+        </div>
+      </div>
+
+      <div class="note-card">
+        本ページに記載の内容は、運営上の都合により変更となる場合があります。変更が生じた場合は、速やかにご案内いたします。
+      </div>
+    </section>
+
+    <footer>
+      <div class="footer-sns">
+        <a class="footer-sns-icon ig" href="https://www.instagram.com/iyakusai/" target="_blank" rel="noopener" aria-label="Instagram">📷</a>
+        <a class="footer-sns-icon x" href="https://x.com/iyakusai" target="_blank" rel="noopener" aria-label="X (Twitter)">𝕏</a>
+      </div>
+      <div class="footer-logo">IYAKUSAI 2026</div>
+      <p>© 2026 富山大学 医学薬学祭実行委員会</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

@@ -202,18 +202,6 @@
       color: var(--c-text-soft);
       letter-spacing: 0.06em;
     }
-    .hero-theme {
-      font-family: var(--font-display);
-      font-size: clamp(1rem, 2.4vw, 1.5rem);
-      font-weight: 700;
-      color: var(--c-text-soft);
-      letter-spacing: 0.06em;
-      margin-bottom: 1.4rem;
-    }
-    .hero-theme .accent {
-      color: var(--c-accent-deep);
-      font-weight: 900;
-    }
     .hero-divider {
       margin: 2.2rem auto 0;
       width: 64px; height: 3px;
@@ -299,9 +287,6 @@
       letter-spacing: 0.08em;
       background: var(--c-accent);
       color: #fff;
-    }
-    .news-tag.past {
-      background: var(--c-text-muted);
     }
     .news-date {
       font-family: var(--font-display);
@@ -635,16 +620,15 @@
 
   <!-- Top nav -->
   <nav class="top-nav">
-    <a class="nav-logo" href="index.html">
+    <a class="nav-logo" href="/">
       <span class="nav-leaf"></span>
       IYAKUSAI 2026
     </a>
     <ul class="nav-tabs">
-      <li><a href="index.html" class="active">ホーム</a></li>
-      <li><a href="recruitment.html">新歓募集</a></li>
-      <li><a href="exhibitor-briefing.html">出展説明会</a></li>
-      <li><a href="sponsorship.html">ご協賛</a></li>
-      <li><a href="contact.html">お問い合わせ</a></li>
+      <li><a href="/" class="active">ホーム</a></li>
+      <li><a href="/recruitment.html">新歓募集</a></li>
+      <li><a href="/exhibitor-briefing.html">出展説明会</a></li>
+      <li><a href="/contact.html">お問い合わせ</a></li>
     </ul>
   </nav>
 
@@ -661,12 +645,11 @@
     <section class="hero">
       <div class="hero-badge">
         <span class="dot"></span>
-        2026.10.17 SAT – 10.18 SUN
+        Coming Soon
       </div>
       <p class="hero-title-en">University of Toyama — Medicine &amp; Pharmacy Festival</p>
       <h1 class="hero-title-jp">医学<span class="accent">薬学祭</span></h1>
       <div class="hero-year">2026</div>
-      <p class="hero-theme">テーマ　<span class="accent">BOOM! REBORN!</span></p>
       <p class="hero-university">富山大学 杉谷キャンパス</p>
       <div class="hero-divider"></div>
     </section>
@@ -680,34 +663,18 @@
         </div>
         <ul class="news-list">
           <li>
-            <a class="news-item" href="sponsorship.html">
+            <a class="news-item" href="/recruitment.html">
               <span class="news-tag">NEW</span>
-              <span class="news-date">2026.07.21</span>
-              <span class="news-title">企業・団体の皆様へ「ご協賛のお願い」を掲載しました（協賛メニュー・申込方法）</span>
-              <span class="news-arrow">詳細を見る →</span>
-            </a>
-          </li>
-          <li>
-            <a class="news-item" href="#festival">
-              <span class="news-tag">NEW</span>
-              <span class="news-date">2026.07.13</span>
-              <span class="news-title">医薬祭2026の会期（10/17・18）とテーマ「BOOM! REBORN!」を公開しました</span>
-              <span class="news-arrow">詳細を見る →</span>
-            </a>
-          </li>
-          <li>
-            <a class="news-item" href="exhibitor-briefing.html">
-              <span class="news-tag">NEW</span>
-              <span class="news-date">2026.07.13</span>
-              <span class="news-title">第3回 出展説明会（日程調整中）のご案内を掲載しました</span>
-              <span class="news-arrow">詳細を見る →</span>
-            </a>
-          </li>
-          <li>
-            <a class="news-item" href="recruitment.html">
-              <span class="news-tag past">終了</span>
               <span class="news-date">2026.04.27</span>
               <span class="news-title">新入生向け 新歓会＆説明会（5/10 開催）のお知らせを掲載しました</span>
+              <span class="news-arrow">詳細を見る →</span>
+            </a>
+          </li>
+          <li>
+            <a class="news-item" href="/exhibitor-briefing.html">
+              <span class="news-tag">NEW</span>
+              <span class="news-date">2026.04.26</span>
+              <span class="news-title">出展説明会のお知らせを掲載しました</span>
               <span class="news-arrow">詳細を見る →</span>
             </a>
           </li>
@@ -715,49 +682,22 @@
       </div>
     </section>
 
-    <!-- Festival overview -->
-    <section class="section" id="festival">
-      <div class="section-label">Festival</div>
-      <h2 class="section-heading">医薬祭2026 開催概要</h2>
-      <p class="section-body">
-        今年のテーマは <strong>「BOOM! REBORN!」</strong>。富山大学 杉谷キャンパスにて2日間開催します。
-      </p>
-      <div class="committee-block">
-        <div class="committee-detail">
-          <div class="card-label">会期</div>
-          <div class="card-value">2026年10月17日（土）・18日（日）</div>
-        </div>
-        <div class="committee-detail">
-          <div class="card-label">開催時間</div>
-          <div class="card-value">10月17日（土）10:00〜18:00<br>10月18日（日）10:00〜17:00</div>
-        </div>
-        <div class="committee-detail">
-          <div class="card-label">会場</div>
-          <div class="card-value">富山大学 杉谷キャンパス</div>
-        </div>
-        <div class="committee-detail">
-          <div class="card-label">テーマ</div>
-          <div class="card-value">BOOM! REBORN!</div>
-        </div>
-      </div>
-    </section>
-
     <!-- Events posters -->
     <section class="section">
       <div class="section-label">Events</div>
-      <h2 class="section-heading">イベント情報</h2>
+      <h2 class="section-heading">開催予定のイベント</h2>
       <p class="section-body">
-        出展説明会（第3回・日程調整中）と、これまでの新歓イベントのご案内です。ポスターをタップすると詳細ページが開きます。
+        ポスターをタップすると詳細ページが開きます。
       </p>
       <div class="events-poster-grid">
-        <a class="event-poster-card" href="exhibitor-briefing.html">
+        <a class="event-poster-card" href="/exhibitor-briefing.html">
           <img src="img/briefing/01-cover.png" alt="出展説明会のお知らせ">
           <div class="event-poster-caption">
             <span class="event-poster-name">出展説明会</span>
             <span class="event-poster-arrow">詳細を見る →</span>
           </div>
         </a>
-        <a class="event-poster-card" href="recruitment.html">
+        <a class="event-poster-card" href="/recruitment.html">
           <img src="img/recruitment/01-welcome.png" alt="新歓イベント NEW WELCOME 2026">
           <div class="event-poster-caption">
             <span class="event-poster-name">新歓イベント</span>
@@ -770,18 +710,13 @@
     <!-- Info -->
     <section class="section">
       <div class="section-label">Information</div>
-      <h2 class="section-heading">最新情報・お問い合わせ</h2>
+      <h2 class="section-heading">ホームページ準備中</h2>
       <p class="section-body">
-        当日のタイムテーブルや出展団体情報など、詳細は随時こちらと公式SNSで更新していきます。<br>
-        出展・イベントに関するご質問は「お問い合わせ」ページよりお気軽にご連絡ください。<br>
-        ご協賛をご検討中の企業・団体の皆様は、「ご協賛」ページに協賛メニュー・申込方法を掲載しております。
+        ただいま医薬祭2026に向けホームページを鋭意制作中です。<br>
+        ご質問・お問い合わせは「お問い合わせ」ページよりお気軽にご連絡ください。
       </p>
-      <a class="pill-cta" href="contact.html">
+      <a class="pill-cta" href="/contact.html">
         お問い合わせページへ
-        <span class="arrow">→</span>
-      </a>
-      <a class="pill-cta" href="sponsorship.html" style="margin-left: 0.8rem;">
-        ご協賛のご案内へ
         <span class="arrow">→</span>
       </a>
     </section>

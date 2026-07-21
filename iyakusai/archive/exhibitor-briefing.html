@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>新歓募集 - 医薬祭2026 - 富山大学</title>
+  <title>出展説明会 - 医薬祭2026 - 富山大学</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -232,130 +232,6 @@
       line-height: 1.9;
     }
 
-    /* ─── Greeting (松下委員から) ─── */
-    .greeting-card {
-      margin-top: 1.8rem;
-      padding: 2rem 2.2rem;
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      border-radius: 20px;
-      box-shadow: var(--shadow-sm);
-      position: relative;
-    }
-    .greeting-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; bottom: 0;
-      width: 5px;
-      border-top-left-radius: 20px;
-      border-bottom-left-radius: 20px;
-      background: var(--c-accent);
-    }
-    .greeting-meta {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 1rem;
-      padding-bottom: 0.9rem;
-      border-bottom: 1px dashed var(--c-border-strong);
-    }
-    .greeting-tag {
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-family: var(--font-display);
-      font-size: 0.7rem;
-      font-weight: 900;
-      letter-spacing: 0.08em;
-      background: var(--c-accent-soft);
-      color: var(--c-accent-deep);
-    }
-    .greeting-name {
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--c-text);
-    }
-    .greeting-body {
-      color: var(--c-text-soft);
-      font-size: 0.96rem;
-      line-height: 2;
-    }
-    .greeting-body p + p { margin-top: 1rem; }
-
-    /* ─── Event detail (日時・会場・費用…) ─── */
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1rem;
-      margin-top: 1.8rem;
-    }
-    .detail-card {
-      background: var(--c-surface);
-      border: 1px solid var(--c-border);
-      border-radius: 18px;
-      padding: 1.4rem 1.5rem;
-      box-shadow: var(--shadow-sm);
-      position: relative;
-      overflow: hidden;
-    }
-    .detail-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 4px;
-      background: var(--c-accent);
-      opacity: 0.85;
-    }
-    .detail-icon {
-      width: 38px; height: 38px;
-      border-radius: 11px;
-      background: var(--c-leaf-pale);
-      display: flex; align-items: center; justify-content: center;
-      margin-bottom: 0.7rem;
-      font-size: 1.05rem;
-    }
-    .detail-label {
-      font-family: var(--font-display);
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: var(--c-text-muted);
-      margin-bottom: 0.25rem;
-    }
-    .detail-value {
-      font-family: var(--font-display);
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--c-text);
-      line-height: 1.5;
-    }
-    .detail-value .small {
-      display: block;
-      font-family: var(--font-body);
-      font-size: 0.82rem;
-      font-weight: 400;
-      color: var(--c-text-soft);
-      margin-top: 0.2rem;
-    }
-    .map-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 0.5rem;
-      font-family: var(--font-body);
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--c-accent-deep);
-      text-decoration: none;
-      border-bottom: 1px dashed var(--c-accent-soft);
-      transition: color 0.2s, border-color 0.2s;
-    }
-    .map-link:hover {
-      color: var(--c-accent);
-      border-bottom-color: var(--c-accent);
-    }
-
-    /* ─── Highlight list ─── */
     .highlight-list {
       list-style: none;
       margin-top: 1.4rem;
@@ -428,59 +304,121 @@
     }
     .cta-button .arrow { font-size: 1.1rem; line-height: 1; }
 
-    /* ─── Posters ─── */
-    .poster-grid {
+    /* ─── Schedule grid ─── */
+    .venue-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
       gap: 1.4rem;
       margin-top: 1.8rem;
     }
-    .poster-card {
+    .venue-card {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: 20px;
+      padding: 1.8rem;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.3s, box-shadow 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .venue-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 5px;
+      background: var(--c-accent);
+      opacity: 0.85;
+    }
+    .venue-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+    }
+    .venue-icon {
+      width: 48px; height: 48px;
+      border-radius: 14px;
+      background: var(--c-leaf-pale);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+    }
+    .venue-name {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: var(--c-text);
+      margin-bottom: 0.2rem;
+    }
+    .venue-location {
+      font-size: 0.82rem;
+      color: var(--c-text-muted);
+      margin-bottom: 1.2rem;
+    }
+    .session-list {
+      list-style: none;
+      display: grid;
+      gap: 0.7rem;
+    }
+    .session-list li {
+      padding: 0.75rem 1rem;
+      background: var(--c-surface-soft);
+      border: 1px solid var(--c-border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .session-date {
+      font-family: var(--font-display);
+      font-weight: 700;
+      color: var(--c-accent-deep);
+      font-size: 0.95rem;
+    }
+    .session-times {
+      color: var(--c-text-soft);
+      font-size: 0.88rem;
+    }
+    .venue-note {
+      margin-top: 1rem;
+      padding: 0.7rem 0.9rem;
+      background: var(--c-leaf-pale);
+      border: 1px dashed var(--c-accent-soft);
+      border-radius: 10px;
+      font-size: 0.82rem;
+      color: var(--c-accent-deep);
+      line-height: 1.6;
+    }
+
+    /* ─── Poster gallery ─── */
+    .poster-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.4rem;
+      margin-top: 1.8rem;
+    }
+    .poster {
       background: var(--c-surface);
       border: 1px solid var(--c-border);
       border-radius: 20px;
       overflow: hidden;
       box-shadow: var(--shadow-sm);
       transition: transform 0.3s, box-shadow 0.3s;
-      display: flex;
-      flex-direction: column;
     }
-    .poster-card:hover {
-      transform: translateY(-3px);
+    .poster:hover {
+      transform: translateY(-4px);
       box-shadow: var(--shadow-md);
     }
-    .poster-card a {
-      display: block;
-      background: var(--c-surface-soft);
-      line-height: 0;
-    }
-    .poster-card img {
+    .poster img {
       width: 100%;
-      height: auto;
       display: block;
     }
     .poster-caption {
-      padding: 0.95rem 1.2rem;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-top: 1px solid var(--c-border);
-    }
-    .poster-tag {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 999px;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      background: var(--c-accent-soft);
-      color: var(--c-accent-deep);
-      white-space: nowrap;
-    }
-    .poster-text {
-      font-size: 0.85rem;
+      padding: 0.8rem 1rem;
+      font-size: 0.82rem;
       color: var(--c-text-soft);
-      line-height: 1.5;
+      text-align: center;
+      border-top: 1px solid var(--c-border);
+      font-family: var(--font-display);
+      font-weight: 700;
     }
 
     /* ─── Contact ─── */
@@ -602,8 +540,7 @@
       .nav-tabs a { font-size: 0.78rem; padding: 0.35rem 0.6rem; min-width: 0; }
       .page-header { padding: 3rem 1.5rem 1.5rem; }
       .section { padding: 2rem 1.5rem; }
-      .greeting-card { padding: 1.6rem 1.5rem; }
-      .contact-card { padding: 1.5rem; }
+      .venue-card, .contact-card { padding: 1.5rem; }
       .cta-card { padding: 1.8rem 1.4rem; }
       .org-block, .lead-card { padding: 1.5rem; }
     }
@@ -613,16 +550,15 @@
 
   <!-- Top nav -->
   <nav class="top-nav">
-    <a class="nav-logo" href="index.html">
+    <a class="nav-logo" href="/">
       <span class="nav-leaf"></span>
       IYAKUSAI 2026
     </a>
     <ul class="nav-tabs">
-      <li><a href="index.html">ホーム</a></li>
-      <li><a href="recruitment.html" class="active">新歓募集</a></li>
-      <li><a href="exhibitor-briefing.html">出展説明会</a></li>
-      <li><a href="sponsorship.html">ご協賛</a></li>
-      <li><a href="contact.html">お問い合わせ</a></li>
+      <li><a href="/">ホーム</a></li>
+      <li><a href="/recruitment.html">新歓募集</a></li>
+      <li><a href="/exhibitor-briefing.html" class="active">出展説明会</a></li>
+      <li><a href="/contact.html">お問い合わせ</a></li>
     </ul>
   </nav>
 
@@ -637,122 +573,155 @@
     <header class="page-header">
       <div class="page-badge">
         <span class="dot"></span>
-        New Member Welcome
+        Exhibitor Briefing
       </div>
-      <h1 class="page-title">医薬祭2026 <span class="accent">新歓募集</span></h1>
-      <p class="page-subtitle">University of Toyama — Welcome New Members</p>
+      <h1 class="page-title">医薬祭2026 <span class="accent">出展説明会</span></h1>
+      <p class="page-subtitle">University of Toyama — Medicine &amp; Pharmacy Festival</p>
     </header>
 
-    <!-- 新入生へのメッセージ -->
+    <!-- Overview -->
     <section class="section">
-      <div class="section-label">Message</div>
-      <h2 class="section-heading">新入生の皆さんへ</h2>
-      <div class="lead-card">
-        <h3>🌱 委員はいつでも募集中です！</h3>
-        <p>5月10日の新歓会＆説明会は<strong>終了しました</strong>。ご参加いただいた皆さん、ありがとうございました！<br>
-        医薬祭実行委員会では、<strong>年間を通じて新しいメンバーを募集しています。</strong>「今からでも参加したい」「まずは話を聞いてみたい」という方は、下の連絡先や公式SNSまでお気軽にご連絡ください。学年・学部は問いません。</p>
-      </div>
-      <div class="greeting-card">
-        <div class="greeting-meta">
-          <span class="greeting-tag">FROM</span>
-          <span class="greeting-name">医薬祭実行委員会 総務部</span>
-        </div>
-        <div class="greeting-body">
-          <p>新入生の皆さん、こんにちは！<br>医薬祭実行委員会 総務部です。</p>
-          <p>まずは皆さん！<br>数あるサークルの中から医薬祭実行委員会を候補に入れて下さってありがとうございます！<br>医薬祭実行委員会は、メンバーそれぞれの「頑張りたい！」という気持ちを大切にしている組織です。</p>
-          <p>「ガッツリ運営に携わりたい！」という方も、「自分のペースで楽しく手伝いたい！」という方も、<strong>大歓迎です！！</strong></p>
-          <p>……さて、そうは言っても具体的な活動内容や雰囲気など、分からない点も多いかと思います。委員会の様子や活動内容は、<strong>いつでもお問い合わせや公式SNSでお伝えできます。</strong><br>一人でも友達と一緒でもOK！少しでも興味があれば気軽にのぞいてみてください。皆さんとご一緒できるのを楽しみにしています。</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- イベント詳細 -->
-    <section class="section">
-      <div class="section-label">Event</div>
-      <h2 class="section-heading">【終了】新歓会＆説明会（5/10）</h2>
+      <div class="section-label">Overview</div>
+      <h2 class="section-heading">出展を希望される団体・個人の方へ</h2>
       <p class="section-body">
-        こちらのイベントは <strong>終了しました</strong>。たくさんのご参加ありがとうございました。<br>
-        （以下は開催時のご案内です）
+        出展（飲食、展示）を希望する団体向けに、説明会を以下の日程で開催します。<br>
+        出展を希望する団体は<strong>必ず出席</strong>してください。<br>
+        出展を検討している団体の方もぜひご参加ください。<br>
+        代理出席可能ですので団体内で予定を調整したうえでご参加ください。
       </p>
-
-      <div class="detail-grid">
-        <div class="detail-card">
-          <div class="detail-icon">📅</div>
-          <div class="detail-label">日時</div>
-          <div class="detail-value">5月10日（日）<span class="small">17:00〜20:00</span></div>
-        </div>
-        <div class="detail-card">
-          <div class="detail-icon">📍</div>
-          <div class="detail-label">会場</div>
-          <div class="detail-value">
-            友達の家 とやま
-            <a class="map-link" href="https://maps.app.goo.gl/w9WiWdv7wV4Jx6Lb7" target="_blank" rel="noopener">Google Mapで開く →</a>
-          </div>
-        </div>
-        <div class="detail-card">
-          <div class="detail-icon">💴</div>
-          <div class="detail-label">参加費</div>
-          <div class="detail-value">無料<span class="small">事前予約優先（定員30名）</span></div>
-        </div>
-        <div class="detail-card">
-          <div class="detail-icon">🎒</div>
-          <div class="detail-label">持ち物</div>
-          <div class="detail-value">なし<span class="small">手ぶらでOK</span></div>
-        </div>
-      </div>
-
       <ul class="highlight-list">
-        <li>一人での参加も、友達と一緒の参加も大歓迎です</li>
-        <li>具体的な活動内容や委員会の雰囲気をざっくばらんに聞ける場です</li>
-        <li>事前にフォームから申し込みをお願いします</li>
+        <li>五福・高岡からの出張出展も大歓迎です</li>
+        <li>個人出展も受け付けます</li>
+        <li>外部団体・企業の出展も受付中！</li>
       </ul>
+
+      <div class="lead-card">
+        <h3>説明会の内容</h3>
+        <p>医薬祭概要説明、昨年との変更点、出展するにあたっての注意点 など</p>
+      </div>
     </section>
 
-    <!-- 申込 CTA -->
+    <!-- CTA -->
     <section class="section">
-      <div class="section-label">Join us</div>
-      <h2 class="section-heading">委員会に参加したい方へ</h2>
+      <div class="section-label">Application</div>
+      <h2 class="section-heading">出展説明会への参加申込</h2>
       <p class="section-body">
-        医薬祭実行委員会は<strong>通年でメンバーを募集中</strong>です。<br>
-        「話だけ聞いてみたい」「見学したい」でも大歓迎。以下の連絡先や公式SNSのDMからお気軽にご連絡ください。
+        出展説明会に参加される際は、以下のフォームから団体情報の入力をお願いいたします。
       </p>
       <div class="cta-card">
-        <h3>入会・見学のお問い合わせ</h3>
-        <p>電話・Email の連絡先をご案内しています。SNSのDMでもOKです。</p>
-        <a class="cta-button" href="contact.html">
-          お問い合わせページへ
+        <h3>団体情報入力フォーム</h3>
+        <p>Google フォームが新しいタブで開きます</p>
+        <a class="cta-button" href="https://docs.google.com/forms/d/e/1FAIpQLSev-WRRIDjfwnnHRdvAyE7GCeK5U1WoJl8bCFngDhf6KLRUUQ/viewform?usp=dialog" target="_blank" rel="noopener">
+          フォームを開く
           <span class="arrow">→</span>
         </a>
       </div>
     </section>
 
-    <!-- ポスター -->
+    <!-- Schedule -->
     <section class="section">
-      <div class="section-label">Poster</div>
-      <h2 class="section-heading">参考：新歓ポスター</h2>
+      <div class="section-label">Schedule</div>
+      <h2 class="section-heading">日時と場所</h2>
       <p class="section-body">
-        5月の新歓イベントで使用したポスターです。委員会の雰囲気の参考にご覧ください。画像をクリックすると拡大表示されます。
+        ご都合の合う日程・会場をお選びください。<br>
+        <strong>いずれの回も内容は同一です</strong>のでご都合の良い 1 回にご参加いただければ大丈夫です。
       </p>
 
+      <div class="venue-grid">
+
+        <div class="venue-card">
+          <div class="venue-icon">🌐</div>
+          <div class="venue-name">オンライン</div>
+          <div class="venue-location">Google Meet</div>
+          <ul class="session-list">
+            <li>
+              <span class="session-date">5月6日（水祝）</span>
+              <span class="session-times">① 11:00〜　② 17:00〜</span>
+            </li>
+            <li>
+              <span class="session-date">5月9日（土）</span>
+              <span class="session-times">① 11:00〜　② 17:00〜</span>
+            </li>
+          </ul>
+          <p class="venue-note">参加リンクはフォーム入力後にメールでお送りします</p>
+        </div>
+
+        <div class="venue-card">
+          <div class="venue-icon">🏫</div>
+          <div class="venue-name">杉谷キャンパス</div>
+          <div class="venue-location">講義実習棟 201教室</div>
+          <ul class="session-list">
+            <li>
+              <span class="session-date">5月7日（木）</span>
+              <span class="session-times">18:30〜</span>
+            </li>
+            <li>
+              <span class="session-date">5月11日（月）</span>
+              <span class="session-times">18:30〜</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="venue-card">
+          <div class="venue-icon">🏛️</div>
+          <div class="venue-name">五福キャンパス</div>
+          <div class="venue-location">金森産業ホール</div>
+          <ul class="session-list">
+            <li>
+              <span class="session-date">5月8日（金）</span>
+              <span class="session-times">18:30〜</span>
+            </li>
+            <li>
+              <span class="session-date">5月12日（火）</span>
+              <span class="session-times">18:30〜</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Poster gallery -->
+    <section class="section">
+      <div class="section-label">Poster</div>
+      <h2 class="section-heading">出展説明会ポスター</h2>
+      <p class="section-body">
+        SNS でも告知中のポスター 4 枚です。クリックで拡大できます。
+      </p>
       <div class="poster-grid">
-        <div class="poster-card">
-          <a href="img/recruitment/01-welcome.png" target="_blank" rel="noopener">
-            <img src="img/recruitment/01-welcome.png" alt="医学薬学祭2026 新歓ポスター（NEW WELCOME）" loading="lazy">
-          </a>
-          <div class="poster-caption">
-            <span class="poster-tag">POSTER 1</span>
-            <span class="poster-text">NEW WELCOME 2026 / 大学祭を一緒に創りませんか？</span>
-          </div>
-        </div>
-        <div class="poster-card">
-          <a href="img/recruitment/02-detail.png" target="_blank" rel="noopener">
-            <img src="img/recruitment/02-detail.png" alt="医学薬学祭2026 新歓イベント概要ポスター" loading="lazy">
-          </a>
-          <div class="poster-caption">
-            <span class="poster-tag">POSTER 2</span>
-            <span class="poster-text">イベント概要 / 5月10日（日）17:00〜 友達の家 とやま</span>
-          </div>
-        </div>
+        <a class="poster" href="img/briefing/01-cover.png" target="_blank" rel="noopener">
+          <img src="img/briefing/01-cover.png" alt="第一回 出展説明会のお知らせ">
+          <div class="poster-caption">① 出展説明会のお知らせ</div>
+        </a>
+        <a class="poster" href="img/briefing/02-about.png" target="_blank" rel="noopener">
+          <img src="img/briefing/02-about.png" alt="医学薬学祭について">
+          <div class="poster-caption">② 医学薬学祭について</div>
+        </a>
+        <a class="poster" href="img/briefing/03-schedule-onsite.png" target="_blank" rel="noopener">
+          <img src="img/briefing/03-schedule-onsite.png" alt="説明会日程 杉谷・五福">
+          <div class="poster-caption">③ 説明会日程（杉谷・五福）</div>
+        </a>
+        <a class="poster" href="img/briefing/04-schedule-online.png" target="_blank" rel="noopener">
+          <img src="img/briefing/04-schedule-online.png" alt="説明会日程 オンライン">
+          <div class="poster-caption">④ 説明会日程（オンライン）</div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Contact CTA -->
+    <section class="section">
+      <div class="section-label">Contact</div>
+      <h2 class="section-heading">お問い合わせ</h2>
+      <p class="section-body">
+        出展に関するご質問は、お問い合わせページに記載の連絡先までお寄せください。
+      </p>
+      <div class="cta-card">
+        <h3>お問い合わせ窓口のご案内</h3>
+        <p>電話・Email の連絡先をご案内しております。</p>
+        <a class="cta-button" href="/contact.html">
+          お問い合わせページへ
+          <span class="arrow">→</span>
+        </a>
       </div>
     </section>
 

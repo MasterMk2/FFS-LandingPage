@@ -209,33 +209,30 @@ def _processed_servers_from_cache() -> list:
     return _expand_extensions(result.data)
 
 
-def _filter_ghost_players(servers: list) -> list:
-    """players から実際に飛んでないエントリを除去する。
+def _sort_players(servers: list) -> list:
+    """players をスロット搭乗中 → 観戦中の順に並べ替える。
 
-    DCSSB RestAPI `/servers` は内部の `server.players.values()` をそのまま
-    返すため、以下が混在する:
-      - DCS 本体の Server エントリ (id=1, nick='Server', unit_type='')
-      - 退出後に dict から消え切ってない切断プレイヤー (unit_type='')
-      - ブリーフィング / slot-select 画面の Spectator (unit_type='')
+    DCSSB RestAPI `/servers` の `players[]` は `server.get_active_players()`
+    から作られるので、切断済みプレイヤーは含まれない (以前の DCSSB は
+    `server.players.values()` をそのまま返していたため、切断者がミッション
+    再起動まで残り続けていた。その回避策として入れていた `unit_type` 非空
+    フィルタは、接続中でも slot 未選択の人まで消してしまうので撤去済み)。
 
-    PlayerEntry スキーマには active/connected が含まれないので、
-    `unit_type` が非空 (= 実スロットに座っている) なものだけ残す。
-    副作用として "接続中だが slot 未選択" も非表示になるが、ランディング用途
-    としては "誰が今飛んでるか" の方が欲しい情報なので許容する。
+    `unit_type` が空 = ブリーフィング / slot-select 画面の観戦者。飛んでいる
+    人を先に見せたいので後ろに回す。
     """
     out: list = []
     for s in servers:
         players = s.get("players")
         if isinstance(players, list):
-            filtered = [
-                p
-                for p in players
-                if isinstance(p, dict) and (p.get("unit_type") or "").strip()
-            ]
             s2 = dict(s)
-            s2["players"] = filtered
-            if s.get("num_players") is not None:
-                s2["num_players"] = len(filtered)
+            s2["players"] = sorted(
+                players,
+                key=lambda p: (
+                    not (p.get("unit_type") or "").strip(),
+                    (p.get("nick") or "").lower(),
+                ),
+            )
             out.append(s2)
         else:
             out.append(s)
@@ -268,14 +265,7 @@ def _home_stats() -> dict:
     running = sum(
         1 for s in servers if (s.get("status") or "").lower() == "running"
     )
-    total_players = sum(
-        sum(
-            1
-            for p in (s.get("players") or [])
-            if isinstance(p, dict) and (p.get("unit_type") or "").strip()
-        )
-        for s in servers
-    )
+    total_players = sum(len(s.get("players") or []) for s in servers)
     # tracks cache から総数を合算。unavailable サーバは 0 として扱う。
     tracks_c = tracks_cache.get()
     tracks_total = 0
@@ -332,7 +322,7 @@ async def panel_servers(request: Request):
     if result is not None:
         if result.ok and isinstance(result.data, list):
             servers = sorted(
-                _filter_ghost_players(_expand_extensions(result.data)),
+                _sort_players(_expand_extensions(result.data)),
                 key=lambda s: s.get("name") or "",
             )
         elif result.error:

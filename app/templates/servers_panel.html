@@ -127,10 +127,16 @@
         {% for p in players %}
           {% set pname = p.get("nick") or p.get("name") or p.get("unit_display_name") or "?" %}
           {% set pside = p.get("side") %}
-          {% set slot_label = p.get("unit_type") or p.get("slot") or p.get("unit_name") %}
-          <div class="player-chip side-{{ pside if pside is not none else 'u' }}" title="{{ pname }}{% if slot_label %} · {{ slot_label }}{% endif %}">
+          {# unit_type が空 = ブリーフィング / slot-select 画面の観戦者 #}
+          {% set slot_label = (p.get("unit_type") or "").strip() %}
+          <div class="player-chip side-{{ pside if pside is not none else 'u' }}{% if not slot_label %} spectating{% endif %}"
+               title="{{ pname }} · {{ slot_label or 'spectating' }}">
             <span class="player-name">{{ pname }}</span>
-            {% if slot_label %}<span class="player-slot">{{ slot_label }}</span>{% endif %}
+            {% if slot_label %}
+            <span class="player-slot">{{ slot_label }}</span>
+            {% else %}
+            <span class="player-slot">spectating</span>
+            {% endif %}
           </div>
         {% endfor %}
       {% else %}

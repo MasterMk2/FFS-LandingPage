@@ -228,3 +228,22 @@ footer{padding:1rem;text-align:center;color:var(--muted);border-top:1px solid va
 .guide-embed{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem}
 .guide-embed iframe{display:block;width:100%;height:min(85vh,1100px);border:0;background:#1a1a1a}
 .guide-fallback{margin:0;font-size:.8rem}
+
+/* --- Known Issues: 記事一覧 & 記事内目次 --- */
+.fixes-index{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.9rem 1.25rem;margin-bottom:1.5rem}
+.fixes-index ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.88rem;line-height:1.75}
+.fixes-index a{color:var(--fg);text-decoration:none;border-bottom:1px solid transparent}
+.fixes-index a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.fix-toc{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;margin:0 0 1rem}
+.fix-toc-label{display:block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:.3rem}
+.fix-toc-list{margin:0;padding-left:1.2rem;font-size:.84rem;line-height:1.7;color:var(--muted)}
+.fix-toc-list a{color:var(--fg);text-decoration:none;border-bottom:1px solid transparent}
+.fix-toc-list a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.fix-section{scroll-margin-top:1rem}
+@media (max-width:640px){
+  .fix-toc-list{columns:1}
+  .fixes-index ul{columns:1}
+}
+@media (min-width:641px){
+  .fix-toc-list{columns:2;column-gap:1.5rem}
+}

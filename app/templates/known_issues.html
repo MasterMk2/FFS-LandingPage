@@ -7,6 +7,168 @@
     <p class="subtle">サーバ運用中に発見された既知の問題と修正方法をまとめています。</p>
   </header>
 
+  <nav class="fixes-index" aria-label="記事一覧">
+    <span class="fix-toc-label">記事</span>
+    <ul>
+      <li><a href="#sim-thread-stall">[Investigation] 全プレイヤーが同時に一瞬フリーズする — シムスレッドのバースト肥大とプロセス稼働時間の関係</a></li>
+      <li><a href="#wine-stub-crash">[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</a></li>
+    </ul>
+  </nav>
+
+  <article class="fix-article" id="sim-thread-stall">
+    <h3>[Investigation] 全プレイヤーが同時に一瞬フリーズする — シムスレッドのバースト肥大とプロセス稼働時間の関係</h3>
+
+    <div class="fix-meta">
+      <span class="fix-tag">DCS Dedicated Server</span>
+      <span class="fix-tag">Multiplayer</span>
+      <span class="fix-tag">Performance</span>
+      <span class="fix-tag">2026-08</span>
+    </div>
+
+      <nav class="fix-toc" aria-label="目次">
+        <span class="fix-toc-label">目次</span>
+      <ol class="fix-toc-list">
+        <li><a href="#sim-thread-stall--environment">Environment</a></li>
+        <li><a href="#sim-thread-stall--symptom">Symptom</a></li>
+        <li><a href="#sim-thread-stall--why-it-is-hard-to-detect">Why it is hard to detect</a></li>
+        <li><a href="#sim-thread-stall--method">Method</a></li>
+        <li><a href="#sim-thread-stall--findings">Findings</a></li>
+        <li><a href="#sim-thread-stall--root-cause-isolation">Root Cause Isolation</a></li>
+        <li><a href="#sim-thread-stall--mitigation">Mitigation</a></li>
+        <li><a href="#sim-thread-stall--status">Status</a></li>
+        <li><a href="#sim-thread-stall--related-separate-issue">Related (separate issue)</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="sim-thread-stall--environment">
+      <h4>Environment</h4>
+      <ul>
+        <li>DCS World Dedicated Server (Linux / Wine, Docker 上で運用)</li>
+        <li>DCSServerBot によるプロセス管理、12 時間間隔の定期再起動</li>
+        <li>ミッション: 大規模常設マップ (AI ユニット約 580、クライアントスロット約 300)</li>
+        <li>観測対象人数: 1〜15 名</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--symptom">
+      <h4>Symptom</h4>
+      <p>プレイヤーから「<strong>その場にいた全員が同時にすっ飛ぶ</strong>」という報告。数百ミリ秒の瞬間的フリーズで、不規則に繰り返される。</p>
+      <p>別症状として、ミッション稼働の後半になるほど全体的に重くなる (ラバーバンド感) 現象も併発する。両者は同一原因の別側面であることが後に判明した。</p>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--why-it-is-hard-to-detect">
+      <h4>Why it is hard to detect</h4>
+      <p>通常の監視では、この現象は捉えにくい。切り分けに時間を要した理由:</p>
+      <ul>
+        <li>サーバ FPS は 1 分平均のため、300 ms の停止は平均値にほとんど現れない。平均 FPS が健全な区間でも停止は起きていた。</li>
+        <li>NIC の合計バイトカウンタでは判別できない。同一インターフェースにテレメトリ export や DB 通信が相乗りしているため、ゲーム状態の送信が全員に対して止まっても合計値は途切れない。<br>
+        実測では、全クライアントが 300 ms 沈黙した時点でも、インターフェース合計の最大途切れは 25 ms だった。</li>
+        <li>プロセス全体の CPU 使用率 (1 秒平均) も、300 ms のフルコア・バーストを埋めてしまう。</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--method">
+      <h4>Method</h4>
+      <p>以下の 3 点を同時計測することで初めて捕捉できた。</p>
+
+      <h5>1. シムスレッドをナノ秒精度で 200 Hz サンプリング</h5>
+      <p>jiffy 単位の CPU 時間 (<code>/proc/&lt;pid&gt;/stat</code>) では量子化ノイズにより偽の周期が現れることがある。<code>schedstat</code> を用いる。</p>
+<pre class="fix-pre"><code># field 1 = 累積 on-CPU 時間 (ns), field 2 = ランキュー待ち時間 (ns)
+cat /proc/&lt;pid&gt;/task/&lt;main_tid&gt;/schedstat</code></pre>
+
+      <h5>2. クライアント別の送信途切れを検出</h5>
+      <p>合計値では見えないため、ゲームポートから出る UDP のみを BPF で抽出し、<strong>宛先ごとに</strong> 沈黙時間を追跡する。ペイロードは読まない。</p>
+<pre class="fix-pre"><code># BPF: IPv4 && UDP && src port == &lt;game port&gt;
+# AF_PACKET raw socket + SO_ATTACH_FILTER
+# 宛先 IP ごとに last-seen を保持し、閾値を超えた沈黙を記録する
+#
+# 判定: 複数クライアントの沈黙が同時に始まり同時に終わる → サーバ側
+#       1 クライアントのみ                              → その回線側</code></pre>
+
+      <h5>3. 停止「発生中」のスレッド状態</h5>
+      <p>停止を検知した瞬間に全スレッドの状態と <code>wchan</code> を取得する。事後の取得では判定できない。</p>
+<pre class="fix-pre"><code># R  = 実行中        → 計算で詰まっている
+# D  = 割り込み不可  → I/O 待ち
+# S + wchan          → 何を待っているかが名前で判る</code></pre>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--findings">
+      <h4>Findings</h4>
+
+      <h5>停止はサーバ側で、全員同時に起きる</h5>
+      <p>2 クライアント同時の例。開始が 13 ms 以内、復帰が 1 ms 以内で揃っている。個々の回線起因では説明できない挙動である。</p>
+<pre class="fix-pre"><code>client A  silent  T+0.295 .. T+0.598   (303 ms)
+client B  silent  T+0.308 .. T+0.597   (289 ms)</code></pre>
+      <p>9 名接続時のサンプルでは、9 名全員が同時に沈黙していることを確認した。</p>
+
+      <h5>停止中、シムスレッドは「計算中」</h5>
+      <p>捕捉できた停止のスレッド状態はいずれも <code>R</code> (実行中)。同時刻のメジャーフォルトは 0。I/O 待ちではなく計算による停止である。捕捉した停止は 7/7 が同一秒内の CPU バーストと一致した。</p>
+
+      <h5>バーストはプロセス稼働時間とともに肥大する</h5>
+      <p>人数をほぼ一定 (0〜2 名) に保った状態での、シムスレッドのバースト計測:</p>
+<pre class="fix-pre"><code>プロセス稼働   バースト長(中央値)   デューティ比
+  +0.3 h            56 ms            0.3 %
+  +2.3 h            46 ms            0.9 %
+  +4.3 h            46 ms            3.6 %
+  +6.3 h            50 ms            6.8 %
+  +8.3 h            65 ms            9.1 %
+ +11.3 h            90 ms           12.7 %</code></pre>
+      <p>バースト頻度は約 1.5 回/秒で頭打ちになり、1 回あたりの長さが伸び続ける。一定周期のジョブが、増え続けるデータを走査している場合の挙動と一致する。</p>
+
+      <h5>停止の発生率には明確な閾値がある</h5>
+      <p>プレイヤーが接続していた時間だけを分母に取った発生率:</p>
+<pre class="fix-pre"><code>ミッション経過   露出時間     停止回数   発生率
+  2- 4 h         65.8 分         0      0.0 /時
+  4- 6 h         92.2 分         0      0.0 /時
+  6- 8 h         43.3 分         0      0.0 /時
+  8-10 h         96.6 分         3      1.9 /時
+ 10-12 h         56.5 分         3      3.2 /時</code></pre>
+      <p>稼働 8 時間未満では、計 201 プレイヤー分を通じて発生が記録されていない。</p>
+
+      <h5>FPS 低下も同じ原因の別側面</h5>
+      <p>3 週間分の集計 (プレイヤー 3〜5 名時)。60 FPS を割った時間:</p>
+<pre class="fix-pre"><code>ミッション経過      平均 FPS    60FPS 未満の時間
+ 新鮮   (&lt; 4h)      114.9      0 分 / 459 分
+ 中間   (4-8h)      102.6      0 分 / 595 分
+ 古い   (8h+)        86.8    137 分 / 794 分  (最低 7.2 FPS)</code></pre>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--root-cause-isolation">
+      <h4>Root Cause Isolation</h4>
+      <p>蓄積がミッションの Lua 状態にあるのか、DCS プロセス側にあるのかを切り分けるため、<strong>プロセスを維持したままミッションだけ</strong>作り直して比較した (無人時に実施)。</p>
+<pre class="fix-pre"><code>                          PID       デューティ比
+ミッション +4.2h          同一         0.0524
+ミッションのみ再起動直後   同一         0.0642   ← リセットされない
+（参考）プロセスごと再起動  新規    0.122 → 0.003   ← リセットされる</code></pre>
+      <p>ミッションを作り直しても蓄積は解消しない。原因がミッションスクリプト (MIST / CTLD 等) ではなく DCS サーバプロセス側にあることを示す。スクリプト側の最適化では改善しない。</p>
+      <p>プロセス再起動でのみリセットされることは、2 回の定期再起動で独立に再現している (デューティ比 0.122→0.003 および 0.127→0.001)。</p>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--mitigation">
+      <h4>Mitigation</h4>
+      <p>プロセス側の蓄積そのものには手を入れられないため、再起動間隔の短縮で対処する。</p>
+      <p>要件は「混雑する時間帯がプロセス稼働 8 時間を超えないこと」。12 時間周期では混雑帯を 8 時間以内に収められないため、8 時間周期 (1 日 3 回) へ変更し、混雑帯の直前に再起動が来るよう時刻を配置する。</p>
+      <p>再起動時刻は各コミュニティの在室分布から決めるべきで、DCSServerBot 利用者は <code>scheduler</code> プラグインの <code>action.times</code> にリストで複数指定できる。</p>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--status">
+      <h4>Status</h4>
+      <p>発生機構は確認済み。緩和策は未適用で、効果は未検証。適用後、混雑帯での停止発生率が 0 になるかを同じ計測系で追跡する予定。</p>
+      <p>また、以下は未解明のまま残っている:</p>
+      <ul>
+        <li>プロセス側で何が蓄積しているかは特定できていない (ミッションスクリプト由来ではないことのみ確定)</li>
+        <li>10 名以上の高負荷時における停止長の実測データが不足している</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--related-separate-issue">
+      <h4>Related (separate issue)</h4>
+      <p>調査中、ホスト側のメモリ逼迫によりカーネルが DCS プロセスをスワップアウトする事象を観測した (メジャーフォルト 165/秒)。<code>vm.swappiness</code> が既定の 60 のままだと、ページキャッシュを捨てる前にサーバの作業セットが追い出される。レイテンシ重視のホストでは低く設定することを推奨する。</p>
+<pre class="fix-pre"><code>sudo sysctl -w vm.swappiness=10</code></pre>
+      <p>ただし本記事の停止現象との因果は確認されていない。停止を捕捉した期間のメジャーフォルトは 0 であり、別問題として扱う。</p>
+    </section>
+  </article>
+
   <article class="fix-article" id="wine-stub-crash">
     <h3>[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</h3>
 
@@ -16,7 +178,19 @@
       <span class="fix-tag">msvcp140_atomic_wait.dll</span>
     </div>
 
-    <section class="fix-section">
+      <nav class="fix-toc" aria-label="目次">
+        <span class="fix-toc-label">目次</span>
+      <ol class="fix-toc-list">
+        <li><a href="#wine-stub-crash--environment">Environment</a></li>
+        <li><a href="#wine-stub-crash--symptom">Symptom</a></li>
+        <li><a href="#wine-stub-crash--root-cause">Root Cause</a></li>
+        <li><a href="#wine-stub-crash--fix">Fix</a></li>
+        <li><a href="#wine-stub-crash--known-side-effect">Known Side Effect</a></li>
+        <li><a href="#wine-stub-crash--tested-on">Tested on</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="wine-stub-crash--environment">
       <h4>Environment</h4>
       <ul>
         <li>DCS World Server <code>2.9.27.24969</code> (2026-06 時点の最新)</li>
@@ -26,7 +200,7 @@
       </ul>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--symptom">
       <h4>Symptom</h4>
       <p>DCS 専用サーバ (<code>DCS_server.exe</code>) がログ出力なしに起動直後クラッシュ。Wine が以下を報告:</p>
 <pre class="fix-pre"><code>EXCEPTION_WINE_STUB: 0x80000100</code></pre>
@@ -36,7 +210,7 @@ err:module:loader_init Importing dlls for DCS_server.exe failed, status c0000135
       <p>サーバは <code>dcs.log</code> を書かず、<code>Listening on port XXXXX</code> にも到達しない。</p>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--root-cause">
       <h4>Root Cause</h4>
       <p>DCS <code>2.9.27.24969</code> で <code>msvcp140.dll</code> の依存関係が更新され、<code>msvcp140_atomic_wait.dll</code> から
       <code>__std_tzdb_get_sys_info</code> と <code>__std_tzdb_delete_sys_info</code> を <strong>静的インポート</strong> するようになった。</p>
@@ -55,7 +229,7 @@ err:module:loader_init Importing dlls for DCS_server.exe failed, status c0000135
 };                      // total: 40 bytes (_CRT_PACKING=8)</code></pre>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--fix">
       <h4>Fix</h4>
       <p>wine-11.0 ソースから、問題の 2 関数を最小限実装したパッチ済み <code>msvcp140_atomic_wait.dll</code> をビルドして置き換える。</p>
 
@@ -123,12 +297,12 @@ sed -i 's/"[*]msvcp140_atomic_wait"="native"/"*msvcp140_atomic_wait"="builtin"/'
    "$WINEPREFIX/user.reg"</code></pre>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--known-side-effect">
       <h4>Known Side Effect</h4>
       <p>DCS ログのタイムスタンプが UTC 固定になる (実装は常に UTC offset=0 を返す)。表示上のみの問題でゲームプレイへの影響なし。</p>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--tested-on">
       <h4>Tested on</h4>
       <ul>
         <li>DCS <code>2.9.27.24969</code>、wine-stable <code>11.0.0.0~bookworm-1</code></li>

@@ -26,6 +26,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://iyakusai.com/` (+ `www` / `2025`) | 静的 HTML (別プロジェクト、同じ Caddy でホスト) |
 | `https://sneaker.freedomflight.jp/` | Sneaker (Live Map) — 実体は姉妹 repo コンテナ |
 | `https://lardoon.freedomflight.jp/` | Lardoon (Tacview Replay archive) |
+| `https://gravitymap.freedomflight.jp/` | MyGravityMap — DCS とは無関係の個人ツール (姉妹 repo)、完全静的、file_server 配信 |
 
 ## トポロジ
 
@@ -40,7 +41,8 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
                     ├─── iyakusai.com       → file_server ./iyakusai/
                     ├─── freedomflight.jp   → reverse_proxy ffs-website:8000
                     ├─── sneaker.~          → reverse_proxy ffs-sneaklardooon:7788
-                    └─── lardoon.~          → reverse_proxy ffs-sneaklardooon:3883
+                    ├─── lardoon.~          → reverse_proxy ffs-sneaklardooon:3883
+                    └─── gravitymap.~          → file_server ./gravitymap/
 
  [ ffs-website ] (本 repo FastAPI 本体)
    │

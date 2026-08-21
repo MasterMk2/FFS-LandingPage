@@ -19,7 +19,6 @@
 #   catch-all (未登録ホスト / IP 直打ち on :80)
 #       → 404
 ###############################################################################
-
 {
 	admin off
 	email xxxx@gmail.com
@@ -70,6 +69,20 @@ lardoon.freedomflight.jp {
 	encode zstd gzip
 	reverse_proxy ffs-sneaklardooon:3883 {
 		header_up X-Real-IP {remote_host}
+	}
+	log
+}
+
+# MyGravityMap (姉妹 repo、Google マップタイムライン可視化) — 完全静的、gravitymap/
+# を scripts/deploy-gravitymap.sh がビルド・同期。ffs-website / DCSSB とは無関係。
+#
+# crypto.subtle (Web Crypto API、ファイルハッシュ判定に使用) が secure context
+# 必須のため、http:// では機能しない。DNS 設定済み (2026-08-21) につき TLS 化。
+gravitymap.freedomflight.jp {
+	root * /srv/gravitymap
+	encode zstd gzip
+	handle {
+		file_server
 	}
 	log
 }

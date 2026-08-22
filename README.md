@@ -6,6 +6,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 - DCSServerBot (DCSSB) の RestAPI + Tracks API を参照してサーバ状況・戦績・リプレイ DL を提供
 - postgres `serverstats` を読み取り専用で直接叩き、FPS/CPU/Memory の時系列グラフを SVG で描画
 - Caddy を前段に立て、`freedomflight.jp` / `iyakusai.com` / `sneaker.~` / `lardoon.~` を Host ヘッダで振り分け
+- `freedomflight.jp/gca/` は ../ffs-dcs-server の `dcs-web-gca` コンテナへパス振り分け (管制卓)
 - Let's Encrypt で TLS 自動発行・自動更新
 
 ## スタック
@@ -23,6 +24,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://freedomflight.jp/status` | サーバ状況 + Server Load 時系列 |
 | `https://freedomflight.jp/leaderboard` | 月次リーダーボード |
 | `https://freedomflight.jp/tracks` | DCS リプレイ (.trk) 一覧 + ダウンロード |
+| `https://freedomflight.jp/gca/` | Web GCA 管制卓 — 実体は姉妹 repo [DCSWebGCA](https://github.com/MasterMk2/DCSWebGCA) のコンテナ (`ffs-dcs-web-gca:8080`)。サブドメインではなく `handle_path /gca/*` で出しているので DNS 追加不要。WebSocket も同経路 |
 | `https://iyakusai.com/` (+ `www` / `2025`) | 静的 HTML (別プロジェクト、同じ Caddy でホスト) |
 | `https://sneaker.freedomflight.jp/` | Sneaker (Live Map) — 実体は姉妹 repo コンテナ |
 | `https://lardoon.freedomflight.jp/` | Lardoon (Tacview Replay archive) |

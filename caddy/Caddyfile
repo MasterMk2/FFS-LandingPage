@@ -46,9 +46,23 @@ iyakusai.com, www.iyakusai.com, 2025.iyakusai.com {
 # A レコード追加後に `freedomflight.jp, www.freedomflight.jp {` に戻す。
 freedomflight.jp {
 	encode zstd gzip
-	reverse_proxy ffs-website:8000 {
-		header_up Host {host}
-		header_up X-Real-IP {remote_host}
+
+	# DCS Web GCA (ブラウザ管制コンソール)。実体は ../ffs-dcs-server の compose が
+	# 起動する dcs-web-gca:8080。sneaker/lardoon と違いサブドメインを切っていないので
+	# DNS 追加なしで動く。WebSocket (/gca/ws) も reverse_proxy がそのまま upgrade する。
+	# 末尾スラッシュ無しでも入れるように redir を先に置く (handle_path は /gca/* のみ一致)。
+	redir /gca /gca/
+	handle_path /gca/* {
+		reverse_proxy ffs-dcs-web-gca:8080 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		reverse_proxy ffs-website:8000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	log
 }
@@ -78,6 +92,17 @@ lardoon.freedomflight.jp {
 #
 # crypto.subtle (Web Crypto API、ファイルハッシュ判定に使用) が secure context
 # 必須のため、http:// では機能しない。DNS 設定済み (2026-08-21) につき TLS 化。
+# DCS Web GCA をサブドメインで出したくなった場合はここを有効化する
+# (A レコード gca.freedomflight.jp -> 111.237.107.64 を先に追加すること。
+#  /gca/ 側と併存しても問題ない)。
+# gca.freedomflight.jp {
+# 	encode zstd gzip
+# 	reverse_proxy ffs-dcs-web-gca:8080 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
+# 	log
+# }
+
 gravitymap.freedomflight.jp {
 	root * /srv/gravitymap
 	encode zstd gzip

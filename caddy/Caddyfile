@@ -58,6 +58,17 @@ freedomflight.jp {
 		}
 	}
 
+	# DCS Landing Teacher (着陸/着艦レビュー・LSO グレーディング)。実体は
+	# ../ffs-dcs-server の compose が起動する dcs-landing-teacher:8000 (server1 専用)。
+	# GCA と同じくパス振り分けなので DNS 追加不要。WebSocket (/landing-teacher/api/ws/landings)
+	# も同じ reverse_proxy がそのまま upgrade する。
+	redir /landing-teacher /landing-teacher/
+	handle_path /landing-teacher/* {
+		reverse_proxy ffs-dcs-landing-teacher:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
 	handle {
 		reverse_proxy ffs-website:8000 {
 			header_up Host {host}

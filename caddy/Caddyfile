@@ -69,6 +69,23 @@ freedomflight.jp {
 		}
 	}
 
+	# Google Health Collector (個人ヘルスデータ)。実体は姉妹 repo
+	# ../GoogleHealthCollector の compose が起動する google-health-collector:8000。
+	# ffs-website 側の /health (Owner's Health パネル) とは別物で、こちらは
+	# 全 34 データ型の蓄積・可視化。パスは /health/v2/ なので衝突しない。
+	#
+	# ★ アプリ側で GHC_PASSWORD によるログイン必須。X-Real-IP を渡さないと
+	#   ログイン試行のレート制限が全部同一 IP 扱いになり効かなくなる
+	#   (アプリ側は GHC_TRUST_PROXY=1 でこのヘッダを信頼している)。
+	redir /health/v2 /health/v2/
+	handle_path /health/v2/* {
+		# 個人の健康データなので検索エンジンに拾わせない。
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy google-health-collector:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
 	handle {
 		reverse_proxy ffs-website:8000 {
 			header_up Host {host}

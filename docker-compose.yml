@@ -75,6 +75,7 @@ services:
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./iyakusai:/srv/iyakusai:ro
+      - ./gravitymap:/srv/gravitymap:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

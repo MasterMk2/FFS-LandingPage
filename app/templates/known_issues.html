@@ -135,11 +135,20 @@ heap handle: 0x7ffffe220000 のみ (ucrtbase の CRT ヒープ)</code></pre>
 else if (bin - heap->bins < 0x30 && alloc > 0x800) enable = TRUE;          /* 小さい bin: 累計 2048 回で有効化 */
 else if (bin - heap->bins < 0x30 && alloc - freed > 0x10) enable = TRUE;
 else if (alloc - freed > 0x400000 / block_size) enable = TRUE;             /* それ以外: 生存ブロック数のみ */</code></pre>
+      <p><strong>第一仮説 (誤り)</strong>: 1,520 byte は bin 0x37 (≥ 0x30) で、LFH 化には「生存ブロック 2,730 個超」が必要なため、確保→即解放の Olympus ではこのサイズが永久に LFH 化されない、と読んだ。この規則を緩めた ntdll.dll (パッチ 1) を当てて検証したが、<strong>走査は消えず CPU も同じ勾配で上昇した</strong> (10 分 40% → 34 分 55%)。プロセスメモリから <code>struct heap</code> を直接読むと bin 0x37 は <code>enabled = 1</code> で、標準経路のカウンタも増えていなかった。</p>
+      <p><strong>確定した機構</strong>: LBR が示す直接の呼び出し元 <code>RtlAllocateHeap+0x725</code> を逆アセンブルすると、そこは通常の割り当てではなく <strong>LFH のグループ確保 (<code>group_allocate</code>、インライン化)</strong> だった。</p>
+<pre class="fix-pre"><code>17001b5e0:  mov    rax,r12          ; r12 = 0x30 (bin 2 = 48 byte ブロック)
+17001b5e3:  shl    rax,0x5
+17001b5e7:  sub    rax,r12          ; rax = 31 * 0x30  (GROUP_BLOCK_COUNT = 31)
+17001b5ea:  lea    r8,[r15+rax*1+0x27]
+17001b5f6:  and    r8,0xfffffffffffffff0   ; = 0x5f0 = グループブロックのサイズ
+  ...
+17001b655:  call   heap_allocate_block     ; ← 走査の 100% がここから</code></pre>
       <ul>
-        <li>1,520 byte は bin 0x37 (≥ 0x30) なので、LFH 化には「そのサイズ帯の<strong>生存</strong>ブロックが 0x400000 / 0x600 = 2,730 個超」が必要。</li>
-        <li>Olympus は確保して即解放するので生存数が増えず、<strong>このサイズは永久に LFH 化されない</strong>。全ての割り当てが標準経路 = first-fit の線形走査になる。</li>
-        <li>解放・分割で「1,520 に届かない空き断片」が同じリストに溜まり続け、走査は毎回それを全部スキップする。断片は減らないので、割り当て 1 回のコストが稼働時間に比例して伸びる。飽和時は 1 回あたり約 800 µs = 数万〜十数万エントリを毎回なめている計算になる。</li>
-        <li>Windows の LFH は「同じサイズの割り当て頻度」で有効化されるため、実機では起きない。<strong>Wine 固有</strong>で、Olympus 側から見れば「Windows では正常」なコードである。</li>
+        <li>0x5f0 = 1,520 byte は「48 byte の JSON ノード 31 個 + ヘッダ」の <strong>LFH グループ</strong>のサイズ。cpprest は <code>json::value</code> のノードを 48 byte 単位で大量に作る。</li>
+        <li>空になった LFH グループの行き先は、スレッドの affinity スロット (1 個) → bin の共有リスト (32 個まで) → それ以上は <code>group_release()</code> で<strong>標準ヒープへ解放</strong>。Olympus は 1 サイクルにノードを数千個作って捨てるので、毎サイクル 33 個を超えるグループが空になり、余りが解放される。次のサイクルで <code>group_allocate()</code> が <code>heap_allocate_block(0x5f0)</code> で再確保する。これが毎秒数百〜千回。</li>
+        <li>LFH が有効な間、標準経路を通る要求は事実上このグループ確保だけになる。first-fit の分割で出る「0x5f0 に届かない端数 (0x500〜0x5ef)」は、そのサイズ帯の要求が LFH に吸われて標準経路に来ないため<strong>誰にも消費されず</strong>同じリストに溜まり続け、グループ確保のたびに全部スキップされる。断片数が稼働時間に比例するので走査時間も比例して伸びる。</li>
+        <li>Windows の LFH はグループをこの規模で標準ヒープに戻さないため実機では起きない。<strong>Wine 固有</strong>で、Olympus 側から見れば「Windows では正常」なコードである。</li>
       </ul>
     </section>
 
@@ -156,14 +165,23 @@ else if (alloc - freed > 0x400000 / block_size) enable = TRUE;             /* �
 
     <section class="fix-section" id="wine-heap-lfh-olympus--fix">
       <h4>Fix</h4>
-      <h5>1. ntdll.dll の LFH 有効化条件を 1 行緩和 (本命)</h5>
+      <h5>1. ntdll.dll: 空になった LFH グループを標準ヒープに戻さない (本命)</h5>
 <pre class="fix-pre"><code>--- a/dlls/ntdll/heap.c
 +++ b/dlls/ntdll/heap.c
-@@ bin_try_enable()
+@@ heap_release_bin_group()
+-    if (RtlQueryDepthSList( &bin->groups ) <= ARRAY_SIZE(affinity_mapping))   /* 32 */
++    if (RtlQueryDepthSList( &bin->groups ) <= 0x1000)
+     {
+         RtlInterlockedPushEntrySList( &bin->groups, &group->entry );
+         return STATUS_SUCCESS;
+     }
+     return group_release( heap, flags, bin, group );   /* ← ここに落ちなくなる */
+
+@@ bin_try_enable()   (補助: 全 bin を割り当て頻度で LFH 化。単独では効かなかった)
 -    else if (bin - heap->bins < 0x30 && alloc > 0x800) enable = TRUE;
 +    else if (alloc > 0x800) enable = TRUE;</code></pre>
-      <p>「累計 2,048 回割り当てたサイズ帯は LFH に切り替える」を全 bin (〜32 KB) に適用する。wine-11.0 のソースに当てて mingw で PE 版 <code>ntdll.dll</code> だけを再ビルドし (configure 7 秒、make 4 秒)、<code>/opt/wine-stable/lib/wine/x86_64-windows/ntdll.dll</code> を差し替える。unix 側 <code>ntdll.so</code> は stock のまま (同一ソース版)。差し替えは同ディレクトリにコピーしてから <code>mv -f</code> (rename) で行い、実行中プロセスの旧マッピングを壊さない。</p>
-      <p>事前検証: 本番と同じイメージの使い捨てコンテナで、Olympus と同じパターン (1,512 byte + 小ブロック ×20 の確保→解放を 6 万サイクル) を実行し、wineboot・実行とも正常、<code>HeapCompatibilityInformation = 2</code> (LFH)、stock 比 8% 高速を確認。ただし合成負荷では stock 側の劣化を再現できなかったので、最終判定は本番で行う。</p>
+      <p>bin あたり最大 0x1000 個の空グループを保持する (bin 2 なら 1,520 byte × 4,096 = 6 MB が上限)。グループが標準ヒープに戻らなくなるので <code>group_allocate()</code> の走査そのものが発生せず、端数も生まれない。wine-11.0 のソースに当てて mingw で PE 版 <code>ntdll.dll</code> だけを再ビルドし (configure 7 秒、make 4 秒)、<code>/opt/wine-stable/lib/wine/x86_64-windows/ntdll.dll</code> を差し替える。unix 側 <code>ntdll.so</code> は stock のまま (同一ソース版)。差し替えは同ディレクトリにコピーしてから <code>mv -f</code> (rename) で行い、実行中プロセスの旧マッピングを壊さない。</p>
+      <p>事前検証: 本番と同じイメージの使い捨てコンテナで、1 サイクルに 48 byte ×4,000 + 24 byte ×2,000 + 1,512 byte ×50 + 小ブロックを確保→解放する負荷を 2 万サイクル実行し、wineboot・実行とも正常、stock 230 µs/サイクル → パッチ版 205 µs/サイクル (−11%)。合成負荷では stock 側の「時間比例の劣化」までは再現できず (本番の断片化には多スレッド + 数十万サイクルが要る)、機構の確認は本番の perf で行った。</p>
 
       <h5>2. 暫定緩和 (パッチが使えない場合)</h5>
       <p><code>OlympusCommand.lua</code> の <code>setUnitsData</code> の周期 <code>return time + 0.05</code> を <code>0.25</code> にすると割り当て回数が 1/5 になり、飽和まで約 12 時間に伸びる (地図の全ユニット更新周期は 0.8 秒→4 秒)。断片化そのものは止まらない。</p>
@@ -172,8 +190,15 @@ else if (alloc - freed > 0x400000 / block_size) enable = TRUE;             /* �
     <section class="fix-section" id="wine-heap-lfh-olympus--status">
       <h4>Status / Verification</h4>
       <ul>
-        <li>2026-09-04 23:12 JST: パッチ版 ntdll.dll を適用し、Olympus の周期は元の 0.05 秒のまま (パッチ単独の効果を見るため) で server1 を再起動。判定基準は「無人時 CPU が 3 時間以上 42〜45% で平坦」「perf で ntdll.dll の割合が数 % 以下」。結果はこの記事に追記する。</li>
-        <li>効いた場合: Wine 上流に再現データ付きで報告する (bin ≥ 0x30 の確保→即解放パターンで LFH が有効化されず free-list walk が O(n) で肥大する)。</li>
+        <li>2026-09-04 23:12 JST: パッチ 1 (LFH 化規則の緩和) のみで server1 を再起動 → 34 分で CPU 40% → 55%、走査も残存。<strong>効かず</strong>。この検証で呼び出し元がグループ確保だと判明。</li>
+        <li>2026-09-04 23:51 JST: パッチ 1+2 を適用し、Olympus の周期は元の 0.05 秒のまま再起動。<strong>4 分後の perf でシムスレッド中の ntdll.dll は 9.6% (前 run 同時点 40%、飽和時 85%)、<code>heap_allocate_block</code> の走査は検出されず</strong>、DCS 本体コードが 56%。Main の CPU は 26% (前 run 同時点 37〜40%)。</li>
+<pre class="fix-pre"><code># 再起動 4 分後、シムスレッドの内訳 (perf, DSO 別)
+              前 run (パッチ 1 のみ)   今回 (パッチ 1+2)
+ntdll.dll              40.8%              9.6%   ← heap_allocate_block が消滅
+DCS 本体 [JIT]         38.5%             55.6%
+ntdll.so (syscall)     11.1%             20.0%</code></pre>
+        <li>長期判定は「無人時 CPU が 3 時間以上平坦」。監視中で、結果はここに追記する。</li>
+        <li>Wine 上流への報告: 「1 サイクルに同サイズの割り当てを数千個作って捨てる負荷で、空 LFH グループが 32 個超で標準ヒープに戻され、再確保の first-fit 走査が分割端数の蓄積で時間比例に肥大する」。再現データ (perf/LBR/レジスタ/逆アセンブル) はこの記事のとおり。</li>
         <li>Olympus 上流には「Windows では起きない」ことも含めて情報提供する。JSON オブジェクトの使い捨てを減らせば Wine でも軽くなる。</li>
       </ul>
     </section>

@@ -7,6 +7,463 @@
     <p class="subtle">サーバ運用中に発見された既知の問題と修正方法をまとめています。</p>
   </header>
 
+  <nav class="fixes-index" aria-label="記事一覧">
+    <span class="fix-toc-label">記事</span>
+    <ul>
+      <li><a href="#wine-heap-lfh-olympus">[Fix] Olympus 有効化後、無人でも約 2.5 時間でサーバ FPS が 28 まで崩落する — Wine ヒープの空きリスト線形走査 (LFH 未活性化) と ntdll.dll パッチ</a></li>
+      <li><a href="#ecore-affinity-lag">[Fix] 日によってサーバ FPS が 5〜30 まで落ちる — DCSServerBot auto_affinity による E-core 固定と、SAM レーダー制御スクリプトの A/B 結果</a></li>
+      <li><a href="#sim-thread-stall">[Investigation] 全プレイヤーが同時に一瞬フリーズする — シムスレッドのバースト肥大とプロセス稼働時間の関係</a></li>
+      <li><a href="#wine-stub-crash">[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</a></li>
+    </ul>
+  </nav>
+
+  <article class="fix-article" id="wine-heap-lfh-olympus">
+    <h3>[Fix] Olympus 有効化後、無人でも約 2.5 時間でサーバ FPS が 28 まで崩落する — Wine ヒープの空きリスト線形走査 (LFH 未活性化) と ntdll.dll パッチ</h3>
+
+    <div class="fix-meta">
+      <span class="fix-tag">DCS Dedicated Server</span>
+      <span class="fix-tag">DCS Olympus v2.0.5</span>
+      <span class="fix-tag">Wine 11.0 / ntdll heap</span>
+      <span class="fix-tag">cpprestsdk</span>
+      <span class="fix-tag">Performance</span>
+      <span class="fix-tag">2026-09-04</span>
+    </div>
+
+      <nav class="fix-toc" aria-label="目次">
+        <span class="fix-toc-label">目次</span>
+      <ol class="fix-toc-list">
+        <li><a href="#wine-heap-lfh-olympus--environment">Environment</a></li>
+        <li><a href="#wine-heap-lfh-olympus--symptom">Symptom</a></li>
+        <li><a href="#wine-heap-lfh-olympus--timeline">いつから起きているか</a></li>
+        <li><a href="#wine-heap-lfh-olympus--method">Method (壊さずに中を測る)</a></li>
+        <li><a href="#wine-heap-lfh-olympus--findings">Findings</a></li>
+        <li><a href="#wine-heap-lfh-olympus--root-cause">Root Cause (wine-11.0 heap.c)</a></li>
+        <li><a href="#wine-heap-lfh-olympus--negative">確認して外れた仮説</a></li>
+        <li><a href="#wine-heap-lfh-olympus--fix">Fix</a></li>
+        <li><a href="#wine-heap-lfh-olympus--status">Status / Verification</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--environment">
+      <h4>Environment</h4>
+      <ul>
+        <li>DCS World Dedicated Server <code>2.9.29.27468</code> (MT)、Linux (Ubuntu 24.04 / kernel 7.0) + WineHQ stable <code>11.0</code> (bookworm) + Docker</li>
+        <li>DCS Olympus <code>v2.0.5</code> — backend (<code>olympus.dll</code> / <code>core.dll</code> / <code>luatools.dll</code> / <code>cpprest_2_10.dll</code>) は DCS プロセス内で動作</li>
+        <li>CPU: Core Ultra 7 265K、シムスレッドは P-core (CPU 0-7) に固定済み (前記事参照)</li>
+        <li>ミッション: 常設フリーフライト (ユニット 777)</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--symptom">
+      <h4>Symptom</h4>
+      <p>DCS を起動すると 117 FPS / プロセス CPU 42% から始まり、<strong>プレイヤーが 0 人でも</strong>シムスレッドの CPU が 1 時間あたり約 +25 pt ずつ増え続け、約 2.5〜3 時間で 1 コアを振り切って FPS 28 に張り付く。再起動すると元に戻り、また同じ勾配で落ちる。人数、離陸、SAM、ミッション内容のいずれとも無関係。</p>
+<pre class="fix-pre"><code># 9/4 16:01 起動の run (終始 0 人)。プロセス CPU% / FPS
+経過   10分   30分   60分   90分   120分  150分  180分  240分
+CPU    42     51     59     72     81     98    108    108
+FPS   116    107     95     73     64     37     29     29</code></pre>
+      <p>RSS も 7.1 GB → 8.5 GB と単調に増える。前記事 (E-core 固定) の修正でベースは下がったが、この勾配は変わらなかった。</p>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--timeline">
+      <h4>いつから起きているか</h4>
+      <p>run ごとに「起動からの経過時間 × プロセス CPU%」を並べると、境目は 1 本だけだった。</p>
+<pre class="fix-pre"><code># server1、run 開始からの経過時間別 プロセス CPU% (人数)
+run 開始            10分    60分    120分   180分   360分
+08-31 04:07         38/0    39/0    39/0    40/0    41/0    ← 旧 DCS、Olympus なし
+09-02 04:19         33/0    34/0    35/0    35/0    38/0
+09-03 04:14         43/0    43/0    44/0    44/0    47/0    ← DCS 2.9.29 更新後、Olympus なし: 平坦
+09-03 17:23         52/0    69/0    94/0   108/0           ← server1 で Olympus 有効化: 以後すべての run で再現
+09-04 04:18         45/0    65/0   100/2   108/0
+09-04 16:01         44/0    65/0    93/0   108/1</code></pre>
+      <p>DCS 本体の更新 (9/3 01:12) 後も Olympus 無効の run は 6 時間平坦なので、DCS 更新は無関係。Olympus を server1 で有効化した run から例外なく発生している。</p>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--method">
+      <h4>Method (壊さずに中を測る)</h4>
+      <p>「Olympus を外して直ったら Olympus が悪い」では何が起きているか分からないので、飽和状態のプロセスを止めずにプロファイルした。Wine 配下の PE モジュールはシンボルが取れないため、<strong>DSO (どの DLL か) 単位</strong>と<strong>ロード済み PE の実アドレス範囲</strong>で帰属させる。</p>
+<pre class="fix-pre"><code># 1. シムスレッド (main tid) を 499 Hz でサンプリング、DLL 単位で集計
+perf record -F 499 -t &lt;main_tid&gt; -- sleep 20
+perf report --sort dso,sym --stdio
+
+# 2. 呼び出し元は LBR (Last Branch Record) で取る。PE の .pdata は perf が読めないので
+#    フレームポインタ/unwind に頼らない LBR が唯一の手段
+perf record -F 499 -t &lt;main_tid&gt; --call-graph lbr -- sleep 10
+
+# 3. [JIT] 扱いになる anonymous mapping を PE モジュールに対応付ける:
+#    /proc/&lt;pid&gt;/maps の各領域先頭から 'MZ' → PE ヘッダ → export 名を読む (同一 PID ns から /proc/&lt;pid&gt;/mem)
+
+# 4. ホットループ内のレジスタをサンプリングして「要求サイズ」を直接読む
+perf record -F 997 -t &lt;main_tid&gt; --user-regs=R13,R12 -- sleep 6
+perf script -F ip,uregs</code></pre>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--findings">
+      <h4>Findings</h4>
+      <h5>CPU 時間の 8 割が Wine の ntdll.dll の 1 つのループ</h5>
+<pre class="fix-pre"><code>    85.40%  ntdll.dll          ← うち 77% が ntdll.dll+0x4f500 の 5 命令
+     9.18%  [JIT]              ← DCS 本体 (World/Scripting/edCore/lua 等、anonymous mapping)
+     3.09%  ntdll.so
+     0.56%  ucrtbase.dll</code></pre>
+      <p>逆アセンブルすると <code>heap_allocate_block</code> の中で空きリストを <code>mov rbx,[rbx]</code> で辿り、各ブロックのサイズを要求サイズ (r13) と比べて「足りなければ次へ」を繰り返す first-fit の走査だった。</p>
+<pre class="fix-pre"><code>17004f500:  movzx  edx,BYTE PTR [rbx-0x1]     ; block flags
+17004f504:  cmp    dl,0x3
+17004f50c:  movzx  eax,WORD PTR [rbx-0x8]     ; block size
+17004f515:  shl    eax,0x4
+17004f518:  cmp    rax,r13                    ; size >= requested ?
+17004f51b:  jae    found
+17004f521:  mov    rbx,QWORD PTR [rbx]        ; next free block
+17004f529:  cmp    rbx,r8                     ; list end ?
+17004f52c:  jne    17004f500</code></pre>
+
+      <h5>呼び出し元は Olympus の JSON 構築</h5>
+<pre class="fix-pre"><code>World.dll → Scripting.dll → edCore.dll → lua.dll        (DCS がミッション Lua を実行)
+  → olympus.dll → core.dll → luatools.dll (再帰 ×7)     (Lua テーブル → JSON 変換)
+  → cpprest_2_10.dll (+0x8d81a: 71%)                     (json::value の構築)
+  → ucrtbase.dll!malloc → ntdll!RtlAllocateHeap → heap_allocate_block の空きリスト走査</code></pre>
+      <p><code>OlympusCommand.lua</code> の <code>setUnitsData</code> が 50 ms 毎に 50 ユニット分のテーブルを DLL に渡し、DLL 側が cpprestsdk の JSON オブジェクトに変換して捨てる。毎秒約 1,000 回の割り当てと解放である。</p>
+
+      <h5>要求サイズは 100% が 1,520 byte</h5>
+<pre class="fix-pre"><code># ホットループ内で採取した 5,160 サンプルの要求サイズ (r13) とヒープハンドル (r12)
+block_size 0x5f0 (1.5 KB): 5160 samples (100.0%)
+heap handle: 0x7ffffe220000 のみ (ucrtbase の CRT ヒープ)</code></pre>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--root-cause">
+      <h4>Root Cause (wine-11.0 <code>dlls/ntdll/heap.c</code>)</h4>
+      <p>Wine のヒープには LFH (Low Fragmentation Heap) フロントエンドがあり、サイズ帯 (bin) ごとに自動で有効化される。その条件が <code>bin_try_enable()</code> にある:</p>
+<pre class="fix-pre"><code>if (bin == heap->bins && alloc > 0x10) enable = TRUE;
+else if (bin - heap->bins < 0x30 && alloc > 0x800) enable = TRUE;          /* 小さい bin: 累計 2048 回で有効化 */
+else if (bin - heap->bins < 0x30 && alloc - freed > 0x10) enable = TRUE;
+else if (alloc - freed > 0x400000 / block_size) enable = TRUE;             /* それ以外: 生存ブロック数のみ */</code></pre>
+      <ul>
+        <li>1,520 byte は bin 0x37 (≥ 0x30) なので、LFH 化には「そのサイズ帯の<strong>生存</strong>ブロックが 0x400000 / 0x600 = 2,730 個超」が必要。</li>
+        <li>Olympus は確保して即解放するので生存数が増えず、<strong>このサイズは永久に LFH 化されない</strong>。全ての割り当てが標準経路 = first-fit の線形走査になる。</li>
+        <li>解放・分割で「1,520 に届かない空き断片」が同じリストに溜まり続け、走査は毎回それを全部スキップする。断片は減らないので、割り当て 1 回のコストが稼働時間に比例して伸びる。飽和時は 1 回あたり約 800 µs = 数万〜十数万エントリを毎回なめている計算になる。</li>
+        <li>Windows の LFH は「同じサイズの割り当て頻度」で有効化されるため、実機では起きない。<strong>Wine 固有</strong>で、Olympus 側から見れば「Windows では正常」なコードである。</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--negative">
+      <h4>確認して外れた仮説</h4>
+      <ul>
+        <li><strong>プレイヤー / SAM / ミッション</strong>: 0 人の run で同じ勾配。</li>
+        <li><strong>DCS 2.9.29 更新</strong>: 更新後・Olympus 無効の run は 6 時間平坦。</li>
+        <li><strong>Olympus のリストが肥大 (ユニット/武器/ログ)</strong>: backend API の <code>/olympus/units</code> は 62 KB、<code>/weapons</code> は 4 件で一定。Lua 側の <code>Olympus.units</code> も死亡ユニットを除去している。</li>
+        <li><strong>Lua からのヒープ操作で LFH を強制有効化する実験</strong>: 1,520 byte 級の文字列を 4,000 個保持させても変化なし。DCS の Lua VM は独自アロケータで、cpprest と同じヒープに乗らない (lua.dll が realloc を import していても使われていない)。</li>
+        <li><strong>split lock / wineserver / メモリ逼迫</strong>: いずれも数 % 以下。</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--fix">
+      <h4>Fix</h4>
+      <h5>1. ntdll.dll の LFH 有効化条件を 1 行緩和 (本命)</h5>
+<pre class="fix-pre"><code>--- a/dlls/ntdll/heap.c
++++ b/dlls/ntdll/heap.c
+@@ bin_try_enable()
+-    else if (bin - heap->bins < 0x30 && alloc > 0x800) enable = TRUE;
++    else if (alloc > 0x800) enable = TRUE;</code></pre>
+      <p>「累計 2,048 回割り当てたサイズ帯は LFH に切り替える」を全 bin (〜32 KB) に適用する。wine-11.0 のソースに当てて mingw で PE 版 <code>ntdll.dll</code> だけを再ビルドし (configure 7 秒、make 4 秒)、<code>/opt/wine-stable/lib/wine/x86_64-windows/ntdll.dll</code> を差し替える。unix 側 <code>ntdll.so</code> は stock のまま (同一ソース版)。差し替えは同ディレクトリにコピーしてから <code>mv -f</code> (rename) で行い、実行中プロセスの旧マッピングを壊さない。</p>
+      <p>事前検証: 本番と同じイメージの使い捨てコンテナで、Olympus と同じパターン (1,512 byte + 小ブロック ×20 の確保→解放を 6 万サイクル) を実行し、wineboot・実行とも正常、<code>HeapCompatibilityInformation = 2</code> (LFH)、stock 比 8% 高速を確認。ただし合成負荷では stock 側の劣化を再現できなかったので、最終判定は本番で行う。</p>
+
+      <h5>2. 暫定緩和 (パッチが使えない場合)</h5>
+      <p><code>OlympusCommand.lua</code> の <code>setUnitsData</code> の周期 <code>return time + 0.05</code> を <code>0.25</code> にすると割り当て回数が 1/5 になり、飽和まで約 12 時間に伸びる (地図の全ユニット更新周期は 0.8 秒→4 秒)。断片化そのものは止まらない。</p>
+    </section>
+
+    <section class="fix-section" id="wine-heap-lfh-olympus--status">
+      <h4>Status / Verification</h4>
+      <ul>
+        <li>2026-09-04 23:12 JST: パッチ版 ntdll.dll を適用し、Olympus の周期は元の 0.05 秒のまま (パッチ単独の効果を見るため) で server1 を再起動。判定基準は「無人時 CPU が 3 時間以上 42〜45% で平坦」「perf で ntdll.dll の割合が数 % 以下」。結果はこの記事に追記する。</li>
+        <li>効いた場合: Wine 上流に再現データ付きで報告する (bin ≥ 0x30 の確保→即解放パターンで LFH が有効化されず free-list walk が O(n) で肥大する)。</li>
+        <li>Olympus 上流には「Windows では起きない」ことも含めて情報提供する。JSON オブジェクトの使い捨てを減らせば Wine でも軽くなる。</li>
+      </ul>
+    </section>
+  </article>
+
+  <article class="fix-article" id="ecore-affinity-lag">
+    <h3>[Fix] 日によってサーバ FPS が 5〜30 まで落ちる — DCSServerBot auto_affinity による E-core 固定と、SAM レーダー制御スクリプトの A/B 結果</h3>
+
+    <div class="fix-meta">
+      <span class="fix-tag">DCS Dedicated Server</span>
+      <span class="fix-tag">DCSServerBot</span>
+      <span class="fix-tag">Linux / Wine</span>
+      <span class="fix-tag">Hybrid CPU (P-core / E-core)</span>
+      <span class="fix-tag">Performance</span>
+      <span class="fix-tag">2026-09-03</span>
+    </div>
+
+      <nav class="fix-toc" aria-label="目次">
+        <span class="fix-toc-label">目次</span>
+      <ol class="fix-toc-list">
+        <li><a href="#ecore-affinity-lag--environment">Environment</a></li>
+        <li><a href="#ecore-affinity-lag--symptom">Symptom</a></li>
+        <li><a href="#ecore-affinity-lag--method">Method</a></li>
+        <li><a href="#ecore-affinity-lag--finding-1">Finding 1: シムスレッドが E-core に固定されていた</a></li>
+        <li><a href="#ecore-affinity-lag--finding-2">Finding 2: SAM レーダー制御スクリプトの A/B 結果</a></li>
+        <li><a href="#ecore-affinity-lag--not-the-cause">Not the cause (確認済みの容疑者)</a></li>
+        <li><a href="#ecore-affinity-lag--fix">Fix</a></li>
+        <li><a href="#ecore-affinity-lag--result">Result</a></li>
+        <li><a href="#ecore-affinity-lag--status">Status</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="ecore-affinity-lag--environment">
+      <h4>Environment</h4>
+      <ul>
+        <li>DCS World Dedicated Server <code>2.9.29.27468</code> (MT ビルド、<code>--server --norender</code>)</li>
+        <li>Linux (Ubuntu 24.04 / kernel 7.0) + Wine 11.0 stable (WineHQ bookworm パッケージ) + Docker</li>
+        <li>CPU: Intel Core Ultra 7 265K — P-core 8 基 (CPU 0-7、最大 5.5 GHz) + E-core 12 基 (CPU 8-19、最大 4.6 GHz)、SMT なし</li>
+        <li>プロセス管理: DCSServerBot 3.0.4 (Linux native、Wine 配下の <code>DCS_server.exe</code> を <code>sudo -u &lt;user&gt; wine</code> で起動)</li>
+        <li>ミッション: 常設フリーフライト (ユニット 777 / グループ 473、うちクライアントスロット 309、SAM 87 サイト・EWR 20)</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--symptom">
+      <h4>Symptom</h4>
+      <p>プレイヤーが離陸するとシムスレッドが 1 コアを振り切り (プロセス CPU 105〜118 %)、サーバ FPS が平常 110 から 5〜30 まで落ちる。降りると即座に復帰する。</p>
+      <p>人数依存は非線形で、<strong>16 人で 52 FPS の日もあれば、1 人で 20 FPS の日もある</strong>。8/30 には 4〜5 人で 6.6 FPS が 1 時間以上続いた。RAM / I/O / スワップは動いておらず、純粋な CPU 律速。</p>
+      <p>補足: DCS 2.9.x の専用サーバは既にマルチスレッド (MT) ビルドだが、シミュレーション本体は 1 スレッドで回る。MT 化で分散されるのは描画系が中心で、<code>--norender</code> のサーバでは恩恵が小さい。「マルチコアで動かす」ことでは解決しない種類の問題である。</p>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--method">
+      <h4>Method</h4>
+      <ul>
+        <li>DCSServerBot Monitoring が 1 分毎に書く <code>serverstats</code> (FPS / プロセス CPU / 人数) 45 日分を、ミッション名と人数で層別集計</li>
+        <li><code>statistics</code> (誰がどの機体でいつ乗っていたか) と JOIN し、低 FPS 区間と機体・人物の相関を確認</li>
+        <li>シムスレッドの許可 CPU (<code>/proc/&lt;pid&gt;/task/*/status</code> の <code>Cpus_allowed_list</code>) と、実行中コア (<code>ps -o psr</code>) を 1 秒毎 60 回サンプリング</li>
+        <li>DCSServerBot の <code>core/process/processmanager.py</code> と <code>core/process/linux/cpu.py</code> を読解</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--finding-1">
+      <h4>Finding 1: シムスレッドが E-core に固定されていた</h4>
+      <p>DCSServerBot 3.0 系の <strong>EXPERIMENTAL auto_affinity</strong> (2026-01 追加の ProcessManager) が、起動する実行ファイルに 1〜2 物理コアの CPU affinity を自動で割り当てる。Linux 実装はトポロジを sysfs の <code>physical_package_id</code> (= 全コア 0) で分類し、Efficiency Class を常に 0 として扱うため、<strong>P-core と E-core を区別できない</strong>。</p>
+      <p>affinity は Wine を起動するランチャープロセスに対して設定され、<code>exec</code> を経て DCS のメインスレッド (= シムスレッド) がそれを継承する。DCS のワーカースレッドは自分でマスクを全コアに戻すため、<strong>シムスレッドだけ</strong>が 1〜2 コアに閉じ込められる。</p>
+<pre class="fix-pre"><code># 当日の実測 (無人、ミッション稼働中)
+Cpus_allowed_list (main thread) : 6,8        ← P-core 1 基 + E-core 1 基
+実行コア 60 秒サンプリング       : cpu8 = 55 回 / cpu6 = 5 回   ← 92 % の時間を E-core で過ごす
+その他 66 スレッド               : 0-19 (制限なし)</code></pre>
+      <p>起動後の再配分 (2 秒毎の "cooperative" パス) はランチャープロセスにしか届かないため (DCS プロセスは別 UID で <code>EPERM</code>)、<strong>起動時に引いたコアが 12 時間の稼働中ずっと固定される</strong>。P-core を引いた日は速く、E-core を引いた日は同じ人数でも遅い。これが「日によって性能が違う」観測の説明になる。</p>
+      <p>なお nodes.yaml で <code>auto_affinity</code> を有効化していないにもかかわらず動作していた。<code>ProcessManager</code> がシングルトンで、設定を渡す前に既定値 (<code>auto_affinity=True</code>) で初期化されているためと推定している (上流側の挙動)。</p>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--finding-2">
+      <h4>Finding 2: SAM レーダー制御スクリプトの A/B 結果</h4>
+      <p>ミッション同梱の <code>SAM_RadarOparationLogic</code> (5 秒周期で全グループを走査し、EWR の探知に応じて SAM のレーダー発振を on/off する Lua) が容疑者だったため、8/20 からスクリプトを no-op スタブに置換した版 (B) を稼働させて比較した。B では全 SAM のレーダーが常時 ON になる。</p>
+<pre class="fix-pre"><code># server1、45 日分、RUNNING 中のみ
+ミッション            状態        平均FPS   5%tile   FPS&lt;50    FPS&lt;25   プロセスCPU
+A: 原本 (Lua 有効)    無人        110.3     103.3     0.0 %     0.0 %     36.9 %
+A: 原本 (Lua 有効)    飛行中      100.2      57.5     3.1 %     0.8 %     53.3 %
+B: スタブ (全 ON)     無人         94.2      67.2     0.7 %     0.3 %     39.1 %
+B: スタブ (全 ON)     飛行中       76.7      31.7    12.1 %     2.4 %     54.5 %
+
+# 人数別 平均 FPS (A / B)
+1 人: 106 / 85   2 人: 101 / 83   4 人: 97 / 74   5 人: 91 / 65   8 人: 72 / 40</code></pre>
+      <p>結論: <strong>コストは Lua ではなく、レーダーが ON になった後のエンジン側レーダーシミュレーション</strong>にある。スクリプトは「誰も飛んでいなければ全レーダー OFF、探知圏に入ったものだけ ON」にすることで負荷を下げており、外すと悪化する。SAM 87 / EWR 20 という密度そのものが根本原因で、離陸したプレイヤーが探知圏に入るほど重くなる (A-10 / Su-25T / 攻撃機系の低高度飛行で低 FPS が多いことと整合)。</p>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--not-the-cause">
+      <h4>Not the cause (確認済みの容疑者)</h4>
+      <ul>
+        <li><strong>Wine の同期オーバーヘッド (wineserver)</strong>: wineserver の CPU 時間はシムスレッドの 5〜8 % 程度。ntsync (Linux 6.14+ のカーネル同期プリミティブ) は Wine 11.0 が対応しているが、WineHQ の bookworm 向けパッケージは ntsync 非対応でビルドされているため、使うには Wine 自体の再ビルドが必要。効果見込みが小さいので今回は見送り。</li>
+        <li><strong>同一ホストの他サーバインスタンス</strong>: 他インスタンス稼働中と停止中で server1 の飛行中 FPS に差なし (90.6 vs 89.2)。</li>
+        <li><strong>メモリ / スワップ</strong>: 低 FPS 区間の PSI (memory / io) は 0。</li>
+        <li><strong>プロセス稼働時間</strong>: 無人時 FPS が 12 時間で 106 → 96 に逓減する別事象は存在するが (下記 [Investigation] 記事参照)、本件の 5〜30 FPS への崩落は稼働直後にも起きる。</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--fix">
+      <h4>Fix</h4>
+      <h5>1. DCS のシムスレッドを P-core に明示固定 (nodes.yaml)</h5>
+      <p>インスタンス毎に <code>affinity</code> を明示すると、DCSServerBot はその値をそのまま適用し、auto_affinity の管理対象から外す。Core Ultra 7 265K の P-core は CPU 0-7。</p>
+<pre class="fix-pre"><code># nodes.yaml (各 node の instances.&lt;name&gt; 配下)
+      affinity: 0,1,2,3,4,5,6,7</code></pre>
+      <p>反映には bot コンテナの再起動が必要 (= DCS 再起動)。再起動後、起動直後の DCS 全プロセスで <code>Cpus_allowed_list: 0-7</code> を確認。dcs.log の <code>Created boot pool: n:8</code> も 8 コア認識に変わる (以前は n:20)。</p>
+      <p>稼働中のプロセスに即時適用するには、DCS と同じ UID で全スレッドを対象にする (root でも UID が違うと <code>EPERM</code>):</p>
+<pre class="fix-pre"><code>sudo -u &lt;dcs-user&gt; taskset -a -cp 0-7 &lt;DCS_server.exe の pid&gt;</code></pre>
+      <p>cgroup の <code>cpuset</code> (docker の <code>--cpuset-cpus</code>) で縛る案は採用しなかった。auto_affinity が cpuset の外側のコアだけを選んだ場合に <code>sched_setaffinity</code> が <code>EINVAL</code> となり、DCS 起動処理が例外で失敗しうるため。</p>
+
+      <h5>2. ミッションを原本 (SAM レーダー制御 Lua 有効) に戻す</h5>
+      <p>A/B の B 側は原本より一貫して悪いため、原本に戻した。無人時 (0 人) に <code>serverSettings.lua</code> の <code>current</code> / <code>listStartIndex</code> を原本に向けて DCS を再起動。</p>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--result">
+      <h4>Result</h4>
+<pre class="fix-pre"><code># 同一ミッション (B)、ほぼ同一負荷 (0〜1 人) での即時比較 — E-core → P-core
+                       人数   FPS     プロセスCPU
+修正前 (cpu8 に固定)   0.8    107.3   56.5 %
+修正後 (0-7)           1.0    112.6   49.5 %     ← 同じ仕事を約 12 % 少ない CPU 時間で処理
+
+# 原本ミッション + P-core 固定で再起動後 (1 人)
+                              116.7    39.1 %    ← 過去の A 側平常値 (110 FPS / 37 %) と同水準</code></pre>
+      <p>無人時の FPS は上限 (約 110〜118) に張り付くため、効果はまずプロセス CPU % に現れる。負荷時の FPS 改善幅は今後の <code>serverstats</code> で追跡する (E-core と P-core の単スレッド性能差は概ね 25〜35 %)。</p>
+    </section>
+
+    <section class="fix-section" id="ecore-affinity-lag--status">
+      <h4>Status</h4>
+      <ul>
+        <li><strong>2026-09-04 追記</strong>: 本記事の Result で「修正後 40〜78% の上昇はプレイヤー増加分」と書いたのは誤りで、Olympus 由来の別事象 (ヒープの空きリスト走査が稼働時間に比例して伸びる) だった。上の記事「Olympus 有効化後、無人でも約 2.5 時間でサーバ FPS が 28 まで崩落する」を参照。本記事の E-core 固定と A/B の結論自体は変わらない。</li>
+        <li>P-core 固定と原本ミッションへの切り戻しは 2026-09-03 に適用済み。</li>
+        <li>効果検証: 今後 2〜4 週間の「FPS &lt; 50 が 5 分以上続くエピソード数 / 100 時間」を、適用前の A 側基準値 3.79 件 / 100h と比較する。</li>
+        <li>根本対策として、ミッション側の SAM / EWR 密度 (レーダー同時発振数) の見直しを検討中。</li>
+        <li>DCSServerBot の Linux 向け auto_affinity が P/E コアを区別しない件は上流へ報告予定。ハイブリッド CPU の Linux ホストで DCSServerBot を使っている場合は、<code>affinity</code> を明示することを推奨する。</li>
+      </ul>
+    </section>
+  </article>
+
+  <article class="fix-article" id="sim-thread-stall">
+    <h3>[Investigation] 全プレイヤーが同時に一瞬フリーズする — シムスレッドのバースト肥大とプロセス稼働時間の関係</h3>
+
+    <div class="fix-meta">
+      <span class="fix-tag">DCS Dedicated Server</span>
+      <span class="fix-tag">Multiplayer</span>
+      <span class="fix-tag">Performance</span>
+      <span class="fix-tag">2026-08</span>
+    </div>
+
+      <nav class="fix-toc" aria-label="目次">
+        <span class="fix-toc-label">目次</span>
+      <ol class="fix-toc-list">
+        <li><a href="#sim-thread-stall--environment">Environment</a></li>
+        <li><a href="#sim-thread-stall--symptom">Symptom</a></li>
+        <li><a href="#sim-thread-stall--why-it-is-hard-to-detect">Why it is hard to detect</a></li>
+        <li><a href="#sim-thread-stall--method">Method</a></li>
+        <li><a href="#sim-thread-stall--findings">Findings</a></li>
+        <li><a href="#sim-thread-stall--root-cause-isolation">Root Cause Isolation</a></li>
+        <li><a href="#sim-thread-stall--mitigation">Mitigation</a></li>
+        <li><a href="#sim-thread-stall--status">Status</a></li>
+        <li><a href="#sim-thread-stall--related-separate-issue">Related (separate issue)</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="sim-thread-stall--environment">
+      <h4>Environment</h4>
+      <ul>
+        <li>DCS World Dedicated Server (Linux / Wine, Docker 上で運用)</li>
+        <li>DCSServerBot によるプロセス管理、12 時間間隔の定期再起動</li>
+        <li>ミッション: 大規模常設マップ (AI ユニット約 580、クライアントスロット約 300)</li>
+        <li>観測対象人数: 1〜15 名</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--symptom">
+      <h4>Symptom</h4>
+      <p>プレイヤーから「<strong>その場にいた全員が同時にすっ飛ぶ</strong>」という報告。数百ミリ秒の瞬間的フリーズで、不規則に繰り返される。</p>
+      <p>別症状として、ミッション稼働の後半になるほど全体的に重くなる (ラバーバンド感) 現象も併発する。両者は同一原因の別側面であることが後に判明した。</p>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--why-it-is-hard-to-detect">
+      <h4>Why it is hard to detect</h4>
+      <p>通常の監視では、この現象は捉えにくい。切り分けに時間を要した理由:</p>
+      <ul>
+        <li>サーバ FPS は 1 分平均のため、300 ms の停止は平均値にほとんど現れない。平均 FPS が健全な区間でも停止は起きていた。</li>
+        <li>NIC の合計バイトカウンタでは判別できない。同一インターフェースにテレメトリ export や DB 通信が相乗りしているため、ゲーム状態の送信が全員に対して止まっても合計値は途切れない。<br>
+        実測では、全クライアントが 300 ms 沈黙した時点でも、インターフェース合計の最大途切れは 25 ms だった。</li>
+        <li>プロセス全体の CPU 使用率 (1 秒平均) も、300 ms のフルコア・バーストを埋めてしまう。</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--method">
+      <h4>Method</h4>
+      <p>以下の 3 点を同時計測することで初めて捕捉できた。</p>
+
+      <h5>1. シムスレッドをナノ秒精度で 200 Hz サンプリング</h5>
+      <p>jiffy 単位の CPU 時間 (<code>/proc/&lt;pid&gt;/stat</code>) では量子化ノイズにより偽の周期が現れることがある。<code>schedstat</code> を用いる。</p>
+<pre class="fix-pre"><code># field 1 = 累積 on-CPU 時間 (ns), field 2 = ランキュー待ち時間 (ns)
+cat /proc/&lt;pid&gt;/task/&lt;main_tid&gt;/schedstat</code></pre>
+
+      <h5>2. クライアント別の送信途切れを検出</h5>
+      <p>合計値では見えないため、ゲームポートから出る UDP のみを BPF で抽出し、<strong>宛先ごとに</strong> 沈黙時間を追跡する。ペイロードは読まない。</p>
+<pre class="fix-pre"><code># BPF: IPv4 && UDP && src port == &lt;game port&gt;
+# AF_PACKET raw socket + SO_ATTACH_FILTER
+# 宛先 IP ごとに last-seen を保持し、閾値を超えた沈黙を記録する
+#
+# 判定: 複数クライアントの沈黙が同時に始まり同時に終わる → サーバ側
+#       1 クライアントのみ                              → その回線側</code></pre>
+
+      <h5>3. 停止「発生中」のスレッド状態</h5>
+      <p>停止を検知した瞬間に全スレッドの状態と <code>wchan</code> を取得する。事後の取得では判定できない。</p>
+<pre class="fix-pre"><code># R  = 実行中        → 計算で詰まっている
+# D  = 割り込み不可  → I/O 待ち
+# S + wchan          → 何を待っているかが名前で判る</code></pre>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--findings">
+      <h4>Findings</h4>
+
+      <h5>停止はサーバ側で、全員同時に起きる</h5>
+      <p>2 クライアント同時の例。開始が 13 ms 以内、復帰が 1 ms 以内で揃っている。個々の回線起因では説明できない挙動である。</p>
+<pre class="fix-pre"><code>client A  silent  T+0.295 .. T+0.598   (303 ms)
+client B  silent  T+0.308 .. T+0.597   (289 ms)</code></pre>
+      <p>9 名接続時のサンプルでは、9 名全員が同時に沈黙していることを確認した。</p>
+
+      <h5>停止中、シムスレッドは「計算中」</h5>
+      <p>捕捉できた停止のスレッド状態はいずれも <code>R</code> (実行中)。同時刻のメジャーフォルトは 0。I/O 待ちではなく計算による停止である。捕捉した停止は 7/7 が同一秒内の CPU バーストと一致した。</p>
+
+      <h5>バーストはプロセス稼働時間とともに肥大する</h5>
+      <p>人数をほぼ一定 (0〜2 名) に保った状態での、シムスレッドのバースト計測:</p>
+<pre class="fix-pre"><code>プロセス稼働   バースト長(中央値)   デューティ比
+  +0.3 h            56 ms            0.3 %
+  +2.3 h            46 ms            0.9 %
+  +4.3 h            46 ms            3.6 %
+  +6.3 h            50 ms            6.8 %
+  +8.3 h            65 ms            9.1 %
+ +11.3 h            90 ms           12.7 %</code></pre>
+      <p>バースト頻度は約 1.5 回/秒で頭打ちになり、1 回あたりの長さが伸び続ける。一定周期のジョブが、増え続けるデータを走査している場合の挙動と一致する。</p>
+
+      <h5>停止の発生率には明確な閾値がある</h5>
+      <p>プレイヤーが接続していた時間だけを分母に取った発生率:</p>
+<pre class="fix-pre"><code>ミッション経過   露出時間     停止回数   発生率
+  2- 4 h         65.8 分         0      0.0 /時
+  4- 6 h         92.2 分         0      0.0 /時
+  6- 8 h         43.3 分         0      0.0 /時
+  8-10 h         96.6 分         3      1.9 /時
+ 10-12 h         56.5 分         3      3.2 /時</code></pre>
+      <p>稼働 8 時間未満では、計 201 プレイヤー分を通じて発生が記録されていない。</p>
+
+      <h5>FPS 低下も同じ原因の別側面</h5>
+      <p>3 週間分の集計 (プレイヤー 3〜5 名時)。60 FPS を割った時間:</p>
+<pre class="fix-pre"><code>ミッション経過      平均 FPS    60FPS 未満の時間
+ 新鮮   (&lt; 4h)      114.9      0 分 / 459 分
+ 中間   (4-8h)      102.6      0 分 / 595 分
+ 古い   (8h+)        86.8    137 分 / 794 分  (最低 7.2 FPS)</code></pre>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--root-cause-isolation">
+      <h4>Root Cause Isolation</h4>
+      <p>蓄積がミッションの Lua 状態にあるのか、DCS プロセス側にあるのかを切り分けるため、<strong>プロセスを維持したままミッションだけ</strong>作り直して比較した (無人時に実施)。</p>
+<pre class="fix-pre"><code>                          PID       デューティ比
+ミッション +4.2h          同一         0.0524
+ミッションのみ再起動直後   同一         0.0642   ← リセットされない
+（参考）プロセスごと再起動  新規    0.122 → 0.003   ← リセットされる</code></pre>
+      <p>ミッションを作り直しても蓄積は解消しない。原因がミッションスクリプト (MIST / CTLD 等) ではなく DCS サーバプロセス側にあることを示す。スクリプト側の最適化では改善しない。</p>
+      <p>プロセス再起動でのみリセットされることは、2 回の定期再起動で独立に再現している (デューティ比 0.122→0.003 および 0.127→0.001)。</p>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--mitigation">
+      <h4>Mitigation</h4>
+      <p>プロセス側の蓄積そのものには手を入れられないため、再起動間隔の短縮で対処する。</p>
+      <p>要件は「混雑する時間帯がプロセス稼働 8 時間を超えないこと」。12 時間周期では混雑帯を 8 時間以内に収められないため、8 時間周期 (1 日 3 回) へ変更し、混雑帯の直前に再起動が来るよう時刻を配置する。</p>
+      <p>再起動時刻は各コミュニティの在室分布から決めるべきで、DCSServerBot 利用者は <code>scheduler</code> プラグインの <code>action.times</code> にリストで複数指定できる。</p>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--status">
+      <h4>Status</h4>
+      <p>発生機構は確認済み。緩和策は未適用で、効果は未検証。適用後、混雑帯での停止発生率が 0 になるかを同じ計測系で追跡する予定。</p>
+      <p>また、以下は未解明のまま残っている:</p>
+      <ul>
+        <li>プロセス側で何が蓄積しているかは特定できていない (ミッションスクリプト由来ではないことのみ確定)</li>
+        <li>10 名以上の高負荷時における停止長の実測データが不足している</li>
+      </ul>
+    </section>
+
+    <section class="fix-section" id="sim-thread-stall--related-separate-issue">
+      <h4>Related (separate issue)</h4>
+      <p>調査中、ホスト側のメモリ逼迫によりカーネルが DCS プロセスをスワップアウトする事象を観測した (メジャーフォルト 165/秒)。<code>vm.swappiness</code> が既定の 60 のままだと、ページキャッシュを捨てる前にサーバの作業セットが追い出される。レイテンシ重視のホストでは低く設定することを推奨する。</p>
+<pre class="fix-pre"><code>sudo sysctl -w vm.swappiness=10</code></pre>
+      <p>ただし本記事の停止現象との因果は確認されていない。停止を捕捉した期間のメジャーフォルトは 0 であり、別問題として扱う。</p>
+    </section>
+  </article>
+
   <article class="fix-article" id="wine-stub-crash">
     <h3>[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</h3>
 
@@ -16,7 +473,19 @@
       <span class="fix-tag">msvcp140_atomic_wait.dll</span>
     </div>
 
-    <section class="fix-section">
+      <nav class="fix-toc" aria-label="目次">
+        <span class="fix-toc-label">目次</span>
+      <ol class="fix-toc-list">
+        <li><a href="#wine-stub-crash--environment">Environment</a></li>
+        <li><a href="#wine-stub-crash--symptom">Symptom</a></li>
+        <li><a href="#wine-stub-crash--root-cause">Root Cause</a></li>
+        <li><a href="#wine-stub-crash--fix">Fix</a></li>
+        <li><a href="#wine-stub-crash--known-side-effect">Known Side Effect</a></li>
+        <li><a href="#wine-stub-crash--tested-on">Tested on</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="wine-stub-crash--environment">
       <h4>Environment</h4>
       <ul>
         <li>DCS World Server <code>2.9.27.24969</code> (2026-06 時点の最新)</li>
@@ -26,7 +495,7 @@
       </ul>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--symptom">
       <h4>Symptom</h4>
       <p>DCS 専用サーバ (<code>DCS_server.exe</code>) がログ出力なしに起動直後クラッシュ。Wine が以下を報告:</p>
 <pre class="fix-pre"><code>EXCEPTION_WINE_STUB: 0x80000100</code></pre>
@@ -36,7 +505,7 @@ err:module:loader_init Importing dlls for DCS_server.exe failed, status c0000135
       <p>サーバは <code>dcs.log</code> を書かず、<code>Listening on port XXXXX</code> にも到達しない。</p>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--root-cause">
       <h4>Root Cause</h4>
       <p>DCS <code>2.9.27.24969</code> で <code>msvcp140.dll</code> の依存関係が更新され、<code>msvcp140_atomic_wait.dll</code> から
       <code>__std_tzdb_get_sys_info</code> と <code>__std_tzdb_delete_sys_info</code> を <strong>静的インポート</strong> するようになった。</p>
@@ -55,7 +524,7 @@ err:module:loader_init Importing dlls for DCS_server.exe failed, status c0000135
 };                      // total: 40 bytes (_CRT_PACKING=8)</code></pre>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--fix">
       <h4>Fix</h4>
       <p>wine-11.0 ソースから、問題の 2 関数を最小限実装したパッチ済み <code>msvcp140_atomic_wait.dll</code> をビルドして置き換える。</p>
 
@@ -123,12 +592,12 @@ sed -i 's/"[*]msvcp140_atomic_wait"="native"/"*msvcp140_atomic_wait"="builtin"/'
    "$WINEPREFIX/user.reg"</code></pre>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--known-side-effect">
       <h4>Known Side Effect</h4>
       <p>DCS ログのタイムスタンプが UTC 固定になる (実装は常に UTC offset=0 を返す)。表示上のみの問題でゲームプレイへの影響なし。</p>
     </section>
 
-    <section class="fix-section">
+    <section class="fix-section" id="wine-stub-crash--tested-on">
       <h4>Tested on</h4>
       <ul>
         <li>DCS <code>2.9.27.24969</code>、wine-stable <code>11.0.0.0~bookworm-1</code></li>

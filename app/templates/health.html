@@ -9,4 +9,164 @@
   hx-swap="innerHTML">
   <p class="loading">loading...</p>
 </section>
+
+<h2 class="section-title">公開 API</h2>
+<section class="api-doc">
+  <p class="api-lead">
+    このページに出している心拍データは、認証なしの読み取り専用 API としても公開しています。
+    CORS を許可しているのでブラウザから直接 fetch できます。
+  </p>
+
+  <div class="api-base">
+    <span class="api-k">Base URL</span>
+    <code>https://freedomflight.jp/health/v2/api/public</code>
+  </div>
+
+  <div class="api-live card">
+    <header><h2>いま返ってくる値</h2><span class="badge" id="api-live-badge">読み込み中</span></header>
+    <pre class="fix-pre"><code id="api-live-body">GET /latest?type=heart-rate</code></pre>
+  </div>
+
+  <h3 class="api-h3">エンドポイント</h3>
+  <table class="lb-table api-table">
+    <thead><tr><th>メソッド / パス</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono">GET /types</td>
+        <td>公開中のデータ型一覧と上限値。クライアント側で決め打ちしないで済むように。</td>
+      </tr>
+      <tr>
+        <td class="mono">GET /latest?type=heart-rate</td>
+        <td>最新 1 点。<code>age_seconds</code> 付き。</td>
+      </tr>
+      <tr>
+        <td class="mono">GET /series?type=heart-rate&amp;minutes=60</td>
+        <td>時系列。<strong>既定では間引かずに記録した粒度のまま</strong>返します。</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="api-h3">/series のパラメータ</h3>
+  <table class="lb-table api-table">
+    <thead><tr><th>名前</th><th>既定</th><th>内容</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">type</td><td class="mono">heart-rate</td>
+          <td>データ型。公開対象外を指定すると 404。</td></tr>
+      <tr><td class="mono">minutes</td><td class="mono">60</td>
+          <td>終端から遡る分数。最大 <strong>1440</strong> (24 時間)。超えると 400。</td></tr>
+      <tr><td class="mono">end</td><td class="mono">現在時刻</td>
+          <td>終端 (ISO 8601)。過去を切り出すときに使います。</td></tr>
+      <tr><td class="mono">max_points</td><td class="mono">50000</td>
+          <td>指定すると等間隔に間引きます。間引かれたかは <code>truncated</code> で判ります。</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="api-h3">レスポンス例</h3>
+  {% raw %}
+  <pre class="fix-pre"><code>$ curl -s 'https://freedomflight.jp/health/v2/api/public/latest?type=heart-rate'
+{
+  "data_type": "heart-rate",
+  "label": "心拍数",
+  "unit": "bpm",
+  "value": 66.0,
+  "time": "2026-08-27T03:59:43Z",   // UTC
+  "age_seconds": 465                // 計測時刻からの経過秒
+}
+
+$ curl -s 'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&minutes=60'
+{
+  "data_type": "heart-rate",
+  "label": "心拍数",
+  "unit": "bpm",
+  "start": "2026-08-27T03:07:28Z",
+  "end":   "2026-08-27T04:07:28Z",
+  "count": 1433,
+  "truncated": false,               // true なら max_points で間引かれている
+  "points": [
+    { "t": "2026-08-27T03:07:30Z", "v": 61.0 },
+    { "t": "2026-08-27T03:07:33Z", "v": 62.0 },
+    ...
+  ]
+}</code></pre>
+  {% endraw %}
+
+  <h3 class="api-h3">解像度と鮮度</h3>
+  <p class="api-note">
+    Fitbit Charge 6 が記録した粒度をそのまま保存しているので、心拍は
+    <strong>中央値 2-3 秒間隔 (1 日あたり約 36,000 点)</strong> で取り出せます。
+  </p>
+  <p class="api-note api-warn">
+    <strong>ただしリアルタイムではありません。</strong>
+    時計 → スマートフォン → Google クラウドの同期が挟まるため、最新の点でも
+    <strong>数分〜十数分前</strong>のものです。時計がスマートフォンと離れているとき
+    (就寝中など) は数時間空くこともあります。この遅延はデータ提供元の都合で、
+    こちら側では短縮できません。
+  </p>
+  <p class="api-note">
+    そのため <code>minutes=5</code> のような短い窓を指定すると
+    <strong><code>count</code> が 0 になることが普通にあります</strong>。
+    「今の値」が欲しい場合は <code>/latest</code> を使い、
+    <code>age_seconds</code> を見て古さを判断してください。
+    <code>minutes</code> は 30 以上を推奨します。
+  </p>
+
+  <h3 class="api-h3">制限</h3>
+  <ul class="api-list">
+    <li>IP あたり <strong>60 リクエスト / 分</strong>。超えると 429 と <code>Retry-After</code> を返します。</li>
+    <li>1 回のリクエストで最大 <strong>24 時間分 / 50,000 点</strong>。</li>
+    <li>公開しているのは <strong>心拍のみ</strong>です (<code>/types</code> で確認できます)。
+        他のデータ型は 404 になります。</li>
+    <li>読み取り専用です。書き込み系のメソッドはありません。</li>
+  </ul>
+
+  <h3 class="api-h3">使用例</h3>
+  {% raw %}
+  <pre class="fix-pre"><code>// ブラウザ (CORS 許可済み)
+const r = await fetch(
+  'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&minutes=60');
+const { points, unit } = await r.json();
+console.log(points.length, unit);   // 1433 'bpm'</code></pre>
+
+  <pre class="fix-pre"><code># Python
+import urllib.request, json
+BASE = "https://freedomflight.jp/health/v2/api/public"
+
+with urllib.request.urlopen(f"{BASE}/latest?type=heart-rate") as r:
+    d = json.load(r)
+print(f"{d['value']:.0f} {d['unit']} ({d['age_seconds'] // 60} 分前)")
+
+# 過去 6 時間を 5 分粒度に間引いて取る
+url = f"{BASE}/series?type=heart-rate&minutes=360&max_points=72"
+with urllib.request.urlopen(url) as r:
+    s = json.load(r)
+print(s["count"], "点", "間引きあり" if s["truncated"] else "そのまま")</code></pre>
+  {% endraw %}
+
+  <p class="api-foot">
+    実装は <a href="https://github.com/MasterMk2/GoogleHealthCollector" target="_blank"
+    rel="noopener">GoogleHealthCollector</a> (Google Health API v4 から
+    42 データ型を収集・蓄積)。このページの心拍パネルとは別系統で、
+    公開しているのはそのうち心拍だけです。
+  </p>
+</section>
+
+<script>
+// ドキュメントが実際に動くことをその場で示す。失敗しても本文は読めるようにする。
+(async () => {
+  const badge = document.getElementById('api-live-badge');
+  const body = document.getElementById('api-live-body');
+  try {
+    const r = await fetch('/health/v2/api/public/latest?type=heart-rate');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    body.textContent =
+      "GET /latest?type=heart-rate\n\n" + JSON.stringify(d, null, 2);
+    const min = Math.floor((d.age_seconds ?? 0) / 60);
+    badge.textContent = d.value == null ? 'データなし' : `${d.value} ${d.unit} / ${min} 分前`;
+  } catch (e) {
+    badge.textContent = '取得できません';
+    body.textContent = String(e);
+  }
+})();
+</script>
 {% endblock %}

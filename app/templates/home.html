@@ -53,6 +53,39 @@
     </p>
     <span class="home-card-cta">sneaker.freedomflight.jp を開く ↗</span>
   </a>
+  <a class="home-card" href="/gca/" target="_blank" rel="noopener">
+    <h3>Web GCA — 管制コンソール</h3>
+    <p>
+      ブラウザで動く<strong>地上管制卓</strong>。Tacview のリアルタイムテレメトリから
+      進入中の機体を拾い、<strong>GCA (PAR)</strong> の方位・降下スコープと
+      トークダウン (&quot;5 miles from touchdown, on course, on glidepath&quot;) を自動生成します。
+      迎撃管制の <strong>GCI</strong>、飛行場管制の <strong>TWR</strong> も同じ画面から。
+      滑走路データは DCS 本体から取得しているので、マップが変わっても手直し不要です。
+    </p>
+    <span class="home-card-cta">管制卓を開く ↗</span>
+  </a>
+  <a class="home-card" href="/guide#olympus">
+    <h3>DCS Olympus — ブラウザ管制 / ユニット配置</h3>
+    <p>
+      ブラウザからユニットを<strong>配置・操作</strong>できる RTS 風インターフェース。
+      航空機・地上部隊・艦艇をその場でスポーンし、移動や攻撃を指示できます。
+      DCS を起動していなくても参加でき、飛んでいる仲間に合わせてシナリオを作る、
+      味方支援を足す、といった遊び方ができます。
+      サーバーごとに URL が分かれています。ログインに必要なパスワードは Discord で配布中。
+    </p>
+    <span class="home-card-cta">使い方を見る →</span>
+  </a>
+  <a class="home-card" href="/landing-teacher/" target="_blank" rel="noopener">
+    <h3>Landing Teacher — 着陸/着艦レビュー</h3>
+    <p>
+      Tacview のリアルタイムテレメトリから着陸・着艦を自動検出し、
+      空母着艦は米海軍式 <strong>LSO グレーディング</strong> (OK / OK- / (OK) / CUT ほか)、
+      陸上着陸は簡易採点 (A〜E) で振り返れます。
+      履歴ダッシュボードと GCA スコープ風の進入軌跡ビューをブラウザで確認可能。
+      現時点は server1 のみ対応。
+    </p>
+    <span class="home-card-cta">Landing Teacher を開く ↗</span>
+  </a>
   <a class="home-card" href="https://lardoon.freedomflight.jp/" target="_blank" rel="noopener">
     <h3>Lardoon — Tacview Archive</h3>
     <p>
@@ -68,6 +101,19 @@
       DCS World の <code>File → Open</code> で再生でき、デブリーフィング / AAR / 機動検証に使えます。
     </p>
     <span class="home-card-cta">リプレイを見る →</span>
+  </a>
+</section>
+
+<h2 class="section-title">Other</h2>
+<section class="home-cards">
+  <a class="home-card" href="https://gravitymap.freedomflight.jp/" target="_blank" rel="noopener">
+    <h3>MyGravityMap</h3>
+    <p>
+      DCS とは無関係の個人プロジェクト。Google マップのタイムライン履歴から、
+      自分がどこに引き寄せられて生きてきたかを可視化するブラウザアプリ。
+      位置データは端末内 (IndexedDB) だけで処理され、サーバには送信されません。
+    </p>
+    <span class="home-card-cta">gravitymap.freedomflight.jp を開く ↗</span>
   </a>
 </section>
 {% endblock %}

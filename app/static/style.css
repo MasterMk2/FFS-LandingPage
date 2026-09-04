@@ -115,12 +115,17 @@ footer{padding:1rem;text-align:center;color:var(--muted);border-top:1px solid va
 .player-chip{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--border);border-radius:999px;padding:.15rem .55rem;font-size:.72rem;background:rgba(255,255,255,.03);max-width:100%;min-width:0}
 .player-chip .player-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .player-chip .player-slot{color:var(--muted);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-chip.side-1{border-color:rgba(248,81,73,.45);background:rgba(248,81,73,.08)}
-.player-chip.side-1 .player-name{color:#ff9e9a}
-.player-chip.side-2{border-color:rgba(120,160,255,.45);background:rgba(120,160,255,.08)}
-.player-chip.side-2 .player-name{color:#a9c6ff}
-.player-chip.side-0,.player-chip.side-u{border-color:var(--border);background:rgba(255,255,255,.03)}
-.player-chip.side-0 .player-name,.player-chip.side-u .player-name{color:var(--muted)}
+/* RestAPI の PlayerEntry.side は Side enum の名前 (RED/BLUE/NEUTRAL/UNKNOWN)。
+   数値 class は旧レスポンス互換で残してある。 */
+.player-chip.side-1,.player-chip.side-RED{border-color:rgba(248,81,73,.45);background:rgba(248,81,73,.08)}
+.player-chip.side-1 .player-name,.player-chip.side-RED .player-name{color:#ff9e9a}
+.player-chip.side-2,.player-chip.side-BLUE{border-color:rgba(120,160,255,.45);background:rgba(120,160,255,.08)}
+.player-chip.side-2 .player-name,.player-chip.side-BLUE .player-name{color:#a9c6ff}
+.player-chip.side-0,.player-chip.side-u,.player-chip.side-NEUTRAL,.player-chip.side-UNKNOWN{border-color:var(--border);background:rgba(255,255,255,.03)}
+.player-chip.side-0 .player-name,.player-chip.side-u .player-name,.player-chip.side-NEUTRAL .player-name,.player-chip.side-UNKNOWN .player-name{color:var(--muted)}
+/* 接続中だが slot 未選択 (ブリーフィング / 観戦) */
+.player-chip.spectating{border-style:dashed;opacity:.75}
+.player-chip.spectating .player-slot{font-style:italic}
 .player-empty{color:var(--muted);font-size:.78rem;font-style:italic;padding:.15rem 0}
 .weather-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.3rem .75rem;margin-top:.75rem;padding-top:.6rem;border-top:1px dashed var(--border)}
 .weather-grid>div{display:flex;flex-direction:column;gap:.05rem;min-width:0}
@@ -217,14 +222,103 @@ footer{padding:1rem;text-align:center;color:var(--muted);border-top:1px solid va
 .ph-sleep-lbl.today{color:#a5b4fc;font-weight:600}
 .ph-footer{font-size:.68rem;color:var(--muted);text-align:right;margin-top:.85rem;opacity:.6}
 
-/* /guide page */
-.guide-page .guide-header{margin-bottom:1rem}
-.guide-page .guide-header h2{margin:0 0 .25rem;font-size:1.4rem}
+/* /guide page — __FFS_GUIDE_BODY_CSS__ (PDF 埋め込みから本文へ移行) */
+.guide-page{max-width:820px}
+.guide-page .guide-header{margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.guide-page .guide-header h2{margin:0 0 .25rem;font-size:1.5rem}
+.guide-meta{margin:.5rem 0 0;font-size:.75rem}
 .guide-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin:.75rem 0 0}
 .guide-btn{display:inline-block;padding:.4rem .9rem;border:1px solid var(--accent);border-radius:6px;color:var(--accent);text-decoration:none;font-size:.85rem;transition:all .15s}
 .guide-btn:hover{background:rgba(100,255,218,.1)}
 .guide-btn-secondary{border-color:var(--border);color:var(--muted)}
 .guide-btn-secondary:hover{color:var(--fg);border-color:var(--accent);background:rgba(255,255,255,.03)}
-.guide-embed{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem}
-.guide-embed iframe{display:block;width:100%;height:min(85vh,1100px);border:0;background:#1a1a1a}
-.guide-fallback{margin:0;font-size:.8rem}
+
+/* 目次 */
+.guide-toc{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 0 1.75rem}
+.guide-toc a{color:var(--muted);text-decoration:none;font-size:.8rem;padding:.25rem .7rem;border:1px solid var(--border);border-radius:999px;background:rgba(255,255,255,.02);transition:all .15s}
+.guide-toc a:hover{color:var(--fg);border-color:var(--accent);background:rgba(100,255,218,.06)}
+
+/* 節 */
+.guide-sec{margin:0 0 2.25rem;scroll-margin-top:1rem}
+.guide-sec h3 small{font-size:.75em;color:var(--warn);font-weight:400}
+.home-card h3 small{font-size:.72em;color:var(--warn);font-weight:400}
+.guide-sec h3{margin:0 0 .75rem;font-size:1.2rem;padding-bottom:.4rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.guide-sec h4{margin:1.5rem 0 .5rem;font-size:.98rem;color:var(--accent)}
+.guide-sec p{margin:0 0 .75rem;line-height:1.75}
+.guide-sec-new h3{border-bottom-color:var(--accent)}
+
+/* リスト */
+.guide-list,.guide-steps{margin:0 0 .9rem;padding-left:1.3rem;line-height:1.8}
+.guide-list li,.guide-steps li{margin-bottom:.3rem}
+.guide-list li::marker,.guide-steps li::marker{color:var(--muted)}
+
+/* テーブル */
+.guide-tablewrap{overflow-x:auto;margin:0 0 1rem;border:1px solid var(--border);border-radius:8px;background:var(--panel)}
+.guide-table{width:100%;border-collapse:collapse;font-size:.88rem;min-width:min(100%,420px)}
+.guide-table th,.guide-table td{text-align:left;padding:.55rem .8rem;border-bottom:1px solid var(--border);vertical-align:top}
+.guide-table thead th{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;background:rgba(255,255,255,.02)}
+.guide-table tbody tr:last-child td{border-bottom:0}
+.guide-table code{font-size:.85em}
+
+/* インラインタグ */
+.tag{display:inline-block;font-size:.7rem;padding:.1rem .5rem;border-radius:999px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+.tag-req{border-color:rgba(248,81,73,.45);color:#ff9b93}
+.tag-rec{border-color:rgba(63,185,80,.45);color:var(--up)}
+.tag-new{border-color:var(--accent);color:var(--accent);letter-spacing:.06em}
+.tag-prep{border-color:var(--warn);color:var(--warn);letter-spacing:.06em}
+
+/* 注記 */
+.guide-note,.guide-warn{margin:0 0 .9rem;padding:.6rem .85rem;border-radius:6px;font-size:.85rem;line-height:1.7;border-left:3px solid var(--border);background:rgba(255,255,255,.02);color:var(--muted)}
+.guide-warn{border-left-color:var(--warn);background:rgba(210,153,34,.07);color:#e6cf94}
+.guide-note code,.guide-warn code{color:inherit}
+
+@media (max-width:640px){
+  .guide-page .guide-header h2{font-size:1.3rem}
+  .guide-sec h3 small{font-size:.75em;color:var(--warn);font-weight:400}
+.home-card h3 small{font-size:.72em;color:var(--warn);font-weight:400}
+.guide-sec h3{font-size:1.08rem}
+}
+
+/* --- Known Issues: 記事一覧 & 記事内目次 --- */
+.fixes-index{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.9rem 1.25rem;margin-bottom:1.5rem}
+.fixes-index ul{margin:.4rem 0 0;padding-left:1.1rem;font-size:.88rem;line-height:1.75}
+.fixes-index a{color:var(--fg);text-decoration:none;border-bottom:1px solid transparent}
+.fixes-index a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.fix-toc{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;margin:0 0 1rem}
+.fix-toc-label{display:block;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:.3rem}
+.fix-toc-list{margin:0;padding-left:1.2rem;font-size:.84rem;line-height:1.7;color:var(--muted)}
+.fix-toc-list a{color:var(--fg);text-decoration:none;border-bottom:1px solid transparent}
+.fix-toc-list a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.fix-section{scroll-margin-top:1rem}
+@media (max-width:640px){
+  .fix-toc-list{columns:1}
+  .fixes-index ul{columns:1}
+}
+@media (min-width:641px){
+  .fix-toc-list{columns:2;column-gap:1.5rem}
+}
+
+/* ---- 公開 API ドキュメント (/health) ---- */
+.api-doc{max-width:900px}
+.api-lead{color:var(--muted);margin:.25rem 0 1rem;line-height:1.7}
+.api-base{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:.6rem .9rem;margin-bottom:1rem}
+.api-k{color:var(--muted);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;flex-shrink:0}
+.api-base code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.85rem;color:var(--accent);word-break:break-all}
+.api-live{margin-bottom:1.25rem}
+.api-live .fix-pre{margin-bottom:0}
+.api-h3{margin:1.5rem 0 .5rem;font-size:.95rem;color:var(--fg)}
+.api-table{margin-bottom:.5rem}
+.api-table td.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;color:#a9c6ff;white-space:nowrap}
+.api-table td{vertical-align:top;line-height:1.6}
+.api-doc code{background:rgba(255,255,255,.05);padding:.1rem .35rem;border-radius:4px;font-size:.85em;font-family:ui-monospace,Menlo,Consolas,monospace}
+.api-doc .fix-pre code{background:none;padding:0}
+.api-note{color:var(--muted);line-height:1.8;margin:.5rem 0}
+.api-note strong{color:var(--fg)}
+.api-warn{border-left:3px solid var(--warn);padding-left:.9rem}
+.api-warn strong{color:var(--warn)}
+.api-list{color:var(--muted);line-height:1.9;padding-left:1.2rem;margin:.5rem 0}
+.api-list strong{color:var(--fg)}
+.api-foot{color:var(--muted);font-size:.85rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);line-height:1.7}
+@media (max-width:600px){
+  .api-table td.mono{white-space:normal;word-break:break-all}
+}

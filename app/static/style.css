@@ -67,7 +67,7 @@ main{padding:1.75rem 1.5rem;max-width:1100px;margin:0 auto}
 .hostmon{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.75rem;margin-bottom:1rem}
 .hostmon-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.8rem .9rem;display:flex;flex-direction:column;gap:.4rem}
 .hostmon-card.caution{border-color:var(--warn)}
-.hostmon-card.warn{border-color:var(--down);background:linear-gradient(180deg,rgba(248,81,73,.06),var(--panel))}
+.hostmon-card.warn{border-color:var(--down);background:linear-gradient(180deg,rgba(205,106,97,.07),var(--panel))}
 .hostmon-head{display:flex;justify-content:space-between;align-items:baseline;gap:.5rem}
 .hostmon-label{color:var(--muted);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase}
 .hostmon-value{color:var(--fg);font-size:1.4rem;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -89,21 +89,21 @@ main{padding:1.75rem 1.5rem;max-width:1100px;margin:0 auto}
 .hostmon-meta-row .meta-k{color:var(--muted);text-transform:uppercase;font-size:.65rem;letter-spacing:.05em;margin-right:.35rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:1rem;transition:border-color .2s}
-.card.status-up{border-color:rgba(63,185,80,.5)}
-.card.status-down{border-color:rgba(248,81,73,.5)}
-.card.status-warn{border-color:rgba(210,153,34,.5)}
+.card.status-up{border-color:rgba(92,158,99,.55)}
+.card.status-down{border-color:rgba(205,106,97,.55)}
+.card.status-warn{border-color:rgba(195,154,78,.55)}
 .card header{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.5rem;min-width:0}
 .card h2{margin:0;font-size:1.05rem;min-width:0}
 .badge{font-size:.75rem;padding:.15rem .5rem;border-radius:999px;background:var(--bg);color:var(--fg);border:1px solid var(--border);text-transform:uppercase;flex-shrink:0}
-.card.status-up .badge{background:rgba(63,185,80,.15);color:var(--up);border-color:rgba(63,185,80,.4)}
-.card.status-down .badge{background:rgba(248,81,73,.15);color:var(--down);border-color:rgba(248,81,73,.4)}
-.card.status-warn .badge{background:rgba(210,153,34,.15);color:var(--warn);border-color:rgba(210,153,34,.4)}
+.card.status-up .badge{background:rgba(92,158,99,.16);color:var(--up);border-color:rgba(92,158,99,.45)}
+.card.status-down .badge{background:rgba(205,106,97,.16);color:var(--down);border-color:rgba(205,106,97,.45)}
+.card.status-warn .badge{background:rgba(195,154,78,.16);color:var(--warn);border-color:rgba(195,154,78,.45)}
 .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 dl{display:grid;grid-template-columns:7rem minmax(0,1fr);gap:.25rem .75rem;margin:0;align-items:baseline}
 dt{color:var(--muted);font-size:.85rem}
 dd{margin:0;font-size:.9rem;min-width:0}
 dd:not(.truncate){word-break:break-word}
-.error{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.4);color:#e2a49e;padding:.75rem 1rem;border-radius:8px}
+.error{background:rgba(205,106,97,.13);border:1px solid rgba(205,106,97,.45);color:#e2a49e;padding:.75rem 1rem;border-radius:8px}
 .loading{color:var(--muted);text-align:center;padding:2rem}
 .updated{color:var(--muted);font-size:.8rem;margin-top:1rem;text-align:right}
 .weather{color:var(--accent)}
@@ -133,7 +133,7 @@ footer{padding:1.75rem 1.5rem;text-align:center;color:var(--muted);border-top:1p
 /* セクション見出しは細い罫線を伸ばして「章の区切り」を作る */
 .section-title{display:flex;align-items:center;gap:.9rem;margin:2.5rem 0 1rem;font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.16em;text-transform:uppercase}
 .section-title::after{content:"";flex:1;height:1px;background:var(--border)}
-.notice{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.35);color:#dcc18b;padding:.6rem .9rem;border-radius:8px;font-size:.9rem}
+.notice{background:rgba(195,154,78,.11);border:1px solid rgba(195,154,78,.4);color:#dcc18b;padding:.6rem .9rem;border-radius:8px;font-size:.9rem}
 .load-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.25rem .5rem;margin:.75rem 0 0;padding:.5rem 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 .load-stats>div{display:flex;flex-direction:column;gap:.1rem}
 .load-stats dt{margin:0;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
@@ -167,9 +167,9 @@ footer{padding:1.75rem 1.5rem;text-align:center;color:var(--muted);border-top:1p
 .player-chip .player-slot{color:var(--muted);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* RestAPI の PlayerEntry.side は Side enum の名前 (RED/BLUE/NEUTRAL/UNKNOWN)。
    数値 class は旧レスポンス互換で残してある。 */
-.player-chip.side-1,.player-chip.side-RED{border-color:rgba(248,81,73,.45);background:rgba(248,81,73,.08)}
+.player-chip.side-1,.player-chip.side-RED{border-color:rgba(205,106,97,.5);background:rgba(205,106,97,.09)}
 .player-chip.side-1 .player-name,.player-chip.side-RED .player-name{color:#e09792}
-.player-chip.side-2,.player-chip.side-BLUE{border-color:rgba(120,160,255,.45);background:rgba(120,160,255,.08)}
+.player-chip.side-2,.player-chip.side-BLUE{border-color:rgba(157,184,220,.5);background:rgba(157,184,220,.1)}
 .player-chip.side-2 .player-name,.player-chip.side-BLUE .player-name{color:#9db8dc}
 .player-chip.side-0,.player-chip.side-u,.player-chip.side-NEUTRAL,.player-chip.side-UNKNOWN{border-color:var(--border);background:rgba(255,255,255,.03)}
 .player-chip.side-0 .player-name,.player-chip.side-u .player-name,.player-chip.side-NEUTRAL .player-name,.player-chip.side-UNKNOWN .player-name{color:var(--muted)}
@@ -313,7 +313,7 @@ footer{padding:1.75rem 1.5rem;text-align:center;color:var(--muted);border-top:1p
 /* インラインタグ */
 .tag{display:inline-block;font-size:.7rem;padding:.1rem .5rem;border-radius:999px;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
 .tag-req{border-color:rgba(205,106,97,.5);color:#dd9791}
-.tag-rec{border-color:rgba(63,185,80,.45);color:var(--up)}
+.tag-rec{border-color:rgba(92,158,99,.5);color:var(--up)}
 .tag-new{border-color:var(--accent);color:var(--accent);letter-spacing:.06em}
 .tag-prep{border-color:var(--warn);color:var(--warn);letter-spacing:.06em}
 

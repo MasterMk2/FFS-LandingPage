@@ -178,9 +178,35 @@ freedomflight.jp {
 	# Google の通知は変更ヒントのみ。Pi 側で channel/resource/token を検証し、
 	# durable queue へ投入して即時応答する。Calendar API/Hermes API は公開しない。
 	handle /google/calendar/watch {
+		# Channel token is an opaque callback authenticator; do not retain it
+		# in public-proxy access logs. The Pi service records only a hash.
+		log_skip
 		@notpost not method POST
 		respond @notpost 405
 		reverse_proxy 192.168.3.210:8791
+	}
+
+	# FastBriefing (.miz からブリーフィングを生成するブラウザ内ツール)。実体は
+	# ~mastermk2/FastBriefing/deploy の compose が起動する ffs-fastbriefing:80
+	# (nginx + 静的 SPA)。GCA / Landing Teacher と同じくパス振り分けなので
+	# DNS 追加不要。末尾スラッシュが無いと相対解決が 1 階層ずれるので redir を先に置く。
+	#
+	# ★ 成立の条件はビルド時の BASE_PATH="./" (deploy/docker-compose.yml)。
+	#   "/" にすると index.html が /assets/... を絶対参照してサブパスで 404、
+	#   "/briefing/" 固定にすると LAN のポート直打ち (:18500) が壊れる。
+	#   "./" だけが両立する。配信物を実測して確認済み (2026-09-07):
+	#     index.html は ./assets/... ./favicon.svg のみ、
+	#     js/css/html に絶対パス参照 0 件、
+	#     worker も new URL("missionParser-*.js", import.meta.url) の相対解決。
+	#   ビルドし直したらこの 3 点を再確認すること。
+	#
+	# ★ .miz の解析は fflate + luaparse でブラウザ内に完結し、ファイルはサーバへ
+	#   送られない。よってここは静的資産を配るだけで、アップロード経路は無い。
+	redir /briefing /briefing/
+	handle_path /briefing/* {
+		reverse_proxy ffs-fastbriefing:80 {
+			header_up X-Real-IP {remote_host}
+		}
 	}
 
 	handle {

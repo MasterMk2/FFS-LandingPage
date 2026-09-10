@@ -69,6 +69,74 @@ freedomflight.jp {
 		}
 	}
 
+	# DCS Olympus (ブラウザ管制 / ユニット配置)。実体は ../ffs-dcs-server の compose が
+	# 起動する dcs-server-N の netns 内で Node.js が listen している 1818N。
+	# GCA / Landing Teacher と同じくパス振り分けなので DNS 追加不要。
+	#
+	# ★ SPA が資産・API とも全て相対パス (./assets/..., ./api/...) で組み立てているため
+	#   handle_path でプレフィックスを剥がせばサブパスで成立する。絶対パスの fetch は
+	#   ビルド済み JS に 1 件も無いことを確認済み (2026-09-03)。
+	#   末尾スラッシュが無いと相対解決が 1 階層ずれるので redir を必ず先に置く。
+	#
+	# ★★ X-Forwarded-For を落としてはいけない (Caddy 既定で付く)。
+	#   Olympus の frontend/build/utils.js::connectionIsLocal() は
+	#       local = req.headers[config.frontend.proxyHeader] === undefined;
+	#   で判定しており (proxyHeader = "x-forwarded-for")、ヘッダが無いと
+	#   「ローカル接続」とみなして X-Enabled-Command-Modes に全ロールを載せる。
+	#   さらに x-command-mode ヘッダがあれば authorization をそのロールの
+	#   パスワードで上書きするため、権限昇格の経路になる。
+	#   XFF が付いている限り remote 扱いになり、認証したロールだけが有効になる。
+	# Olympus audio backend (SRS 連携) の WebSocket。
+	# frontend (1818N) とは別プロセスで、dcs-server-N の netns 内の 4000 で
+	# listen している (ws の WebSocketServer)。ホストには公開していない。
+	# SPA は location からホスト+パスを取り、その後ろに olympus.json の
+	# audio.WSEndpoint を足して
+	#   wss://freedomflight.jp/olympusN/audio
+	# を開く。よってこのパスだけ 4000 へ振り分ける。
+	# reverse_proxy は Upgrade をそのまま通すので追加設定は要らない。
+	# /olympusN/* より長いパスなので Caddy の specificity ソートで先に評価される。
+	#
+	# ★ この WebSocket 自体には認証が無い (上流実装が素の WebSocketServer)。
+	#   ただし SRS サーバ (1811N) はもともとサーバーパスワード無しで公開されており、
+	#   EXTERNAL_AWACS_MODE も有効なので、露出としては既存の SRS ポートと同等。
+	#   ここを絞りたい場合は SRS 側の設定 (COALITION_AUDIO_SECURITY 等) で行う。
+	handle /olympus1/audio {
+		reverse_proxy ffs-dcs-server-1:4000
+	}
+
+	handle /olympus2/audio {
+		reverse_proxy ffs-dcs-server-2:4000
+	}
+
+	handle /olympus3/audio {
+		reverse_proxy ffs-dcs-server-3:4000
+	}
+
+	redir /olympus1 /olympus1/
+	handle_path /olympus1/* {
+		# ユニットをスポーンできる管制画面なので検索エンジンに拾わせない。
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-1:18181 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	redir /olympus2 /olympus2/
+	handle_path /olympus2/* {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-2:18182 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	redir /olympus3 /olympus3/
+	handle_path /olympus3/* {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-3:18183 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
 	# Google Health Collector (個人ヘルスデータ)。実体は姉妹 repo
 	# ../GoogleHealthCollector の compose が起動する google-health-collector:8000。
 	# ffs-website 側の /health (Owner's Health パネル) とは別物で、こちらは
@@ -82,6 +150,61 @@ freedomflight.jp {
 		# 個人の健康データなので検索エンジンに拾わせない。
 		header X-Robots-Tag "noindex, nofollow, noarchive"
 		reverse_proxy google-health-collector:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# Hermes Unified Channel Gateway — 公式LINEの Webhook 受け口 (Phase G.1)
+	#   LINE → :443 → [router NAPT] → 170:30443 → ffs-caddy → 192.168.3.210:8790
+	#   受け口の実体は Raspberry Pi (toyamautil) の channel-gateway.service
+	#   line.iyakusai.com (医薬祭の取り込み口) とは別物。あちらは収集、これは対話。
+	#
+	# ★ 署名検証は「届いたバイト列そのもの」に対して行う。ボディを書き換える
+	#   ディレクティブをこのブロックに足すと、署名が必ず不一致になって全通信が
+	#   403 になる。reverse_proxy は素通しなので、そのままで正しい。
+	# ★ 公開するのはこの 1 パスだけ。Hermes API (8642) と Dashboard は
+	#   絶対にここへ足さないこと。
+	# ★ LINE は約 2 秒で応答を要求し、失敗が続くと Webhook を無効化する。
+	#   ゲートウェイは受理して即 200 を返し実処理は非同期に回すので、
+	#   この経路にタイムアウト延長は不要。
+	handle /line/webhook {
+		# LINE は POST しか使わない。他のメソッドは受け口に触れさせない。
+		@notpost not method POST
+		respond @notpost 405
+		reverse_proxy 192.168.3.210:8790
+	}
+
+	# Hermes Google Calendar push webhook — Phase H.1
+	# Google の通知は変更ヒントのみ。Pi 側で channel/resource/token を検証し、
+	# durable queue へ投入して即時応答する。Calendar API/Hermes API は公開しない。
+	handle /google/calendar/watch {
+		# Channel token is an opaque callback authenticator; do not retain it
+		# in public-proxy access logs. The Pi service records only a hash.
+		log_skip
+		@notpost not method POST
+		respond @notpost 405
+		reverse_proxy 192.168.3.210:8791
+	}
+
+	# FastBriefing (.miz からブリーフィングを生成するブラウザ内ツール)。実体は
+	# ~mastermk2/FastBriefing/deploy の compose が起動する ffs-fastbriefing:80
+	# (nginx + 静的 SPA)。GCA / Landing Teacher と同じくパス振り分けなので
+	# DNS 追加不要。末尾スラッシュが無いと相対解決が 1 階層ずれるので redir を先に置く。
+	#
+	# ★ 成立の条件はビルド時の BASE_PATH="./" (deploy/docker-compose.yml)。
+	#   "/" にすると index.html が /assets/... を絶対参照してサブパスで 404、
+	#   "/briefing/" 固定にすると LAN のポート直打ち (:18500) が壊れる。
+	#   "./" だけが両立する。配信物を実測して確認済み (2026-09-07):
+	#     index.html は ./assets/... ./favicon.svg のみ、
+	#     js/css/html に絶対パス参照 0 件、
+	#     worker も new URL("missionParser-*.js", import.meta.url) の相対解決。
+	#   ビルドし直したらこの 3 点を再確認すること。
+	#
+	# ★ .miz の解析は fflate + luaparse でブラウザ内に完結し、ファイルはサーバへ
+	#   送られない。よってここは静的資産を配るだけで、アップロード経路は無い。
+	redir /briefing /briefing/
+	handle_path /briefing/* {
+		reverse_proxy ffs-fastbriefing:80 {
 			header_up X-Real-IP {remote_host}
 		}
 	}
@@ -142,4 +265,25 @@ gravitymap.freedomflight.jp {
 
 :80 {
 	respond "Not Found" 404
+}
+
+
+###############################################################################
+# 公式LINE(@553herww)の Webhook 受け口
+#   LINE → :443 → [router NAPT] → 170:30443 → ffs-caddy → 192.168.3.200:8788
+#   受け口の実体は Raspberry Pi の iyakusai-line-oa-server.service
+#   ★ 独立したサブドメインにしてあるのは、iyakusai.com が XREA へ移っても
+#      この経路が生き残るようにするため(道連れになると受信が無音で止まる)
+#   手順・設計: _目録/line/tools/公式LINE取り込みランブック.md
+###############################################################################
+line.iyakusai.com {
+	# 外に出すのは /webhook だけ。/export と /media は PULL_TOKEN で守られているが、
+	# そもそもインターネットからは触らせない。
+	handle /webhook {
+		reverse_proxy 192.168.3.200:8788
+	}
+	handle {
+		respond 404
+	}
+	log
 }

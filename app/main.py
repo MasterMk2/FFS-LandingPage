@@ -111,6 +111,34 @@ _SUBPORT_RE = re.compile(r"\*\*\s*(.+?)\s*\[(\d+)\]\s*\*\*")
 # host:port を先頭行から取り出すパターン (IP / hostname 両対応)。
 _HOSTPORT_RE = re.compile(r"^([A-Za-z0-9.\-]+):(\d+)$")
 
+# DCS Server Bot の Olympus extension は、稼働状況の「値」として各ロールの
+# ログインパスワードを平文で返す:
+#     https://<host>/olympusN/
+#     ▫️ GameMaster: <パスワード>
+#     🔹 Commander: <パスワード>
+#     🔸 Commander: <パスワード>
+# このパネルは `/` から htmx (hx-get="/panel/servers") で読み込まれる公開
+# ページなので、そのまま出すとトップページにパスワードが載る。
+#
+# ★ ロール名を列挙して弾く実装にしないこと。bot が返すラベルは実際には
+#   GameMaster と Commander×2 (絵文字だけが違う) で、Olympus には
+#   adminPassword もある。ラベルが 1 つ増減しただけで静かに漏れ始める。
+#   そこで「Olympus 拡張の 2 行目以降にある `ラベル: 値`」は中身を一律で
+#   伏せ、掲示場所だけを出す。接続先 URL は 1 行目なので影響を受けない。
+_SECRET_BEARING_EXT_RE = re.compile(r"olympus", re.I)
+_LABELLED_VALUE_RE = re.compile(r"^(?P<label>[^:]{1,40}):\s*\S.*$")
+_SECRET_NOTICE = "パスワードは Discord に掲示"
+
+
+def _mask_secret_line(ext_name: object, line: str) -> str:
+    """Olympus 拡張の `ラベル: 値` 行から値を落とし、掲示場所に置き換える。"""
+    if not _SECRET_BEARING_EXT_RE.search(str(ext_name or "")):
+        return line
+    m = _LABELLED_VALUE_RE.match(line)
+    if not m:
+        return line
+    return f"{m.group('label').strip()}: {_SECRET_NOTICE}"
+
 
 def _expand_extensions(servers: list) -> list:
     """`extensions[].value` を 1 chip = 1 エンドポイント に正規化する。
@@ -155,11 +183,14 @@ def _expand_extensions(servers: list) -> list:
                     )
                 else:
                     # 想定外の追加行は `**` だけ落として素直に別 chip 化。
+                    # Olympus のロール行はここに落ちてくるので、値を伏せる。
                     new_exts.append(
                         {
                             "name": ext.get("name"),
                             "version": ext.get("version"),
-                            "value": line.replace("**", ""),
+                            "value": _mask_secret_line(
+                                ext.get("name"), line.replace("**", "")
+                            ),
                         }
                     )
         s2["extensions"] = new_exts

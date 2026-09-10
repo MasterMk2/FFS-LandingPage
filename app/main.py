@@ -358,6 +358,19 @@ async def status_page(request: Request):
     return render(request, "index.html", {"poll_seconds": 15})
 
 
+def _server_order_key(s: dict) -> tuple:
+    """サーバカードの並び順。`address` 末尾のポート (server1=18101, server2=18102, ...) 順。
+
+    表示名で並べると大文字小文字や改名で順番が入れ替わる (2026-09-10、
+    "FFS Open Alpha 3" が "FFS open alpha 1" より前に来た)。ポートは nodes.yaml で
+    インスタンスごとに固定なので改名しても変わらない。ポートが取れないものは末尾に名前順。
+    """
+    port = str(s.get("address") or "").rsplit(":", 1)[-1]
+    if port.isdigit():
+        return (0, int(port), "")
+    return (1, 0, (s.get("name") or "").casefold())
+
+
 @app.get("/panel/servers", response_class=HTMLResponse)
 async def panel_servers(request: Request):
     cached = servers_cache.get()
@@ -368,7 +381,7 @@ async def panel_servers(request: Request):
         if result.ok and isinstance(result.data, list):
             servers = sorted(
                 _sort_players(_expand_extensions(result.data)),
-                key=lambda s: s.get("name") or "",
+                key=_server_order_key,
             )
         elif result.error:
             error = result.error

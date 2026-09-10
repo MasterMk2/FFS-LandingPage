@@ -5,14 +5,23 @@
 
   <header class="guide-header">
     <h2>Player Guide</h2>
+    {% if lang == 'ja' %}
     <p class="subtle">
       FFS DCS サーバーへの参加方法、SRS / LotATC / Tacview / Olympus の設定、
       ブラウザで使えるツール、Discord bot の使い方をまとめたプレイヤー向けガイドです。
     </p>
     <p class="guide-meta subtle">最終更新: 2026-09-03</p>
+    {% else %}
+    <p class="subtle">
+      A player guide covering how to join the FFS DCS servers, setting up SRS / LotATC / Tacview /
+      Olympus, the browser-based tools, and using the Discord bot.
+    </p>
+    <p class="guide-meta subtle">Last updated: 2026-09-03</p>
+    {% endif %}
   </header>
 
-  <nav class="guide-toc" aria-label="目次">
+  <nav class="guide-toc" aria-label="{% if lang == 'ja' %}目次{% else %}Table of contents{% endif %}">
+    {% if lang == 'ja' %}
     <a href="#start">はじめに</a>
     <a href="#connect">DCS に接続</a>
     <a href="#srs">SRS 音声</a>
@@ -21,97 +30,150 @@
     <a href="#web">ブラウザツール</a>
     <a href="#discord">Discord</a>
     <a href="#trouble">困ったとき</a>
+    {% else %}
+    <a href="#start">Introduction</a>
+    <a href="#connect">Connecting to DCS</a>
+    <a href="#srs">SRS Voice</a>
+    <a href="#tools-ingame">LotATC / Tacview</a>
+    <a href="#olympus">Olympus</a>
+    <a href="#web">Browser Tools</a>
+    <a href="#discord">Discord</a>
+    <a href="#trouble">Troubleshooting</a>
+    {% endif %}
   </nav>
 
   <!-- ================================================================ -->
   <section class="guide-sec" id="start">
-    <h3>1. はじめに</h3>
+    <h3>{% if lang == 'ja' %}1. はじめに{% else %}1. Introduction{% endif %}</h3>
 
+    {% if lang == 'ja' %}
     <p>
       FFS は DCS World の専用サーバーを <strong>3 台</strong> 運用しているコミュニティです。
       無料機体だけでも参加できます。まずは Server 1 に入ってみてください。
     </p>
+    {% else %}
+    <p>
+      FFS is a community running <strong>three</strong> dedicated DCS World servers.
+      You can join with the free (flaming cliffs) aircraft alone. Start by jumping into Server 1.
+    </p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
         <thead>
-          <tr><th>ソフト</th><th>必要度</th><th>用途</th></tr>
+          <tr><th>{% if lang == 'ja' %}ソフト{% else %}Software{% endif %}</th><th>{% if lang == 'ja' %}必要度{% else %}Requirement{% endif %}</th><th>{% if lang == 'ja' %}用途{% else %}Purpose{% endif %}</th></tr>
         </thead>
         <tbody>
           <tr>
             <td>DCS World<br><span class="subtle">(Steam / ED Standalone)</span></td>
-            <td><span class="tag tag-req">必須</span></td>
-            <td>本体。無料機体のみでも参加可</td>
+            <td><span class="tag tag-req">{% if lang == 'ja' %}必須{% else %}Required{% endif %}</span></td>
+            <td>{% if lang == 'ja' %}本体。無料機体のみでも参加可{% else %}The game itself. Free aircraft are enough to join{% endif %}</td>
           </tr>
           <tr>
-            <td><a href="https://github.com/ciribob/DCS-SimpleRadioStandalone/releases" target="_blank" rel="noopener">SRS クライアント</a></td>
-            <td><span class="tag tag-rec">強く推奨</span></td>
-            <td>無線通信。サーバーは <strong>v2.3.4</strong> 系</td>
+            <td><a href="https://github.com/ciribob/DCS-SimpleRadioStandalone/releases" target="_blank" rel="noopener">{% if lang == 'ja' %}SRS クライアント{% else %}SRS client{% endif %}</a></td>
+            <td><span class="tag tag-rec">{% if lang == 'ja' %}強く推奨{% else %}Strongly recommended{% endif %}</span></td>
+            <td>{% if lang == 'ja' %}無線通信。サーバーは <strong>v2.3.4</strong> 系{% else %}Radio comms. The servers run the <strong>v2.3.4</strong> series{% endif %}</td>
           </tr>
           <tr>
-            <td>Discord アカウント</td>
-            <td><span class="tag tag-rec">推奨</span></td>
-            <td>統計連動・サーバー操作・告知の受け取り</td>
+            <td>{% if lang == 'ja' %}Discord アカウント{% else %}Discord account{% endif %}</td>
+            <td><span class="tag tag-rec">{% if lang == 'ja' %}推奨{% else %}Recommended{% endif %}</span></td>
+            <td>{% if lang == 'ja' %}統計連動・サーバー操作・告知の受け取り{% else %}Stats linking, server control, announcements{% endif %}</td>
           </tr>
           <tr>
             <td><a href="https://www.tacview.net/" target="_blank" rel="noopener">Tacview</a></td>
-            <td><span class="tag">任意</span></td>
-            <td>リアルタイム観戦・録画解析</td>
+            <td><span class="tag">{% if lang == 'ja' %}任意{% else %}Optional{% endif %}</span></td>
+            <td>{% if lang == 'ja' %}リアルタイム観戦・録画解析{% else %}Live spectating and recorded analysis{% endif %}</td>
           </tr>
           <tr>
             <td><a href="https://www.lotatc.com/" target="_blank" rel="noopener">LotATC</a></td>
-            <td><span class="tag">任意</span></td>
-            <td>GCI / 管制として参加する場合</td>
+            <td><span class="tag">{% if lang == 'ja' %}任意{% else %}Optional{% endif %}</span></td>
+            <td>{% if lang == 'ja' %}GCI / 管制として参加する場合{% else %}For taking part as GCI / ATC{% endif %}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       DCS の <strong>Multiplayer Name</strong> は後で Discord と紐付けます
       (<a href="#discord">8. Discord</a>)。決めてから入るとスムーズです。
     </p>
+    {% else %}
+    <p class="guide-note">
+      Your <strong>Multiplayer Name</strong> in DCS will later be linked to Discord
+      (<a href="#discord">8. Discord</a>). Decide on it before joining to make things smooth.
+    </p>
+    {% endif %}
   </section>
 
   <!-- ================================================================ -->
   <section class="guide-sec" id="connect">
-    <h3>2. DCS に接続する</h3>
+    <h3>{% if lang == 'ja' %}2. DCS に接続する{% else %}2. Connecting to DCS{% endif %}</h3>
 
+    {% if lang == 'ja' %}
     <p>
       DCS を起動 → <strong>Multiplayer</strong> → サーバー一覧から選びます。
       稼働状況は <a href="/status">Status ページ</a> でリアルタイムに確認できます。
     </p>
+    {% else %}
+    <p>
+      Launch DCS → <strong>Multiplayer</strong> → pick a server from the list.
+      You can watch who is online in real time on the <a href="/status">Status page</a>.
+    </p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
         <thead>
-          <tr><th>サーバー</th><th>DCS 内の表示名</th><th>用途</th></tr>
+          <tr><th>{% if lang == 'ja' %}サーバー{% else %}Server{% endif %}</th><th>{% if lang == 'ja' %}DCS 内の表示名{% else %}Name in DCS{% endif %}</th><th>{% if lang == 'ja' %}用途{% else %}Purpose{% endif %}</th></tr>
         </thead>
         <tbody>
+          {% if lang == 'ja' %}
           <tr><td>Server 1</td><td><code>FFS open alpha 1</code></td><td><strong>常設</strong> — いつでも飛べるメイン枠</td></tr>
           <tr><td>Server 2</td><td><code>FFS open alpha 2</code></td><td><strong>自由</strong> — ミッションを入れ替えて使える枠</td></tr>
           <tr><td>Server 3</td><td><code>FFS open alpha 3</code></td><td><strong>イベント / CO-OP</strong> — 非開催時は自由に使用可</td></tr>
+          {% else %}
+          <tr><td>Server 1</td><td><code>FFS open alpha 1</code></td><td><strong>Permanent</strong> — the main slot, flyable any time</td></tr>
+          <tr><td>Server 2</td><td><code>FFS open alpha 2</code></td><td><strong>Free use</strong> — missions can be swapped in and out</td></tr>
+          <tr><td>Server 3</td><td><code>FFS open alpha 3</code></td><td><strong>Events / CO-OP</strong> — free to use when no event is running</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       Server 2 / 3 は必要なときだけ起動する運用です。停止中でも Discord の
       <code>/server startup</code> で誰でも起動できます
       (<a href="#discord">8.3</a>)。
     </p>
+    {% else %}
+    <p class="guide-note">
+      Server 2 / 3 only start when needed. Even while stopped, anyone can boot them with
+      <code>/server startup</code> on Discord
+      (<a href="#discord">8.3</a>).
+    </p>
+    {% endif %}
 
-    <h4>一覧に出ないとき — Direct Connect</h4>
+    <h4>{% if lang == 'ja' %}一覧に出ないとき — Direct Connect{% else %}If it doesn't show up in the list — Direct Connect{% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       サーバーリストが混雑して見つからない場合は、IP とポートを直接指定してください。
       ゲーム系クライアントは <strong>IP 直打ち</strong> を推奨します
       (ホスト名だと DCS 側の解決に失敗することがあるため)。
     </p>
+    {% else %}
+    <p>
+      If the server list is crowded and you can't find them, specify the IP and port directly.
+      For the game client we recommend entering the <strong>IP directly</strong>
+      (hostname resolution sometimes fails on the DCS side).
+    </p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
         <thead>
-          <tr><th>サーバー</th><th>ホスト</th><th>ポート</th></tr>
+          <tr><th>{% if lang == 'ja' %}サーバー{% else %}Server{% endif %}</th><th>{% if lang == 'ja' %}ホスト{% else %}Host{% endif %}</th><th>{% if lang == 'ja' %}ポート{% else %}Port{% endif %}</th></tr>
         </thead>
         <tbody>
           <tr><td>Server 1</td><td><code>111.237.107.64</code></td><td><code>18101</code></td></tr>
@@ -124,24 +186,36 @@
 
   <!-- ================================================================ -->
   <section class="guide-sec" id="srs">
-    <h3>3. SRS 音声通信</h3>
+    <h3>{% if lang == 'ja' %}3. SRS 音声通信{% else %}3. SRS Voice{% endif %}</h3>
 
+    {% if lang == 'ja' %}
     <p>
       SRS は陣営別・周波数別のボイスチャットです。DCS 本体の音声機能は使いません。
       <strong>サーバーと同じ v2.3.4 系</strong> を入れてください
       (バージョンが違うと接続できません)。
     </p>
-
     <ol class="guide-steps">
       <li>SRS クライアントを起動 (DCS と同じ PC で OK)</li>
       <li><strong>Server Address</strong> に下表の値を入力して接続</li>
       <li>機体に乗ると機載無線と自動同期 (<em>Auto Select Controls = ON</em> 推奨)</li>
     </ol>
+    {% else %}
+    <p>
+      SRS is per-coalition, per-frequency voice chat. It does not use DCS's built-in voice.
+      Install the <strong>same v2.3.4 series as the servers</strong>
+      (different versions cannot connect).
+    </p>
+    <ol class="guide-steps">
+      <li>Start the SRS client (the same PC as DCS is fine)</li>
+      <li>Enter the address from the table below in <strong>Server Address</strong> and connect</li>
+      <li>Once in an aircraft it auto-syncs with the on-board radio (<em>Auto Select Controls = ON</em> recommended)</li>
+    </ol>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
         <thead>
-          <tr><th>サーバー</th><th>アドレス</th><th>ポート</th></tr>
+          <tr><th>{% if lang == 'ja' %}サーバー{% else %}Server{% endif %}</th><th>{% if lang == 'ja' %}アドレス{% else %}Address{% endif %}</th><th>{% if lang == 'ja' %}ポート{% else %}Port{% endif %}</th></tr>
         </thead>
         <tbody>
           <tr><td>Server 1</td><td><code>111.237.107.64</code></td><td><code>18111</code></td></tr>
@@ -156,15 +230,22 @@
   <section class="guide-sec" id="tools-ingame">
     <h3>4. LotATC / Tacview</h3>
 
-    <h4>LotATC — GCI・管制として参加する</h4>
+    <h4>{% if lang == 'ja' %}LotATC — GCI・管制として参加する{% else %}LotATC — joining as GCI / ATC{% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       地上管制 (GCI) で味方を支援したい場合に使います。
       LotATC クライアントからサーバーに接続し、陣営を選んで参加します。
     </p>
+    {% else %}
+    <p>
+      For supporting friendly aircraft as ground-controlled interception (GCI).
+      Connect from the LotATC client to the server and pick your coalition to join.
+    </p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>サーバー</th><th>ポート</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}サーバー{% else %}Server{% endif %}</th><th>{% if lang == 'ja' %}ポート{% else %}Port{% endif %}</th></tr></thead>
         <tbody>
           <tr><td>Server 1</td><td><code>18121</code></td></tr>
           <tr><td>Server 2</td><td><code>18122</code></td></tr>
@@ -173,21 +254,36 @@
       </table>
     </div>
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       LotATC を持っていなくても、ブラウザで動く
       <a href="/gca/">Web GCA</a> で管制ができます (<a href="#web">7. ブラウザツール</a>)。
     </p>
+    {% else %}
+    <p class="guide-note">
+      Even without LotATC you can run control from the browser with
+      <a href="/gca/">Web GCA</a> (<a href="#web">7. Browser Tools</a>).
+    </p>
+    {% endif %}
 
-    <h4>Tacview — リアルタイム観戦・録画</h4>
+    <h4>{% if lang == 'ja' %}Tacview — リアルタイム観戦・録画{% else %}Tacview — real-time spectating and recording{% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       Tacview Advanced をお持ちなら、live で戦況を見ながら録画もできます。
       Tacview の <strong>Record a Telemetry Stream</strong> に
       <code>111.237.107.64:1813x</code> を指定してください。
     </p>
+    {% else %}
+    <p>
+      With Tacview Advanced you can watch the fight live and record it at the same time.
+      Point Tacview's <strong>Record a Telemetry Stream</strong> at
+      <code>111.237.107.64:1813x</code>.
+    </p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>サーバー</th><th>テレメトリ</th><th>リモート操作</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}サーバー{% else %}Server{% endif %}</th><th>{% if lang == 'ja' %}テレメトリ{% else %}Telemetry{% endif %}</th><th>{% if lang == 'ja' %}リモート操作{% else %}Remote Ctrl{% endif %}</th></tr></thead>
         <tbody>
           <tr><td>Server 1</td><td><code>18131</code></td><td><code>18141</code></td></tr>
           <tr><td>Server 2</td><td><code>18132</code></td><td><code>18142</code></td></tr>
@@ -196,6 +292,7 @@
       </table>
     </div>
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       Tacview を持っていなくても、録画は自動で行われ
       <a href="https://lardoon.freedomflight.jp/" target="_blank" rel="noopener">Lardoon</a>
@@ -203,6 +300,15 @@
       <a href="https://sneaker.freedomflight.jp/" target="_blank" rel="noopener">Sneaker</a>
       がブラウザだけで使えます。
     </p>
+    {% else %}
+    <p class="guide-note">
+      Even without Tacview, recording happens automatically and the files are downloadable from
+      <a href="https://lardoon.freedomflight.jp/" target="_blank" rel="noopener">Lardoon</a>.
+      For spectating alone,
+      <a href="https://sneaker.freedomflight.jp/" target="_blank" rel="noopener">Sneaker</a>
+      works entirely in the browser.
+    </p>
+    {% endif %}
   </section>
 
   <!-- ================================================================ -->
@@ -211,6 +317,7 @@
 
     <!-- olympus-live-2026-09-03 -->
 
+    {% if lang == 'ja' %}
     <p>
       <strong>ブラウザからユニットを配置・操作できる RTS 風の管制インターフェース</strong>です。
       DCS を起動していなくても、ブラウザだけで参加できます。
@@ -222,10 +329,23 @@
       <li>編隊の <strong>グループ化</strong>、経路設定、ROE 変更</li>
       <li>味方支援のシナリオを飛行中の仲間に合わせてその場で作る、といった使い方ができます</li>
     </ul>
+    {% else %}
+    <p>
+      <strong>An RTS-style control interface for placing and commanding units from the browser</strong>.
+      You can take part entirely in the browser, without launching DCS.
+    </p>
+
+    <ul class="guide-list">
+      <li><strong>Spawn</strong> units on the map (aircraft, ground forces, ships)</li>
+      <li><strong>Task</strong> existing units (move, attack, escort, refuel, etc.)</li>
+      <li><strong>Group</strong> formations, set routes, change ROE</li>
+      <li>e.g. build friendly-support scenarios on the spot around whoever is currently flying</li>
+    </ul>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>サーバー</th><th>接続先</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}サーバー{% else %}Server{% endif %}</th><th>{% if lang == 'ja' %}接続先{% else %}URL{% endif %}</th></tr></thead>
         <tbody>
           <tr><td>Server 1</td><td><a href="https://freedomflight.jp/olympus1/" target="_blank" rel="noopener"><code>freedomflight.jp/olympus1/</code></a></td></tr>
           <tr><td>Server 2</td><td><a href="https://freedomflight.jp/olympus2/" target="_blank" rel="noopener"><code>freedomflight.jp/olympus2/</code></a></td></tr>
@@ -234,7 +354,8 @@
       </table>
     </div>
 
-    <h4>使いはじめかた</h4>
+    <h4>{% if lang == 'ja' %}使いはじめかた{% else %}Getting started{% endif %}</h4>
+    {% if lang == 'ja' %}
     <ol class="guide-list">
       <li>入りたいサーバーの URL を開きます (上の表)。</li>
       <li><strong>Role</strong> を選びます。<br>
@@ -247,13 +368,35 @@
         (GameMaster / Blue・Red Commander の 3 つ)。
         現在 Olympus が動いているのは Server 1 なので <code>#status-server1</code> をご覧ください。</li>
     </ol>
+    {% else %}
+    <ol class="guide-list">
+      <li>Open the URL of the server you want to join (table above).</li>
+      <li>Pick a <strong>Role</strong>:<br>
+        <code>Game master</code> = referee who can control all coalitions /
+        <code>Blue commander</code> / <code>Red commander</code> = their own coalition only</li>
+      <li>Enter the <strong>Password</strong> and press <strong>Login</strong>.
+        Passwords are posted on <a href="https://discord.gg/h7VkMbUycE" target="_blank" rel="noopener">Discord</a>
+        in the <code>#status-serverN</code> channel (the bot's auto-updated status post),
+        in the <strong>DCS Olympus</strong> section alongside the connection URL
+        (three entries: GameMaster / Blue Commander / Red Commander).
+        Olympus currently runs on Server 1 only, so see <code>#status-server1</code>.</li>
+    </ol>
+    {% endif %}
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       ブックマークするときは <strong>末尾のスラッシュまで</strong> 含めてください
       (<code>/olympus1/</code>)。スラッシュ無しでも自動で補われます。
     </p>
+    {% else %}
+    <p class="guide-note">
+      When bookmarking, include the <strong>trailing slash</strong>
+      (<code>/olympus1/</code>). A missing slash is auto-corrected anyway.
+    </p>
+    {% endif %}
 
-    <h4>無線 (SRS 連携)</h4>
+    <h4>{% if lang == 'ja' %}無線 (SRS 連携){% else %}Radio (SRS integration){% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       Olympus から <strong>SRS の無線につなぐ</strong>ことができます。
       画面上部の <strong>スピーカーのアイコン</strong>で音声機能を有効にしてください。
@@ -263,7 +406,19 @@
       <li>接続先はサーバーごとに自動で選ばれます (Server 1 なら Server 1 の SRS)</li>
       <li>Chrome を推奨します (Olympus 公式の推奨ブラウザ)</li>
     </ul>
+    {% else %}
+    <p>
+      Olympus can <strong>connect to the SRS radio</strong>.
+      Enable the audio feature via the <strong>speaker icon</strong> at the top of the screen.
+      The browser will ask for microphone permission the first time.
+    </p>
+    <ul class="guide-list">
+      <li>The SRS endpoint is chosen automatically per server (Server 1 connects to Server 1's SRS)</li>
+      <li>Chrome is recommended (the officially supported browser for Olympus)</li>
+    </ul>
+    {% endif %}
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       <strong>この機能は導入したばかりです。</strong>
       Olympus が SRS に接続し、SRS 側のクライアント一覧に出るところまでは
@@ -272,57 +427,77 @@
       Discord で教えていただけると助かります。
       無線が確実に必要な場面では、従来どおり SRS クライアントをお使いください。
     </p>
+    {% else %}
+    <p class="guide-note">
+      <strong>This feature is brand new.</strong>
+      We have confirmed that Olympus connects to SRS and shows up in the SRS client list,
+      but actual transmitting / receiving has not been thoroughly tested yet.
+      If it doesn't work for you, or you notice anything odd, a report on Discord is appreciated.
+      For situations where the radio absolutely must work, keep using the regular SRS client.
+    </p>
+    {% endif %}
 
+    {% if lang == 'ja' %}
     <p class="guide-note">
       音声機能は <strong>HTTPS 接続でのみ動作します</strong>。ブラウザがマイクへの
       アクセスを安全な接続でしか許可しないためです。上の表の
       <code>https://</code> の URL をお使いください。
     </p>
+    {% else %}
+    <p class="guide-note">
+      The audio feature <strong>only works over HTTPS</strong>, because browsers only grant
+      microphone access on secure connections. Use the <code>https://</code> URLs from the table above.
+    </p>
+    {% endif %}
   </section>
 
   <!-- ================================================================ -->
   <section class="guide-sec" id="web">
-    <h3>6. ブラウザで使えるツール</h3>
+    <h3>{% if lang == 'ja' %}6. ブラウザで使えるツール{% else %}6. Browser-based tools{% endif %}</h3>
 
+    {% if lang == 'ja' %}
     <p>DCS を持っていなくても、ブラウザだけで戦況を追ったり管制ができます。</p>
+    {% else %}
+    <p>Even without DCS you can follow the fight and run control from the browser alone.</p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
         <thead>
-          <tr><th>ツール</th><th>できること</th></tr>
+          <tr><th>{% if lang == 'ja' %}ツール{% else %}Tool{% endif %}</th><th>{% if lang == 'ja' %}できること{% else %}What it does{% endif %}</th></tr>
         </thead>
         <tbody>
           <tr>
             <td><a href="/status">Status</a></td>
-            <td>稼働状況・ミッション・気象・接続情報・サーバー負荷を 15 秒毎に更新</td>
+            <td>{% if lang == 'ja' %}稼働状況・ミッション・気象・接続情報・サーバー負荷を 15 秒毎に更新{% else %}Server status, mission, weather, connection info and load, refreshed every 15 s{% endif %}</td>
           </tr>
           <tr>
             <td><a href="https://sneaker.freedomflight.jp/" target="_blank" rel="noopener">Sneaker</a></td>
-            <td>飛行中の機体を 2D マップにリアルタイム表示。AWACS 役や地上指揮に</td>
+            <td>{% if lang == 'ja' %}飛行中の機体を 2D マップにリアルタイム表示。AWACS 役や地上指揮に{% else %}Live 2D map of airborne aircraft. For AWACS roles and ground command{% endif %}</td>
           </tr>
           <tr>
             <td><a href="/gca/">Web GCA</a></td>
-            <td>ブラウザ管制卓。GCA (PAR) の進入誘導、GCI、TWR。滑走路データは DCS から自動取得</td>
+            <td>{% if lang == 'ja' %}ブラウザ管制卓。GCA (PAR) の進入誘導、GCI、TWR。滑走路データは DCS から自動取得{% else %}Browser ATC console. GCA (PAR) approach control, GCI, TWR. Runway data auto-fetched from DCS{% endif %}</td>
           </tr>
           <tr>
             <td><a href="/landing-teacher/">Landing Teacher</a></td>
-            <td>着陸・着艦を自動検出して採点。空母は LSO グレーディング、陸上は A〜E<br><span class="subtle">現在 Server 1 のみ対応</span></td>
+            <td>{% if lang == 'ja' %}着陸・着艦を自動検出して採点。空母は LSO グレーディング、陸上は A〜E<br><span class="subtle">現在 Server 1 のみ対応</span>{% else %}Auto-detects and grades landings: LSO grades for carrier traps, A–E for field landings<br><span class="subtle">Server 1 only for now</span>{% endif %}</td>
           </tr>
           <tr>
             <td><a href="https://lardoon.freedomflight.jp/" target="_blank" rel="noopener">Lardoon</a></td>
-            <td>自動録画された Tacview (.acmi) の一覧・検索・ダウンロード。単一フライトへの trim も可</td>
+            <td>{% if lang == 'ja' %}自動録画された Tacview (.acmi) の一覧・検索・ダウンロード。単一フライトへの trim も可{% else %}List, search and download auto-recorded Tacview (.acmi) files. Trim to a single flight{% endif %}</td>
           </tr>
           <tr>
             <td><a href="/tracks">Replays</a></td>
-            <td>DCS のリプレイ (.trk) をダウンロード。DCS の <code>File → Open</code> で再生</td>
+            <td>{% if lang == 'ja' %}DCS のリプレイ (.trk) をダウンロード。DCS の <code>File → Open</code> で再生{% else %}Download DCS replays (.trk); play them via <code>File → Open</code> in DCS{% endif %}</td>
           </tr>
           <tr>
             <td><a href="/leaderboard">Leaderboard</a></td>
-            <td>過去 30 日の飛行時間・撃墜・K/D のランキング</td>
+            <td>{% if lang == 'ja' %}過去 30 日の飛行時間・撃墜・K/D のランキング{% else %}Last-30-day rankings for flight time, kills and K/D{% endif %}</td>
           </tr>
           <tr>
             <td><a href="/known-issues">Known Issues</a></td>
-            <td>既知の不具合と対処状況</td>
+            <td>{% if lang == 'ja' %}既知の不具合と対処状況{% else %}Known issues and their fix status{% endif %}</td>
           </tr>
         </tbody>
       </table>
@@ -331,9 +506,10 @@
 
   <!-- ================================================================ -->
   <section class="guide-sec" id="discord">
-    <h3>7. Discord から使う</h3>
+    <h3>{% if lang == 'ja' %}7. Discord から使う{% else %}7. Using Discord{% endif %}</h3>
 
-    <h4>7.1 最初にやること — アカウント連動</h4>
+    <h4>{% if lang == 'ja' %}7.1 最初にやること — アカウント連動{% else %}7.1 First step — account linking{% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       DCS 内の名前と Discord を紐付けます。
       <strong>これをしないと録画検索や統計が自分に紐付きません。</strong>
@@ -346,32 +522,63 @@
     <p class="guide-note">
       DCS 内から始めることもできます。チャットで <code>.linkme</code> と入力してください。
     </p>
+    {% else %}
+    <p>
+      Link your in-game DCS name to Discord.
+      <strong>Without this, replays and stats won't be attributed to you.</strong>
+    </p>
+    <ol class="guide-steps">
+      <li>Run <code>/linkme</code> in any Discord channel</li>
+      <li>Paste the 4-digit TOKEN it shows into <strong>in-game DCS chat</strong> (press Enter → type it in)</li>
+      <li>When the bot DMs you "Linked successfully", you're done</li>
+    </ol>
+    <p class="guide-note">
+      You can also start from inside DCS: type <code>.linkme</code> in chat.
+    </p>
+    {% endif %}
 
-    <h4>7.2 サーバーの様子を見る</h4>
+    <h4>{% if lang == 'ja' %}7.2 サーバーの様子を見る{% else %}7.2 Watching the servers{% endif %}</h4>
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>コマンド / チャンネル</th><th>内容</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}コマンド / チャンネル{% else %}Command / Channel{% endif %}</th><th>{% if lang == 'ja' %}内容{% else %}Description{% endif %}</th></tr></thead>
         <tbody>
+          {% if lang == 'ja' %}
           <tr><td><code>/server list</code></td><td>全サーバーの稼働状況・ミッション・人数</td></tr>
           <tr><td><code>/serverload</code></td><td>CPU / RAM / FPS / ネットワークのグラフ。重さの切り分けに</td></tr>
           <tr><td><code>/serverstats</code></td><td>1 か月スパンの集計 (プレイヤー数推移など)</td></tr>
           <tr><td><code>#status-server1/2/3</code></td><td>稼働状況と参加者を bot が自動更新。末尾に直近 24h の負荷グラフ</td></tr>
           <tr><td><code>#chat-server1/2/3</code></td><td>DCS 内チャットと Discord の双方向ブリッジ</td></tr>
           <tr><td><code>#events</code></td><td>撃墜・墜落・着艦グレード・爆撃命中などの通知</td></tr>
+          {% else %}
+          <tr><td><code>/server list</code></td><td>All servers: status, missions, player counts</td></tr>
+          <tr><td><code>/serverload</code></td><td>CPU / RAM / FPS / network graphs — for narrowing down performance issues</td></tr>
+          <tr><td><code>/serverstats</code></td><td>1-month aggregates (player count trends, etc.)</td></tr>
+          <tr><td><code>#status-server1/2/3</code></td><td>Bot-maintained status and participants, with a recent-24h load graph appended</td></tr>
+          <tr><td><code>#chat-server1/2/3</code></td><td>Two-way bridge between in-game chat and Discord</td></tr>
+          <tr><td><code>#events</code></td><td>Kills, crashes, trap grades, bombing hits and other notifications</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
 
-    <h4>7.3 ミッション / サーバーを操作する</h4>
+    <h4>{% if lang == 'ja' %}7.3 ミッション / サーバーを操作する{% else %}7.3 Controlling missions / servers{% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       Open α では <strong>ほぼ全てのコマンドを @everyone に開放</strong>しています。
       遠慮なく使ってください。
     </p>
+    {% else %}
+    <p>
+      On Open α, <strong>nearly all commands are open to @everyone</strong>.
+      Use them freely.
+    </p>
+    {% endif %}
 
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>コマンド</th><th>動作</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}コマンド{% else %}Command{% endif %}</th><th>{% if lang == 'ja' %}動作{% else %}Action{% endif %}</th></tr></thead>
         <tbody>
+          {% if lang == 'ja' %}
           <tr><td><code>/mission load</code></td><td>ミッションを切り替え</td></tr>
           <tr><td><code>/mission restart</code> / <code>rotate</code></td><td>リスタート / 次のミッションへ</td></tr>
           <tr><td><code>/mission pause</code> / <code>unpause</code></td><td>一時停止 / 再開</td></tr>
@@ -380,16 +587,34 @@
           <tr><td><code>/server stop</code> / <code>restart</code> / <code>shutdown</code></td><td>ミッション停止 / 再起動 / サーバー終了</td></tr>
           <tr><td><code>/server lock</code> / <code>unlock</code></td><td>新規参加のブロック / 解除</td></tr>
           <tr><td><code>/server password</code></td><td>スロットパスワードの変更</td></tr>
+          {% else %}
+          <tr><td><code>/mission load</code></td><td>Switch missions</td></tr>
+          <tr><td><code>/mission restart</code> / <code>rotate</code></td><td>Restart / advance to the next mission</td></tr>
+          <tr><td><code>/mission pause</code> / <code>unpause</code></td><td>Pause / resume</td></tr>
+          <tr><td><code>/mission modify</code></td><td>Change presets: weather, time of day, etc.</td></tr>
+          <tr><td><code>/server startup</code></td><td><strong>Start a stopped server</strong> (when you want Server 2 / 3)</td></tr>
+          <tr><td><code>/server stop</code> / <code>restart</code> / <code>shutdown</code></td><td>Stop mission / restart / shut the server down</td></tr>
+          <tr><td><code>/server lock</code> / <code>unlock</code></td><td>Block / allow new joins</td></tr>
+          <tr><td><code>/server password</code></td><td>Change the slot password</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
 
+    {% if lang == 'ja' %}
     <p class="guide-warn">
       <code>/server shutdown</code> や <code>/server password</code> は
       他のプレイヤーに直接影響します。人が乗っていないか確認してから使ってください。
     </p>
+    {% else %}
+    <p class="guide-warn">
+      <code>/server shutdown</code> and <code>/server password</code> directly affect other
+      players. Check whether anyone is connected before using them.
+    </p>
+    {% endif %}
 
-    <h4>ミッションファイルを追加する</h4>
+    <h4>{% if lang == 'ja' %}ミッションファイルを追加する{% else %}Adding mission files{% endif %}</h4>
+    {% if lang == 'ja' %}
     <p>
       作った <code>.miz</code> は、対象サーバーの <code>#admin-serverN</code> チャンネルに
       <strong>ドラッグ &amp; ドロップ</strong>するだけで追加できます。
@@ -398,18 +623,37 @@
     <p class="guide-note">
       同名ファイルは上書きされます。残したいものは名前を変えてから投げてください。
     </p>
+    {% else %}
+    <p>
+      To add a <code>.miz</code> you built, just <strong>drag &amp; drop</strong> it into the
+      target server's <code>#admin-serverN</code> channel. After upload you can switch to it
+      right away with <code>/mission load</code>.
+    </p>
+    <p class="guide-note">
+      Same-name files are overwritten. Rename anything you want to keep before uploading.
+    </p>
+    {% endif %}
 
-    <h4>7.4 統計・ランキング</h4>
+    <h4>{% if lang == 'ja' %}7.4 統計・ランキング{% else %}7.4 Stats and rankings{% endif %}</h4>
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>コマンド</th><th>内容</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}コマンド{% else %}Command{% endif %}</th><th>{% if lang == 'ja' %}内容{% else %}Description{% endif %}</th></tr></thead>
         <tbody>
+          {% if lang == 'ja' %}
           <tr><td><code>/stats</code></td><td>自分の撃墜 / 被撃墜 / K/D / 飛行時間</td></tr>
           <tr><td><code>/info &lt;user&gt;</code></td><td>他プレイヤーの公開統計</td></tr>
           <tr><td><code>/sorties</code></td><td>機体別の出撃回数・時間</td></tr>
           <tr><td><code>/greenieboard</code></td><td>空母着艦グレードのランキング</td></tr>
           <tr><td><code>/missionstats</code></td><td>現ミッションのイベント統計</td></tr>
           <tr><td><code>/help</code></td><td>使えるコマンドの一覧</td></tr>
+          {% else %}
+          <tr><td><code>/stats</code></td><td>Your kills / deaths / K/D / flight time</td></tr>
+          <tr><td><code>/info &lt;user&gt;</code></td><td>Another player's public stats</td></tr>
+          <tr><td><code>/sorties</code></td><td>Sortie counts and hours per airframe</td></tr>
+          <tr><td><code>/greenieboard</code></td><td>Carrier trap grade rankings</td></tr>
+          <tr><td><code>/missionstats</code></td><td>Event stats for the current mission</td></tr>
+          <tr><td><code>/help</code></td><td>List of available commands</td></tr>
+          {% endif %}
         </tbody>
       </table>
     </div>
@@ -417,39 +661,74 @@
 
   <!-- ================================================================ -->
   <section class="guide-sec" id="trouble">
-    <h3>8. 困ったとき</h3>
+    <h3>{% if lang == 'ja' %}8. 困ったとき{% else %}8. Troubleshooting{% endif %}</h3>
 
     <div class="guide-tablewrap">
       <table class="guide-table">
-        <thead><tr><th>症状</th><th>対処</th></tr></thead>
+        <thead><tr><th>{% if lang == 'ja' %}症状{% else %}Symptom{% endif %}</th><th>{% if lang == 'ja' %}対処{% else %}Fix{% endif %}</th></tr></thead>
         <tbody>
           <tr>
+            {% if lang == 'ja' %}
             <td>サーバー一覧に出ない</td>
             <td>Direct Connect (<code>111.237.107.64:1810x</code>) で接続。ルーター側で UDP が塞がれている可能性もあります</td>
+            {% else %}
+            <td>Server doesn't show in the list</td>
+            <td>Use Direct Connect (<code>111.237.107.64:1810x</code>). Your router may also be blocking UDP</td>
+            {% endif %}
           </tr>
           <tr>
+            {% if lang == 'ja' %}
             <td>Server 2 / 3 に入れない</td>
             <td>停止中です。Discord で <code>/server startup</code> を実行すれば起動します</td>
+            {% else %}
+            <td>Can't join Server 2 / 3</td>
+            <td>They are stopped. Run <code>/server startup</code> on Discord to boot them</td>
+            {% endif %}
           </tr>
           <tr>
+            {% if lang == 'ja' %}
             <td>SRS が version mismatch</td>
             <td>サーバーは <strong>v2.3.4</strong> 系です。同じ系列を入れ直してください</td>
+            {% else %}
+            <td>SRS reports version mismatch</td>
+            <td>The servers run the <strong>v2.3.4</strong> series. Reinstall the same series</td>
+            {% endif %}
           </tr>
           <tr>
+            {% if lang == 'ja' %}
             <td>bot が反応しない</td>
             <td><code>/linkme</code> が未実行の可能性。再起動直後はコマンド同期に数分かかります</td>
+            {% else %}
+            <td>Bot doesn't respond</td>
+            <td>You may not have run <code>/linkme</code>. After a bot restart, command sync takes a few minutes</td>
+            {% endif %}
           </tr>
           <tr>
+            {% if lang == 'ja' %}
             <td>Olympus にログインできない</td>
             <td>Role とパスワードの組み合わせをご確認ください。パスワードは Discord の <code>#status-server1</code> の稼働状況投稿 (DCS Olympus 欄) に掲示しています (<a href="#olympus">5. DCS Olympus</a>)</td>
+            {% else %}
+            <td>Can't log in to Olympus</td>
+            <td>Check your Role / password combination. Passwords are posted on Discord in the <code>#status-server1</code> status post (DCS Olympus section) (<a href="#olympus">5. DCS Olympus</a>)</td>
+            {% endif %}
           </tr>
           <tr>
+            {% if lang == 'ja' %}
             <td>Sneaker が disconnected</td>
             <td>ミッション上にユニットが 0 機の状態です。進行すれば自動で復帰します</td>
+            {% else %}
+            <td>Sneaker shows "disconnected"</td>
+            <td>The mission currently has 0 units. It reconnects automatically once the mission progresses</td>
+            {% endif %}
           </tr>
           <tr>
+            {% if lang == 'ja' %}
             <td>Lardoon に新しい録画が出ない</td>
             <td>最大 30 秒ほど遅延します。それ以上なら Discord で報告してください</td>
+            {% else %}
+            <td>New recordings don't appear on Lardoon</td>
+            <td>There is up to ~30 s of lag. If it's longer, please report it on Discord</td>
+            {% endif %}
           </tr>
         </tbody>
       </table>
@@ -458,13 +737,20 @@
 
   <!-- ================================================================ -->
   <section class="guide-sec">
-    <h3>9. 連絡先</h3>
+    <h3>{% if lang == 'ja' %}9. 連絡先{% else %}9. Contact{% endif %}</h3>
+    {% if lang == 'ja' %}
     <p>
       質問・不具合報告は Discord の <code>#何でも質問</code> へ。
       悪質行為の報告は <code>#ディスカッション</code> または管理者への DM でお願いします。
     </p>
+    {% else %}
+    <p>
+      For questions and bug reports, use Discord's <code>#何でも質問</code>.
+      Report abusive behaviour in <code>#ディスカッション</code> or via DM to the admins.
+    </p>
+    {% endif %}
     <p class="guide-actions">
-      <a class="guide-btn" href="https://discord.gg/h7VkMbUycE" target="_blank" rel="noopener">Discord に参加 ↗</a>
+      <a class="guide-btn" href="https://discord.gg/h7VkMbUycE" target="_blank" rel="noopener">{% if lang == 'ja' %}Discord に参加 ↗{% else %}Join Discord ↗{% endif %}</a>
       <a class="guide-btn guide-btn-secondary" href="https://x.com/DCS_FFS_JP" target="_blank" rel="noopener">X (@DCS_FFS_JP) ↗</a>
     </p>
   </section>

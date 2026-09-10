@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import cache, db, dcssb, fitbit as _fitbit, sysmon
+from . import cache, db, dcssb, fitbit as _fitbit, i18n, sysmon
 
 logging.basicConfig(
     level=logging.INFO,
@@ -97,6 +97,32 @@ app = FastAPI(
 )
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+
+def render(request: Request, name: str, ctx: dict | None = None):
+    """TemplateResponse の薄いラッパ。lang と翻訳関数 t を全テンプレに注入する。"""
+    lang = i18n.resolve_lang(request)
+    ctx = {"request": request, **(ctx or {}), "lang": lang, "t": lambda k: i18n.t(lang, k)}
+    return templates.TemplateResponse(request, name, ctx)
+
+
+@app.middleware("http")
+async def _lang_cookie(request: Request, call_next):
+    """`?lang=` が有効値なら cookie (ffs_lang) に永続化する。
+
+    HTMX の polling も cookie で lang を引き継ぐための下地。
+    """
+    response = await call_next(request)
+    lang = i18n.normalize(request.query_params.get("lang"))
+    if lang and request.cookies.get(i18n.COOKIE_NAME) != lang:
+        response.set_cookie(
+            i18n.COOKIE_NAME,
+            lang,
+            max_age=i18n.COOKIE_MAX_AGE,
+            samesite="lax",
+            path="/",
+        )
+    return response
 
 
 def _fmt_dt(dt: datetime | None) -> str:
@@ -314,34 +340,22 @@ def _home_stats() -> dict:
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse(
-        "home.html",
-        {
-            "request": request,
-            "stats": _home_stats(),
-        },
-    )
+    return render(request, "home.html", {"stats": _home_stats()})
 
 
 @app.get("/guide", response_class=HTMLResponse)
 async def guide_page(request: Request):
-    return templates.TemplateResponse("guide.html", {"request": request})
+    return render(request, "guide.html")
 
 
 @app.get("/known-issues", response_class=HTMLResponse)
 async def known_issues(request: Request):
-    return templates.TemplateResponse("known_issues.html", {"request": request})
+    return render(request, "known_issues.html")
 
 
 @app.get("/status", response_class=HTMLResponse)
 async def status_page(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "poll_seconds": 15,
-        },
-    )
+    return render(request, "index.html", {"poll_seconds": 15})
 
 
 @app.get("/panel/servers", response_class=HTMLResponse)
@@ -365,10 +379,10 @@ async def panel_servers(request: Request):
     load_by_name: dict = {}
     if load_cached.value and load_cached.value.ok and load_cached.value.series:
         load_by_name = {s.name: s for s in load_cached.value.series}
-    return templates.TemplateResponse(
+    return render(
+        request,
         "servers_panel.html",
         {
-            "request": request,
             "servers": servers,
             "error": error,
             "updated_at": _fmt_dt(cached.fetched_at),
@@ -382,7 +396,7 @@ async def panel_servers(request: Request):
 
 @app.get("/health", response_class=HTMLResponse)
 async def health_page(request: Request):
-    return templates.TemplateResponse("health.html", {"request": request})
+    return render(request, "health.html")
 
 
 @app.get("/panel/fitbit", response_class=HTMLResponse)
@@ -399,10 +413,10 @@ async def panel_fitbit(request: Request):
     data = None
     if live or seven:
         data = {**(seven or {}), **(live or {})}
-    return templates.TemplateResponse(
+    return render(
+        request,
         "fitbit_panel.html",
         {
-            "request": request,
             "d": data,
             "error": error,
             "age": _fmt_age(c_live.fetched_at),
@@ -413,10 +427,10 @@ async def panel_fitbit(request: Request):
 @app.get("/panel/sysmon", response_class=HTMLResponse)
 async def panel_sysmon(request: Request):
     cached = sysmon_cache.get()
-    return templates.TemplateResponse(
+    return render(
+        request,
         "sysmon_panel.html",
         {
-            "request": request,
             "m": cached.value,
             "error": cached.error,
             "age": _fmt_age(cached.fetched_at),
@@ -425,14 +439,14 @@ async def panel_sysmon(request: Request):
 
 
 # DCSSB /highscore のカテゴリ (順序 = 表示順、データが空のカテゴリは非表示)。
-# 上位 10 人のみ表示 (limit=10)。
+# 上位 10 人のみ表示 (limit=10)。ラベルは i18n キー (テンプレ側で t() を通す)。
 HIGHSCORE_CATEGORIES = [
-    ("playtime", "飛行時間", "Flight Time"),
-    ("Air Targets", "空中目標撃破", "Kills"),
-    ("Ground Targets", "地上目標撃破", "Kills"),
+    ("playtime", "lb_cat_playtime", "Flight Time"),
+    ("Air Targets", "lb_cat_air", "Kills"),
+    ("Ground Targets", "lb_cat_ground", "Kills"),
     # Air Defence は SAM / AAA / MANPADS / 対空レーダーをまとめた DCS カテゴリ。
-    ("Air Defence", "対空 (SAM/AAA)", "Kills"),
-    ("PvP-KD-Ratio", "PvP KD 比", "Ratio"),
+    ("Air Defence", "lb_cat_airdef", "Kills"),
+    ("PvP-KD-Ratio", "lb_cat_pvp", "Ratio"),
 ]
 
 
@@ -536,10 +550,10 @@ async def tracks_page(request: Request):
                 }
             )
         server_tracks[server] = files
-    return templates.TemplateResponse(
+    return render(
+        request,
         "tracks.html",
         {
-            "request": request,
             "server_tracks": server_tracks,
             "unavailable": unavailable,
             "error": error,
@@ -592,15 +606,15 @@ async def leaderboard(request: Request):
         entries = [_format_highscore_entry(key, e) for e in (raw.get(key) or [])]
         cats.append({"key": key, "label": label, "metric": metric, "entries": entries})
     has_any = any(c["entries"] for c in cats)
-    return templates.TemplateResponse(
+    return render(
+        request,
         "leaderboard.html",
         {
-            "request": request,
             "cats": cats,
             "error": error,
             "has_any": has_any,
             "limit": limit,
-            "period_label": "過去 30 日",
+            "period_label": "lb_period",
             "updated_at": _fmt_dt(cached.fetched_at),
             "age": _fmt_age(cached.fetched_at),
         },

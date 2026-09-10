@@ -5,22 +5,27 @@
   <header class="tracks-header">
     <h2>DCS Replay Tracks</h2>
     <p class="subtle">
+      {% if lang == 'ja' %}
       各サーバで保存されたミッションリプレイ (.trk)。
       DCS World を起動して <code>File → Open</code> から開くと飛行を再現できます。
+      {% else %}
+      Mission replays (.trk) saved on each server.
+      Launch DCS World and open them via <code>File → Open</code> to replay the flight.
+      {% endif %}
     </p>
   </header>
 
   {% if error %}
-  <div class="error">取得失敗: {{ error }}</div>
+  <div class="error">{{ t('tr_error') }}{{ error }}</div>
   {% endif %}
 
   {% for server, files in server_tracks.items() %}
   <section class="tracks-section">
     <h3>{{ server }} <span class="count">({{ files|length }} tracks)</span></h3>
     {% if unavailable.get(server) %}
-    <p class="notice">サーバが一時的に利用不可のためリストを取得できません。</p>
+    <p class="notice">{{ t('tr_unavailable') }}</p>
     {% elif not files %}
-    <p class="notice">このサーバに保存されたリプレイはありません。</p>
+    <p class="notice">{{ t('tr_empty') }}</p>
     {% else %}
     <table class="tracks-table">
       <thead>

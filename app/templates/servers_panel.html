@@ -1,9 +1,9 @@
 {% if error %}
 <div class="error">
-  <strong>DCSSB API に到達できません:</strong> {{ error }}
+  <strong>{{ t('sp_error_upstream') }}</strong> {{ error }}
 </div>
 {% elif not servers %}
-<div class="error">サーバ情報が取得できませんでした。</div>
+<div class="error">{{ t('sp_error_empty') }}</div>
 {% else %}
 <div class="grid">
 {% for s in servers %}

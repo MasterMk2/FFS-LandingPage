@@ -10,12 +10,19 @@
   <p class="loading">loading...</p>
 </section>
 
-<h2 class="section-title">公開 API</h2>
+<h2 class="section-title">{% if lang == 'ja' %}公開 API{% else %}Public API{% endif %}</h2>
 <section class="api-doc">
+  {% if lang == 'ja' %}
   <p class="api-lead">
     このページに出している心拍データは、認証なしの読み取り専用 API としても公開しています。
     CORS を許可しているのでブラウザから直接 fetch できます。
   </p>
+  {% else %}
+  <p class="api-lead">
+    The heart-rate data shown on this page is also published as an unauthenticated, read-only API.
+    CORS is enabled, so you can fetch it directly from the browser.
+  </p>
+  {% endif %}
 
   <div class="api-base">
     <span class="api-k">Base URL</span>
@@ -23,45 +30,45 @@
   </div>
 
   <div class="api-live card">
-    <header><h2>いま返ってくる値</h2><span class="badge" id="api-live-badge">読み込み中</span></header>
+    <header><h2>{% if lang == 'ja' %}いま返ってくる値{% else %}What the API returns right now{% endif %}</h2><span class="badge" id="api-live-badge">{{ t('health_loading') }}</span></header>
     <pre class="fix-pre"><code id="api-live-body">GET /latest?type=heart-rate</code></pre>
   </div>
 
-  <h3 class="api-h3">エンドポイント</h3>
+  <h3 class="api-h3">{% if lang == 'ja' %}エンドポイント{% else %}Endpoints{% endif %}</h3>
   <table class="lb-table api-table">
-    <thead><tr><th>メソッド / パス</th><th>内容</th></tr></thead>
+    <thead><tr><th>{% if lang == 'ja' %}メソッド / パス{% else %}Method / Path{% endif %}</th><th>{% if lang == 'ja' %}内容{% else %}Description{% endif %}</th></tr></thead>
     <tbody>
       <tr>
         <td class="mono">GET /types</td>
-        <td>公開中のデータ型一覧と上限値。クライアント側で決め打ちしないで済むように。</td>
+        <td>{% if lang == 'ja' %}公開中のデータ型一覧と上限値。クライアント側で決め打ちしないで済むように。{% else %}List of published data types and their limits, so clients don't have to hardcode them.{% endif %}</td>
       </tr>
       <tr>
         <td class="mono">GET /latest?type=heart-rate</td>
-        <td>最新 1 点。<code>age_seconds</code> 付き。</td>
+        <td>{% if lang == 'ja' %}最新 1 点。<code>age_seconds</code> 付き。{% else %}The latest single sample, with an <code>age_seconds</code> field.{% endif %}</td>
       </tr>
       <tr>
         <td class="mono">GET /series?type=heart-rate&amp;minutes=60</td>
-        <td>時系列。<strong>既定では間引かずに記録した粒度のまま</strong>返します。</td>
+        <td>{% if lang == 'ja' %}時系列。<strong>既定では間引かずに記録した粒度のまま</strong>返します。{% else %}Time series. <strong>By default it returns the recorded granularity without decimation.</strong>{% endif %}</td>
       </tr>
     </tbody>
   </table>
 
-  <h3 class="api-h3">/series のパラメータ</h3>
+  <h3 class="api-h3">{% if lang == 'ja' %}/series のパラメータ{% else %}/series parameters{% endif %}</h3>
   <table class="lb-table api-table">
-    <thead><tr><th>名前</th><th>既定</th><th>内容</th></tr></thead>
+    <thead><tr><th>{% if lang == 'ja' %}名前{% else %}Name{% endif %}</th><th>{% if lang == 'ja' %}既定{% else %}Default{% endif %}</th><th>{% if lang == 'ja' %}内容{% else %}Description{% endif %}</th></tr></thead>
     <tbody>
       <tr><td class="mono">type</td><td class="mono">heart-rate</td>
-          <td>データ型。公開対象外を指定すると 404。</td></tr>
+          <td>{% if lang == 'ja' %}データ型。公開対象外を指定すると 404。{% else %}Data type. Unknown / unpublished types return 404.{% endif %}</td></tr>
       <tr><td class="mono">minutes</td><td class="mono">60</td>
-          <td>終端から遡る分数。最大 <strong>1440</strong> (24 時間)。超えると 400。</td></tr>
-      <tr><td class="mono">end</td><td class="mono">現在時刻</td>
-          <td>終端 (ISO 8601)。過去を切り出すときに使います。</td></tr>
+          <td>{% if lang == 'ja' %}終端から遡る分数。最大 <strong>1440</strong> (24 時間)。超えると 400。{% else %}How many minutes back from the end. Max <strong>1440</strong> (24 h); anything larger returns 400.{% endif %}</td></tr>
+      <tr><td class="mono">end</td><td class="mono">{% if lang == 'ja' %}現在時刻{% else %}now{% endif %}</td>
+          <td>{% if lang == 'ja' %}終端 (ISO 8601)。過去を切り出すときに使います。{% else %}End timestamp (ISO 8601). Use it to slice a window in the past.{% endif %}</td></tr>
       <tr><td class="mono">max_points</td><td class="mono">50000</td>
-          <td>指定すると等間隔に間引きます。間引かれたかは <code>truncated</code> で判ります。</td></tr>
+          <td>{% if lang == 'ja' %}指定すると等間隔に間引きます。間引かれたかは <code>truncated</code> で判ります。{% else %}When set, the series is decimated to evenly spaced points. Check <code>truncated</code> to see whether decimation happened.{% endif %}</td></tr>
     </tbody>
   </table>
 
-  <h3 class="api-h3">レスポンス例</h3>
+  <h3 class="api-h3">{% if lang == 'ja' %}レスポンス例{% else %}Response example{% endif %}</h3>
   {% raw %}
   <pre class="fix-pre"><code>$ curl -s 'https://freedomflight.jp/health/v2/api/public/latest?type=heart-rate'
 {
@@ -70,7 +77,7 @@
   "unit": "bpm",
   "value": 66.0,
   "time": "2026-08-27T03:59:43Z",   // UTC
-  "age_seconds": 465                // 計測時刻からの経過秒
+  "age_seconds": 465                // seconds since the sample was taken
 }
 
 $ curl -s 'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&minutes=60'
@@ -81,7 +88,7 @@ $ curl -s 'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&
   "start": "2026-08-27T03:07:28Z",
   "end":   "2026-08-27T04:07:28Z",
   "count": 1433,
-  "truncated": false,               // true なら max_points で間引かれている
+  "truncated": false,               // true = decimated by max_points
   "points": [
     { "t": "2026-08-27T03:07:30Z", "v": 61.0 },
     { "t": "2026-08-27T03:07:33Z", "v": 62.0 },
@@ -90,7 +97,8 @@ $ curl -s 'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&
 }</code></pre>
   {% endraw %}
 
-  <h3 class="api-h3">解像度と鮮度</h3>
+  <h3 class="api-h3">{% if lang == 'ja' %}解像度と鮮度{% else %}Resolution and freshness{% endif %}</h3>
+  {% if lang == 'ja' %}
   <p class="api-note">
     Fitbit Charge 6 が記録した粒度をそのまま保存しているので、心拍は
     <strong>中央値 2-3 秒間隔 (1 日あたり約 36,000 点)</strong> で取り出せます。
@@ -109,19 +117,46 @@ $ curl -s 'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&
     <code>age_seconds</code> を見て古さを判断してください。
     <code>minutes</code> は 30 以上を推奨します。
   </p>
+  {% else %}
+  <p class="api-note">
+    Data is stored at the granularity recorded by the Fitbit Charge 6, so heart rate can be
+    retrieved at a <strong>median interval of 2–3 seconds (roughly 36,000 points per day)</strong>.
+  </p>
+  <p class="api-note api-warn">
+    <strong>However, it is not real-time.</strong>
+    The watch syncs via the phone to Google's cloud, so even the newest point is typically
+    <strong>several to a dozen-plus minutes old</strong>. When the watch is away from the phone
+    (e.g. while sleeping) gaps of several hours can occur. This lag comes from the data
+    provider and cannot be shortened on our side.
+  </p>
+  <p class="api-note">
+    For that reason, short windows like <code>minutes=5</code>
+    <strong>can legitimately return <code>count</code> = 0</strong>.
+    If you need "the current value", use <code>/latest</code> and judge staleness from
+    <code>age_seconds</code>. <code>minutes</code> of 30 or more is recommended.
+  </p>
+  {% endif %}
 
-  <h3 class="api-h3">制限</h3>
+  <h3 class="api-h3">{% if lang == 'ja' %}制限{% else %}Limits{% endif %}</h3>
   <ul class="api-list">
+    {% if lang == 'ja' %}
     <li>IP あたり <strong>60 リクエスト / 分</strong>。超えると 429 と <code>Retry-After</code> を返します。</li>
     <li>1 回のリクエストで最大 <strong>24 時間分 / 50,000 点</strong>。</li>
     <li>公開しているのは <strong>心拍のみ</strong>です (<code>/types</code> で確認できます)。
         他のデータ型は 404 になります。</li>
     <li>読み取り専用です。書き込み系のメソッドはありません。</li>
+    {% else %}
+    <li><strong>60 requests / minute</strong> per IP. Beyond that you get 429 plus a <code>Retry-After</code> header.</li>
+    <li>Up to <strong>24 hours / 50,000 points</strong> per request.</li>
+    <li>Only <strong>heart rate</strong> is published (check with <code>/types</code>).
+        Other data types return 404.</li>
+    <li>Read-only — no write methods exist.</li>
+    {% endif %}
   </ul>
 
-  <h3 class="api-h3">使用例</h3>
+  <h3 class="api-h3">{% if lang == 'ja' %}使用例{% else %}Usage examples{% endif %}</h3>
   {% raw %}
-  <pre class="fix-pre"><code>// ブラウザ (CORS 許可済み)
+  <pre class="fix-pre"><code>// Browser (CORS enabled)
 const r = await fetch(
   'https://freedomflight.jp/health/v2/api/public/series?type=heart-rate&minutes=60');
 const { points, unit } = await r.json();
@@ -133,26 +168,41 @@ BASE = "https://freedomflight.jp/health/v2/api/public"
 
 with urllib.request.urlopen(f"{BASE}/latest?type=heart-rate") as r:
     d = json.load(r)
-print(f"{d['value']:.0f} {d['unit']} ({d['age_seconds'] // 60} 分前)")
+print(f"{d['value']:.0f} {d['unit']} ({d['age_seconds'] // 60} min ago)")
 
-# 過去 6 時間を 5 分粒度に間引いて取る
+# Last 6 hours decimated to 5-minute granularity
 url = f"{BASE}/series?type=heart-rate&minutes=360&max_points=72"
 with urllib.request.urlopen(url) as r:
     s = json.load(r)
-print(s["count"], "点", "間引きあり" if s["truncated"] else "そのまま")</code></pre>
+print(s["count"], "points", "decimated" if s["truncated"] else "as recorded")</code></pre>
   {% endraw %}
 
+  {% if lang == 'ja' %}
   <p class="api-foot">
     実装は <a href="https://github.com/MasterMk2/GoogleHealthCollector" target="_blank"
     rel="noopener">GoogleHealthCollector</a> (Google Health API v4 から
     42 データ型を収集・蓄積)。このページの心拍パネルとは別系統で、
     公開しているのはそのうち心拍だけです。
   </p>
+  {% else %}
+  <p class="api-foot">
+    Implementation: <a href="https://github.com/MasterMk2/GoogleHealthCollector" target="_blank"
+    rel="noopener">GoogleHealthCollector</a> (collects and stores 42 data types from Google Health
+    API v4). It is a separate pipeline from the heart-rate panel on this page; only heart rate
+    from it is published.
+  </p>
+  {% endif %}
 </section>
 
 <script>
 // ドキュメントが実際に動くことをその場で示す。失敗しても本文は読めるようにする。
 (async () => {
+  const T = {
+    nodata: {{ t('health_nodata') | tojson }},
+    failed: {{ t('health_failed') | tojson }},
+    ago: {{ t('health_ago_min') | tojson }},
+  };
+  const fmtAgo = (min) => T.ago.replace('{min}', String(min));
   const badge = document.getElementById('api-live-badge');
   const body = document.getElementById('api-live-body');
   try {
@@ -162,9 +212,9 @@ print(s["count"], "点", "間引きあり" if s["truncated"] else "そのまま"
     body.textContent =
       "GET /latest?type=heart-rate\n\n" + JSON.stringify(d, null, 2);
     const min = Math.floor((d.age_seconds ?? 0) / 60);
-    badge.textContent = d.value == null ? 'データなし' : `${d.value} ${d.unit} / ${min} 分前`;
+    badge.textContent = d.value == null ? T.nodata : `${d.value} ${d.unit} / ${fmtAgo(min)}`;
   } catch (e) {
-    badge.textContent = '取得できません';
+    badge.textContent = T.failed;
     body.textContent = String(e);
   }
 })();

@@ -77,7 +77,8 @@ iyakusai / sneaker / lardoon は DCS サーバとは無関係のサイトだが�
 
 | ファイル | 役割 |
 |---|---|
-| [app/main.py](../../../app/main.py) | FastAPI エントリ・ルート定義・cache 起動 (lifespan) |
+| [app/main.py](../../../app/main.py) | FastAPI エントリ・ルート定義・cache 起動 (lifespan)・`render()` で lang/t を全テンプレに注入 |
+| [app/i18n.py](../../../app/i18n.py) | JA/EN i18n。辞書 (`MESSAGES`) と言語解決 (`?lang=` → cookie `ffs_lang` → `Accept-Language` → ja)。長文はテンプレ内 `{% if lang == 'ja' %}` ブロックで対応。HTMX polling は cookie で言語継承 |
 | [app/cache.py](../../../app/cache.py) | `Fetcher[T]` — 周期リフレッシュ付き in-memory cache |
 | [app/dcssb.py](../../../app/dcssb.py) | DCSSB WebService クライアント (RestAPI + /tracks) |
 | [app/db.py](../../../app/db.py) | postgres `serverstats` を RO で SELECT、時系列と SVG スパークライン生成 |

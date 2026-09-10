@@ -15,6 +15,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 - **Caddy v2** リバースプロキシ + TLS 終端 + 静的ホスト
 - **psycopg 3** で postgres serverstats を async SELECT
 - **in-memory cache** (`app/cache.py`) で F5 連打時の upstream 負荷を遮断
+- **JA/EN 二言語** (`app/i18n.py`): `?lang=` → cookie (`ffs_lang`) → `Accept-Language` → ja の優先順で解決。UI 語句は辞書、長文はテンプレ内 `{% if lang == 'ja' %}` ブロック。HTMX polling も cookie で言語を引き継ぐ
 
 ## 公開 URL
 
@@ -67,10 +68,11 @@ FFS-LandingPage/
 │   └── Caddyfile          # iyakusai / freedomflight / sneaker / lardoon サイトブロック
 ├── iyakusai/              # 医学薬学祭サイトの静的 HTML (別コンテンツ、Caddy がそのまま配信)
 └── app/
-    ├── main.py            # FastAPI ルート / lifespan で cache 起動
+    ├── main.py            # FastAPI ルート / lifespan で cache 起動 / render() が lang と t() を注入
     ├── cache.py           # Fetcher[T] (周期リフレッシュ async キャッシュ)
     ├── dcssb.py           # DCSSB RestAPI + Tracks クライアント
     ├── db.py              # postgres serverstats RO クライアント + スパークライン生成
+    ├── i18n.py            # JA/EN 辞書 + 言語解決 (?lang= / cookie / Accept-Language)
     ├── templates/         # Jinja2 (base + home + index + leaderboard + tracks + panels)
     └── static/style.css
 ```

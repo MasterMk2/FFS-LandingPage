@@ -348,6 +348,16 @@ async def guide_page(request: Request):
     return render(request, "guide.html")
 
 
+@app.get("/hermes", response_class=HTMLResponse)
+async def hermes_page(request: Request):
+    return render(request, "hermes.html")
+
+
+@app.get("/hermes/privacy", response_class=HTMLResponse)
+async def hermes_privacy_page(request: Request):
+    return render(request, "hermes_privacy.html")
+
+
 @app.get("/known-issues", response_class=HTMLResponse)
 async def known_issues(request: Request):
     return render(request, "known_issues.html")

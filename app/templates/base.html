@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}FFS DCS Status{% endblock %}</title>
+{% block head %}{% endblock %}
 <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=10">
 {# Discord バーを閉じた人には最初から出さない。<head> で html にクラスを
    立てておくことで、body 描画後に消す方式で起きる一瞬のちらつきを避ける。
@@ -57,6 +58,10 @@
   {% block content %}{% endblock %}
 </main>
 <footer>
+  <nav class="legal-links" aria-label="legal information">
+    <a href="/hermes">Hermes</a>
+    <a href="/hermes/privacy">Hermes Privacy</a>
+  </nav>
   <nav class="sns-links" aria-label="community links">
     <a class="sns-discord" href="https://discord.gg/h7VkMbUycE" target="_blank" rel="noopener" title="Discord">Discord</a>
     <a class="sns-x" href="https://x.com/DCS_FFS_JP" target="_blank" rel="noopener" title="X (Twitter)">X (@DCS_FFS_JP)</a>

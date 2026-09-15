@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Hermes Personal Assistant — Privacy Policy{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow, noarchive">{% endblock %}
+{% block content %}
+<article class="legal-page">
+  <header>
+    <h2>Hermes Personal Assistant — Privacy Policy</h2>
+    <p class="legal-lead">Effective date: September 15, 2026</p>
+  </header>
+
+  {% if lang == 'ja' %}
+  <p>本ポリシーは、Hermes Personal Assistant（以下「本アプリ」）が Google ユーザーデータをどのように取り扱うかを説明します。本アプリは所有者本人だけが利用する非公開の個人用アプリです。</p>
+
+  <h3>取得する情報</h3>
+  <ul>
+    <li>Google Calendar の予定情報（日時、題名、説明、場所、参加者など、許可された読み取り範囲）</li>
+    <li>購読している Google Calendar の一覧とメタデータ（カレンダー名、識別情報、アクセス権など、許可された読み取り範囲）</li>
+    <li>Gmail のメール情報（送受信者、日時、件名、本文、スレッド情報など、許可された読み取り範囲）</li>
+    <li>同期の成否や最終更新日時など、本アプリの運用に必要な技術情報</li>
+  </ul>
+
+  <h3>利用目的</h3>
+  <p>取得した情報は、所有者本人の日次予定の作成、対応事項と期限の抽出、情報源の更新状況の確認、およびそれらの機能の保守にのみ利用します。</p>
+
+  <h3>保存と保護</h3>
+  <p>データは所有者が管理する機器に保存されます。本アプリは、権限を必要最小限に分離し、認証情報を一般公開されるウェブコンテンツから隔離して運用します。Google のアクセストークンおよび更新トークンを本サイトへ掲載することはありません。</p>
+
+  <h3>外部での処理と配信</h3>
+  <p>本アプリは、所有者本人へ日次予定や通知を届けるために Discord を使用し、緊急度の高い通知に LINE を使用する場合があります。その際、Google ユーザーデータから作成された対応事項、予定、または要約が各サービスへ送信されます。所有者が対話形式の回答を求めた場合は、回答に必要な Google ユーザーデータまたはその派生情報を、所有者が設定した AI モデルサービスへ送信して処理する場合があります。定時の日次予定はローカルの決定論的テンプレートで生成し、AI モデルサービスへは送信しません。</p>
+  <p>外部サービスへの送信は、所有者が要求した機能を提供するために必要な範囲に限定します。各外部サービスは、送信された情報をそれぞれの利用規約とプライバシーポリシーに従って処理します。</p>
+
+  <h3>販売、広告利用、その他の共有</h3>
+  <p>Google ユーザーデータを販売しません。広告、マーケティング、信用評価に利用しません。上記の所有者向け機能に必要な外部サービスへの送信、および法令上必要な場合を除き、第三者へ共有しません。Google ユーザーデータの利用は、Google API Services User Data Policy（Limited Use 要件を含む）に従います。</p>
+
+  <h3>保持と削除</h3>
+  <p>データは本アプリの機能に必要な期間だけ保持します。所有者は、ローカルに保存されたデータを削除し、Google アカウントのセキュリティ設定から本アプリのアクセス権を取り消せます。削除またはアクセス停止に関する問い合わせは、Google の同意画面に表示されるユーザーサポート連絡先で受け付けます。</p>
+
+  <h3>ポリシーの変更</h3>
+  <p>データの取り扱いが変わる場合は、変更後の内容と発効日をこのページに掲載します。</p>
+  {% else %}
+  <p>This policy explains how Hermes Personal Assistant (the “Application”) handles Google user data. The Application is a private personal application used only by its owner.</p>
+
+  <h3>Information collected</h3>
+  <ul>
+    <li>Google Calendar event information, including dates, titles, descriptions, locations, and attendees within the authorized read-only scope.</li>
+    <li>The subscribed Google Calendar list and metadata, including calendar names, identifiers, and access information within the authorized read-only scope.</li>
+    <li>Gmail message information, including senders, recipients, dates, subjects, bodies, and thread information within the authorized read-only scope.</li>
+    <li>Technical information required to operate the Application, such as synchronization results and last-update times.</li>
+  </ul>
+
+  <h3>Purpose of use</h3>
+  <p>The information is used only to prepare the owner's daily plans, identify action items and deadlines, check source freshness, and maintain those functions.</p>
+
+  <h3>Storage and protection</h3>
+  <p>Data is stored on equipment controlled by the owner. The Application separates permissions according to least privilege and isolates credentials from publicly served web content. Google access and refresh tokens are never published on this website.</p>
+
+  <h3>External processing and delivery</h3>
+  <p>The Application uses Discord to deliver daily plans and notifications to the owner, and may use LINE for high-priority notifications. Action items, events, or summaries derived from Google user data are transmitted to those services when delivered. When the owner requests a conversational answer, Google user data or derived information needed for the answer may be sent to and processed by an AI model service configured by the owner. The scheduled daily plan is generated locally from a deterministic template and is not sent to an AI model service.</p>
+  <p>Transfers to external services are limited to what is necessary to provide the owner-requested feature. Each external service processes transmitted information under its own terms and privacy policy.</p>
+
+  <h3>Sale, advertising, and other sharing</h3>
+  <p>Google user data is not sold or used for advertising, marketing, or credit assessment. It is not otherwise shared with third parties except for the external services needed to provide the owner-facing features described above or where required by law. The Application's use of Google user data adheres to the Google API Services User Data Policy, including the Limited Use requirements.</p>
+
+  <h3>Retention and deletion</h3>
+  <p>Data is retained only while needed for the Application's functions. The owner can delete locally stored data and revoke the Application's access from the Google Account security settings. Requests about deletion or stopping access can be made through the user support contact displayed on the Google consent screen.</p>
+
+  <h3>Changes to this policy</h3>
+  <p>If data-handling practices change, the revised policy and its effective date will be published on this page.</p>
+  {% endif %}
+
+  <nav class="legal-actions" aria-label="Hermes legal information">
+    <a href="/hermes">{% if lang == 'ja' %}アプリ情報へ戻る{% else %}Back to application information{% endif %}</a>
+    <a href="/">{% if lang == 'ja' %}FFS ホームへ戻る{% else %}Back to FFS home{% endif %}</a>
+  </nav>
+</article>
+{% endblock %}

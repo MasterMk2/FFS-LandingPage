@@ -182,5 +182,25 @@
     {% endif %}
     <span class="home-card-cta">{{ t('cta_open_gm') }}</span>
   </a>
+  <a class="home-card" href="/drivecal/" target="_blank" rel="noopener">
+    <h3>DriveCal</h3>
+    {% if lang == 'ja' %}
+    <p>
+      DCS とは無関係の個人プロジェクト。スマホで記録した GNSS と加速度・ジャイロから、
+      運転を地図・グラフ・G・高度付きの 3D で振り返るブラウザアプリ (記録用の Android アプリは開発中)。
+      実走行のサンプル (夜間の一般道) とサーキットの合成デモで試せます。
+      ファイルは端末内だけで処理され、サーバには送信されません。
+    </p>
+    {% else %}
+    <p>
+      A personal project unrelated to DCS. A browser app for reviewing drives recorded on a phone
+      (GNSS plus accelerometer and gyro): map, charts, g-forces and a 3D view with altitude
+      (the Android recorder is still in development).
+      Try it with a real night drive on local roads or a synthetic circuit demo.
+      Files are processed entirely on-device and never sent to a server.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_drivecal') }}</span>
+  </a>
 </section>
 {% endblock %}

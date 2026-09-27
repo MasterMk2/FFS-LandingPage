@@ -83,6 +83,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "gravitymap.freedomflight.jp を開く ↗",
         "en": "Open gravitymap.freedomflight.jp ↗",
     },
+    "cta_open_drivecal": {"ja": "DriveCal を開く ↗", "en": "Open DriveCal ↗"},
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

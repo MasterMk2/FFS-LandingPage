@@ -209,6 +209,23 @@ freedomflight.jp {
 		}
 	}
 
+	# DriveCal (スマホの GNSS + IMU の記録で運転を振り返るブラウザアプリ、個人プロジェクト)。
+	# 実体は DriveCal リポジトリの web/deploy/deploy.sh が起動する drivecal-web:80
+	# (nginx + 静的 SPA、dcs_network に後から参加)。FastBriefing と同じくビルド時の
+	# base を "./" にしてあり、サブパスでも LAN のポート直打ち (:18600) でも動く。
+	# 配信物で確認済み (2026-09-27): index.html は ./assets/... のみ、絶対パス参照 0 件、
+	# worker / wasm / 3D の遅延チャンクは import.meta.url からの相対解決。
+	#
+	# ★ セッションファイルの解析はブラウザ内で完結し、アップロード経路は無い。
+	#   /drivecal/samples/ の実走行サンプルは自宅周辺と自宅前の通りを削除済み
+	#   (DriveCal tools の privacy-trim)。
+	redir /drivecal /drivecal/
+	handle_path /drivecal/* {
+		reverse_proxy drivecal-web:80 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
 	handle {
 		reverse_proxy ffs-website:8000 {
 			header_up Host {host}

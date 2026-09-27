@@ -3,6 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+{# Google Analytics 4。GA_MEASUREMENT_ID 未設定時は何も出さない (main.py)。
+   HTMX の /panel/* はこの base を継承しないので、15 秒毎の polling が
+   ページビューとして数えられることはない。 #}
+{% if ga_measurement_id %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', '{{ ga_measurement_id }}');
+</script>
+{% endif %}
 <title>{% block title %}FFS DCS Status{% endblock %}</title>
 {% block head %}{% endblock %}
 <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=10">
@@ -59,6 +71,7 @@
 </main>
 <footer>
   <nav class="legal-links" aria-label="legal information">
+    <a href="/privacy">{{ t('footer_privacy') }}</a>
     <a href="/hermes">Hermes</a>
     <a href="/hermes/privacy">Hermes Privacy</a>
   </nav>

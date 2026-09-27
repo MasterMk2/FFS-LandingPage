@@ -16,6 +16,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 - **psycopg 3** で postgres serverstats を async SELECT
 - **in-memory cache** (`app/cache.py`) で F5 連打時の upstream 負荷を遮断
 - **JA/EN 二言語** (`app/i18n.py`): `?lang=` → cookie (`ffs_lang`) → `Accept-Language` → ja の優先順で解決。UI 語句は辞書、長文はテンプレ内 `{% if lang == 'ja' %}` ブロック。HTMX polling も cookie で言語を引き継ぐ
+- **Google Analytics 4** (任意): `.env` の `GA_MEASUREMENT_ID` を設定したときだけ `base.html` に gtag.js を出す。HTMX の `/panel/*` は base を継承しないので polling はページビューに数えない。GA 利用の開示は `/privacy`
 
 ## 公開 URL
 

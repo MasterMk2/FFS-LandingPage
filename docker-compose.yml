@@ -40,6 +40,8 @@ services:
       DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
       DCSSB_TIMEOUT: "3.0"
       DCSSB_DB_URL: "${DCSSB_DB_URL:-}"
+      # Google Analytics 4 の測定 ID (G-XXXXXXXXXX)。空なら計測タグを出さない。
+      GA_MEASUREMENT_ID: "${GA_MEASUREMENT_ID:-}"
       # psutil にホスト側 /proc を読ませて、コンテナ namespace でなく
       # ホスト全体の CPU / mem / loadavg を計測する。
       HOST_PROC: "/host/proc"

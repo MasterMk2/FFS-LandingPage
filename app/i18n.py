@@ -35,6 +35,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "このお知らせを閉じる",
         "en": "Dismiss this notice",
     },
+    "footer_privacy": {
+        "ja": "プライバシーポリシー",
+        "en": "Privacy Policy",
+    },
     # ── home.html ──
     "home_lead": {
         "ja": (

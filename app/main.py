@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -97,6 +98,28 @@ app = FastAPI(
 )
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+# Google Analytics 4 の測定 ID (G-XXXXXXXXXX)。未設定ならタグ自体を出さないので、
+# ローカル開発やテストのアクセスが本番の計測に混ざらない。値は base.html の
+# <script> 内 JS 文字列にも埋め込むため、形式が正しいものだけを採用する。
+_GA_ID_RE = re.compile(r"G-[A-Z0-9]{4,20}")
+
+
+def _ga_measurement_id(raw: str) -> str | None:
+    value = raw.strip()
+    if not value:
+        return None
+    if not _GA_ID_RE.fullmatch(value):
+        logging.getLogger(__name__).warning(
+            "GA_MEASUREMENT_ID=%r は測定 ID の形式ではないため計測タグを無効化", value
+        )
+        return None
+    return value
+
+
+templates.env.globals["ga_measurement_id"] = _ga_measurement_id(
+    os.getenv("GA_MEASUREMENT_ID", "")
+)
 
 
 def render(request: Request, name: str, ctx: dict | None = None):
@@ -356,6 +379,11 @@ async def hermes_page(request: Request):
 @app.get("/hermes/privacy", response_class=HTMLResponse)
 async def hermes_privacy_page(request: Request):
     return render(request, "hermes_privacy.html")
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    return render(request, "privacy.html")
 
 
 @app.get("/known-issues", response_class=HTMLResponse)

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{% if lang == 'ja' %}プライバシーポリシー{% else %}Privacy Policy{% endif %} — FFS{% endblock %}
+{% block content %}
+<article class="legal-page">
+  <header>
+    <h2>{% if lang == 'ja' %}プライバシーポリシー{% else %}Privacy Policy{% endif %}</h2>
+    <p class="legal-lead">{% if lang == 'ja' %}制定日: 2026年9月27日{% else %}Effective date: September 27, 2026{% endif %}</p>
+  </header>
+
+  {% if lang == 'ja' %}
+  <p>このページでは、FFS ウェブサイト（freedomflight.jp）を閲覧したときに取り扱う情報と、その送信先について説明します。</p>
+
+  <h3>アクセス解析（Google アナリティクス）</h3>
+  <p>本サイトは、利用状況を把握してサイトを改善するため、Google LLC のアクセス解析ツール「Google アナリティクス」を使用しています。ページを表示すると、お使いのブラウザから Google へ次の情報が送信されます。</p>
+  <ul>
+    <li>閲覧したページの URL・タイトルと、参照元（どのページから来たか）</li>
+    <li>ブラウザ・OS・画面サイズなどの端末情報、言語設定、おおよその地域</li>
+    <li>スクロール、外部リンクのクリック、ファイルのダウンロードなどの操作と、その日時</li>
+    <li>ブラウザを区別するために Cookie へ保存される、ランダムな識別子</li>
+  </ul>
+  <p>これらの情報は、閲覧数や利用傾向を統計として把握するためだけに使います。氏名やメールアドレスなど、個人を特定する情報は収集しません。広告の配信やターゲティングにも使いません。</p>
+  <p>Google による情報の取り扱いは、<a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener">Google のサービスを使用するサイトやアプリから収集した情報の Google による使用</a>と<a href="https://policies.google.com/privacy?hl=ja" target="_blank" rel="noopener">Google プライバシーポリシー</a>をご覧ください。</p>
+
+  <h3>計測を拒否する方法</h3>
+  <ul>
+    <li>Google の <a href="https://tools.google.com/dlpage/gaoptout?hl=ja" target="_blank" rel="noopener">Google アナリティクス オプトアウト アドオン</a>をブラウザに導入する</li>
+    <li>ブラウザの設定で Cookie やトラッキングをブロックする</li>
+  </ul>
+  <p>計測を拒否しても、本サイトはこれまでどおり閲覧できます。</p>
+
+  <h3>本サイトが端末に保存する情報</h3>
+  <ul>
+    <li>Cookie <code>ffs_lang</code>: 選んだ表示言語（日本語 / 英語）を覚えておくため（有効期間 1 年）</li>
+    <li>localStorage <code>ffs-dbar-dismissed</code>: Discord の案内バーを閉じたことを覚えておくため</li>
+  </ul>
+  <p>どちらも表示の切り替えにだけ使い、本サイト以外へは送信しません。</p>
+
+  <h3>外部から読み込むスクリプト</h3>
+  <p>ステータス表示の自動更新に使うライブラリ（htmx）を unpkg.com から読み込んでいます。読み込みの際には、IP アドレスやブラウザの種類など、通常の通信に含まれる情報が同サービスへ届きます。</p>
+
+  <h3>ポリシーの変更</h3>
+  <p>取り扱いを変更する場合は、変更後の内容と改定日をこのページに掲載します。</p>
+
+  <h3>お問い合わせ</h3>
+  <p>このポリシーに関するご質問は、<a href="https://discord.gg/h7VkMbUycE" target="_blank" rel="noopener">FFS Discord</a> までお寄せください。</p>
+  {% else %}
+  <p>This page explains what information is handled when you browse the FFS website (freedomflight.jp) and where it is sent.</p>
+
+  <h3>Analytics (Google Analytics)</h3>
+  <p>This site uses Google Analytics, an analytics service provided by Google LLC, to understand how the site is used and to improve it. When you view a page, your browser sends the following information to Google:</p>
+  <ul>
+    <li>The URL and title of the page you viewed, and the referring page</li>
+    <li>Device information such as browser, OS and screen size, language settings, and approximate location</li>
+    <li>Interactions such as scrolling, clicks on external links and file downloads, and when they occurred</li>
+    <li>A random identifier stored in a cookie to distinguish browsers</li>
+  </ul>
+  <p>This information is used only to measure page views and usage trends as statistics. We do not collect information that identifies you personally, such as your name or email address, and we do not use it for advertising or targeting.</p>
+  <p>For how Google handles this information, see <a href="https://policies.google.com/technologies/partner-sites?hl=en" target="_blank" rel="noopener">How Google uses information from sites or apps that use our services</a> and the <a href="https://policies.google.com/privacy?hl=en" target="_blank" rel="noopener">Google Privacy Policy</a>.</p>
+
+  <h3>How to opt out</h3>
+  <ul>
+    <li>Install Google's <a href="https://tools.google.com/dlpage/gaoptout?hl=en" target="_blank" rel="noopener">Google Analytics Opt-out Browser Add-on</a></li>
+    <li>Block cookies or tracking in your browser settings</li>
+  </ul>
+  <p>Opting out does not affect your ability to browse this site.</p>
+
+  <h3>Information stored on your device by this site</h3>
+  <ul>
+    <li>Cookie <code>ffs_lang</code>: remembers your display language (Japanese / English) for one year</li>
+    <li>localStorage <code>ffs-dbar-dismissed</code>: remembers that you closed the Discord banner</li>
+  </ul>
+  <p>Both are used only to adjust the display and are never sent anywhere other than this site.</p>
+
+  <h3>Externally loaded scripts</h3>
+  <p>The library used to refresh the status displays (htmx) is loaded from unpkg.com. When it loads, information included in any ordinary request, such as your IP address and browser type, reaches that service.</p>
+
+  <h3>Changes to this policy</h3>
+  <p>If our practices change, the revised policy and its revision date will be posted on this page.</p>
+
+  <h3>Contact</h3>
+  <p>For questions about this policy, please reach out on the <a href="https://discord.gg/h7VkMbUycE" target="_blank" rel="noopener">FFS Discord</a>.</p>
+  {% endif %}
+
+  <nav class="legal-actions" aria-label="{% if lang == 'ja' %}ページ移動{% else %}page navigation{% endif %}">
+    <a href="/">{% if lang == 'ja' %}FFS ホームへ戻る{% else %}Back to FFS home{% endif %}</a>
+  </nav>
+</article>
+{% endblock %}

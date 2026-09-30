@@ -11,11 +11,21 @@
 #   ↑ compose の default project 名 `ffs-dcs-server` に prefix される。
 #     別名を付けている場合は下の `name:` を合わせて変更する。
 #
+# 必須の環境変数 (.env に書く。未設定なら compose が起動前にエラーで止まる):
+#   CADDY_HTTP_PORT / CADDY_HTTPS_PORT  ルータから 80/443 を転送するホスト側ポート
+#   HERMES_LINE_WEBHOOK_UPSTREAM        /line/webhook の転送先 (LAN 内の host:port)
+#   HERMES_GCAL_WEBHOOK_UPSTREAM        /google/calendar/watch の転送先 (同上)
+#   IYAKUSAI_LINE_WEBHOOK_UPSTREAM      line.iyakusai.com /webhook の転送先 (同上)
+# 任意: APP_UID / APP_GID (既定 10001)、TRACK_DOWNLOAD_CONCURRENCY (既定 4)、
+#       TRACK_DOWNLOAD_PER_CLIENT (既定 2)
+#
 # 起動順序:
 #   1. ../ffs-dcs-server/ で `docker compose up -d dcsserverbot` を先に
 #   2. (初回のみ) ../ffs-dcs-server/scripts/apply-restapi-config.sh を実行
 #   3. ../ffs-dcs-server/ で `docker compose restart dcsserverbot`
-#   4. 当ディレクトリで `docker compose up -d --build`
+#   4. (初回のみ) ./data の所有者を ffs-website の実行ユーザー (APP_UID:APP_GID)
+#      にする。例: `mkdir -p data && sudo chown -R 10001:10001 data`
+#   5. 当ディレクトリで `docker compose up -d --build`
 ###############################################################################
 
 networks:
@@ -30,6 +40,11 @@ services:
   ffs-website:
     build:
       context: .
+      args:
+        # 実行ユーザーの uid/gid (Dockerfile 参照)。./data の所有者と揃える。
+        # ホストで data/ を手編集したい場合はホストユーザーの uid/gid にしてもよい。
+        APP_UID: "${APP_UID:-10001}"
+        APP_GID: "${APP_GID:-10001}"
     image: ffs-website:latest
     container_name: ffs-website
     restart: unless-stopped
@@ -40,6 +55,10 @@ services:
       DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
       DCSSB_TIMEOUT: "3.0"
       DCSSB_DB_URL: "${DCSSB_DB_URL:-}"
+      # /proxy/tracks (リプレイ DL) の同時ダウンロード上限。全体を超えたら 503、
+      # 接続元 1 つあたりを超えたら 429 を返す。
+      TRACK_DOWNLOAD_CONCURRENCY: "${TRACK_DOWNLOAD_CONCURRENCY:-4}"
+      TRACK_DOWNLOAD_PER_CLIENT: "${TRACK_DOWNLOAD_PER_CLIENT:-2}"
       # Google Analytics 4 の測定 ID (G-XXXXXXXXXX)。空なら計測タグを出さない。
       GA_MEASUREMENT_ID: "${GA_MEASUREMENT_ID:-}"
       # psutil にホスト側 /proc を読ませて、コンテナ namespace でなく
@@ -56,13 +75,34 @@ services:
       # ホストリソース監視用。read-only で /proc だけ露出 (/sys や / は不要)。
       - /proc:/host/proc:ro
       # Fitbit refresh token 永続化用 (コンテナ再起動でも token が消えない)。
+      # 実行ユーザー (APP_UID:APP_GID) が書けるよう、ホスト側の所有者を合わせておく。
       - ./data:/data
+    # --- 最小権限 ---
+    # アプリが乗っ取られても書けるのは /data (bind) と /tmp (tmpfs) だけにする。
+    # アプリは /tmp をほぼ使わない (アップロード受付なし) ので小さめで足りる。
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    # メモリ上限。/proxy/tracks はチャンク単位のストリーミング転送で、同時数も
+    # TRACK_DOWNLOAD_CONCURRENCY で抑えるので、リプレイのファイルサイズに比例して
+    # 増えない。常用時の使用量は 50〜60 MiB 程度 (検証環境で実測) なので余裕を見て 512m。
+    # 超えるとカーネルに kill され、restart: unless-stopped で再起動する。
+    mem_limit: 512m
+    # プロセス / スレッド数の上限 (fork 爆弾でホストの PID を食い潰さない)。
+    # uvicorn 1 プロセス + スレッドプール (anyio 既定 40) で数十に収まる
+    # (待機時の実測は 5 スレッド)。
+    pids_limit: 256
     networks:
       - dcs_network
       - db_network   # ffs-postgres 読み取り専用 SELECT (FPS/CPU/メモリ)
 
-  # リバースプロキシ。freedomflight.jp 公開用 (WAN:80/443 → router NAPT →
-  # 192.168.3.170:30080/30443 → container :80/:443)。
+  # リバースプロキシ。freedomflight.jp などを HTTPS 終端する。
+  # ルータで WAN の 80/443 をこのホストの CADDY_HTTP_PORT / CADDY_HTTPS_PORT に
+  # 転送し、それをコンテナの :80 / :443 に publish している。
   # DNS 設定後に Caddyfile の `http://` を消すだけで Let's Encrypt 自動発行。
   caddy:
     image: caddy:2
@@ -70,13 +110,19 @@ services:
     restart: unless-stopped
     environment:
       TZ: "Asia/Tokyo"
+      # LAN 内の別ホストで動いている Webhook 受け口 (host:port)。Caddyfile から
+      # {$VAR} で参照する。内部アドレスを公開リポジトリに書かないよう .env に置く。
+      HERMES_LINE_WEBHOOK_UPSTREAM: "${HERMES_LINE_WEBHOOK_UPSTREAM:?/line/webhook の転送先 host:port を .env に設定してください}"
+      HERMES_GCAL_WEBHOOK_UPSTREAM: "${HERMES_GCAL_WEBHOOK_UPSTREAM:?/google/calendar/watch の転送先 host:port を .env に設定してください}"
+      IYAKUSAI_LINE_WEBHOOK_UPSTREAM: "${IYAKUSAI_LINE_WEBHOOK_UPSTREAM:?line.iyakusai.com /webhook の転送先 host:port を .env に設定してください}"
     ports:
-      - "30080:80/tcp"
-      - "30443:443/tcp"
-      # - "30443:443/udp"   # QUIC/HTTP3 を使う場合 (router で UDP/443 転送も必要)
+      # ホスト側のポート番号は .env で指定する。
+      - "${CADDY_HTTP_PORT:?ルータから 80/tcp を転送するホスト側ポートを .env に設定してください}:80/tcp"
+      - "${CADDY_HTTPS_PORT:?ルータから 443/tcp を転送するホスト側ポートを .env に設定してください}:443/tcp"
+      # QUIC/HTTP3 を使う場合 (ルータで UDP/443 の転送も必要):
+      # - "${CADDY_HTTPS_PORT}:443/udp"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./iyakusai:/srv/iyakusai:ro
       - ./gravitymap:/srv/gravitymap:ro
       - caddy_data:/data
       - caddy_config:/config

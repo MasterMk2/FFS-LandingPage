@@ -15,11 +15,13 @@
     <span class="fix-toc-label">{% if lang == 'ja' %}記事{% else %}Articles{% endif %}</span>
     <ul>
       {% if lang == 'ja' %}
+      <li><a href="#split-lock-misery">[Fix] DCS 2.9.30 に更新したらサーバ FPS が 117 から 77 に落ちて戻らない — Linux カーネルの split lock 対策 (10 ms ペナルティ) と split_lock_mitigate=0</a></li>
       <li><a href="#wine-heap-lfh-olympus">[Fix] Olympus 有効化後、無人でも約 2.5 時間でサーバ FPS が 28 まで崩落する — Wine ヒープの空きリスト線形走査 (LFH 未活性化) と ntdll.dll パッチ</a></li>
       <li><a href="#ecore-affinity-lag">[Fix] 日によってサーバ FPS が 5〜30 まで落ちる — DCSServerBot auto_affinity による E-core 固定と、SAM レーダー制御スクリプトの A/B 結果</a></li>
       <li><a href="#sim-thread-stall">[Investigation] 全プレイヤーが同時に一瞬フリーズする — シムスレッドのバースト肥大とプロセス稼働時間の関係</a></li>
       <li><a href="#wine-stub-crash">[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</a></li>
       {% else %}
+      <li><a href="#split-lock-misery">[Fix] After updating to DCS 2.9.30, server FPS drops from 117 to 77 and stays there — the Linux kernel's split lock mitigation (10 ms penalty) and split_lock_mitigate=0</a></li>
       <li><a href="#wine-heap-lfh-olympus">[Fix] After enabling Olympus, server FPS collapses to 28 within ~2.5 hours even with zero players — Wine heap free-list linear scan (LFH never activated) and an ntdll.dll patch</a></li>
       <li><a href="#ecore-affinity-lag">[Fix] Server FPS drops to 5–30 on some days — DCSServerBot auto_affinity pinning to E-cores, and an A/B test of the SAM radar-control script</a></li>
       <li><a href="#sim-thread-stall">[Investigation] Every player freezes at the same instant for a moment — sim-thread burst growth vs. process uptime</a></li>
@@ -27,6 +29,239 @@
       {% endif %}
     </ul>
   </nav>
+
+  <article class="fix-article" id="split-lock-misery">
+    {% if lang == 'ja' %}
+    <h3>[Fix] DCS 2.9.30 に更新したらサーバ FPS が 117 から 77 に落ちて戻らない — Linux カーネルの split lock 対策 (10 ms ペナルティ) と split_lock_mitigate=0</h3>
+    {% else %}
+    <h3>[Fix] After updating to DCS 2.9.30, server FPS drops from 117 to 77 and stays there — the Linux kernel's split lock mitigation (10 ms penalty) and split_lock_mitigate=0</h3>
+    {% endif %}
+
+    <div class="fix-meta">
+      <span class="fix-tag">DCS Dedicated Server</span>
+      <span class="fix-tag">DCS 2.9.30.28536</span>
+      <span class="fix-tag">Linux kernel / split lock</span>
+      <span class="fix-tag">Wine 11.0</span>
+      <span class="fix-tag">Performance</span>
+      <span class="fix-tag">2026-10-01</span>
+    </div>
+
+      <nav class="fix-toc" aria-label="{% if lang == 'ja' %}目次{% else %}Table of contents{% endif %}">
+        <span class="fix-toc-label">{% if lang == 'ja' %}目次{% else %}Contents{% endif %}</span>
+      <ol class="fix-toc-list">
+        <li><a href="#split-lock-misery--environment">Environment</a></li>
+        <li><a href="#split-lock-misery--symptom">Symptom</a></li>
+        <li><a href="#split-lock-misery--method">Method</a></li>
+        <li><a href="#split-lock-misery--findings">Findings</a></li>
+        <li><a href="#split-lock-misery--root-cause">Root Cause ({% if lang == 'ja' %}split lock とカーネルのペナルティ{% else %}split locks and the kernel penalty{% endif %})</a></li>
+        <li><a href="#split-lock-misery--not-the-cause">{% if lang == 'ja' %}Not the cause (確認済みの容疑者){% else %}Not the cause (suspects cleared){% endif %}</a></li>
+        <li><a href="#split-lock-misery--fix">Fix</a></li>
+        <li><a href="#split-lock-misery--status">Status / Verification</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="split-lock-misery--environment">
+      <h4>Environment</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li>DCS World Dedicated Server <code>2.9.30.28536</code> (MT ビルド、<code>--server --norender</code>)。2026-10-01 18:37 JST に <code>2.9.29.27468</code> から更新</li>
+        <li>Linux (Ubuntu 24.04 / kernel 7.0) + WineHQ stable <code>11.0</code> + Docker。<code>ntdll.dll</code> は次の記事の LFH パッチ適用版</li>
+        <li>CPU: Intel Core Ultra 7 265K (split lock 検出 <code>split_lock_detect</code> に対応)</li>
+        <li>カーネル設定: <code>kernel.split_lock_mitigate = 1</code> (既定値のまま)</li>
+        <li>ミッション: 常設フリーフライト</li>
+        {% else %}
+        <li>DCS World Dedicated Server <code>2.9.30.28536</code> (MT build, <code>--server --norender</code>), updated from <code>2.9.29.27468</code> on 2026-10-01 18:37 JST</li>
+        <li>Linux (Ubuntu 24.04 / kernel 7.0) + WineHQ stable <code>11.0</code> + Docker. <code>ntdll.dll</code> is the LFH-patched build from the next article</li>
+        <li>CPU: Intel Core Ultra 7 265K (supports split lock detection, <code>split_lock_detect</code>)</li>
+        <li>Kernel setting: <code>kernel.split_lock_mitigate = 1</code> (left at the default)</li>
+        <li>Mission: permanent free flight</li>
+        {% endif %}
+      </ul>
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--symptom">
+      <h4>Symptom</h4>
+      {% if lang == 'ja' %}
+      <p>DCS を 2.9.30 に更新して再起動した直後から、サーバ FPS が 77 前後で頭打ちになった。更新前は無人で 115〜117 FPS。次の記事の Wine ヒープ問題のように時間とともに落ちていくのではなく、<strong>起動直後から 77 で、その後も横ばい</strong>。人数 (0〜5 人) にもほとんど左右されない。</p>
+      <p>プロセス CPU は約 35% で、更新前 (約 38%) より低いくらい。CPU が足りないのではなく、何かに足止めされている形だった。</p>
+<pre class="fix-pre"><code># server1、serverstats (1 分毎)
+区間                                FPS            プロセス CPU   人数
+9/27 〜 10/01 18:20  (2.9.29)       105 〜 117     37 〜 50 %     0 〜 8   ← 1 時間平均
+10/01 18:40 〜 21:22 (2.9.30)        74 〜 78      35 〜 43 %     0 〜 5   ← 15 分平均
+10/01 21:24 〜       (対処後)       117            40 %           1        ← 1 分値</code></pre>
+      {% else %}
+      <p>Right after updating DCS to 2.9.30 and restarting, server FPS capped out at around 77. Before the update it ran 115–117 FPS with no players. Unlike the Wine heap problem in the next article, it did not decay over time — <strong>it was 77 from the moment it started and stayed flat</strong>. Player count (0–5) made little difference.</p>
+      <p>Process CPU was about 35%, if anything lower than before the update (about 38%). It was not short of CPU; something was holding it back.</p>
+<pre class="fix-pre"><code># server1, serverstats (per minute)
+window                              FPS            process CPU   players
+9/27 – 10/01 18:20  (2.9.29)        105 – 117      37 – 50 %     0 – 8   ← hourly averages
+10/01 18:40 – 21:22 (2.9.30)         74 – 78       35 – 43 %     0 – 5   ← 15-minute averages
+10/01 21:24 –       (after fix)     117            40 %          1       ← per-minute values</code></pre>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--method">
+      <h4>Method</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li>DCSServerBot Monitoring が 1 分毎に書く <code>serverstats</code> (FPS / プロセス CPU / 人数) を更新前後で比較</li>
+        <li>DCS のメインスレッド (シムスレッド) の <code>/proc/&lt;pid&gt;/task/&lt;tid&gt;/wchan</code> と <code>syscall</code> を 5 ms 間隔で 10 秒 (約 1,900 回) 読み、何で待っているかを集計</li>
+        <li>スレッド毎の CPU 時間を 10 秒差分で計測</li>
+        <li>ホストのカーネルログ (<code>journalctl -k</code>) と <code>/proc/sys/kernel/split_lock_mitigate</code> を確認</li>
+        {% else %}
+        <li>Compared DCSServerBot Monitoring's per-minute <code>serverstats</code> (FPS / process CPU / players) before and after the update</li>
+        <li>Read the DCS main thread's (sim thread's) <code>/proc/&lt;pid&gt;/task/&lt;tid&gt;/wchan</code> and <code>syscall</code> every 5 ms for 10 s (~1,900 samples) and tallied what it was waiting on</li>
+        <li>Measured per-thread CPU time as a 10-second delta</li>
+        <li>Checked the host kernel log (<code>journalctl -k</code>) and <code>/proc/sys/kernel/split_lock_mitigate</code></li>
+        {% endif %}
+      </ul>
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--findings">
+      <h4>Findings</h4>
+      {% if lang == 'ja' %}
+      <p>メインスレッドが CPU を使っていたのは 26% だけで、残りの 74% は待っていた。待ちの内訳は次のとおり。</p>
+<pre class="fix-pre"><code># 対処前 (21:13、無人)。メインスレッド 10 秒 / 約 1,900 サンプル
+wchan                     割合    syscall 番号
+msleep_interruptible      56 %    -1 (システムコールの外)
+anon_pipe_read            18 %    0  (read: wineserver 経由の待ち)
+実行中                    26 %</code></pre>
+      <p><code>msleep_interruptible</code> はカーネル内部のスリープ関数で、アプリが自分から呼ぶものではない。しかも syscall 番号が -1 なので、システムコールではなく <strong>CPU 例外の処理中に眠らされている</strong>ことになる。同じ時間帯のカーネルログには、DCS のスレッドについて次の警告が出続けていた。</p>
+      {% else %}
+      <p>The main thread was on CPU only 26% of the time; the other 74% it was waiting. The breakdown:</p>
+<pre class="fix-pre"><code># Before the fix (21:13, empty). Main thread, 10 s / ~1,900 samples
+wchan                     share   syscall nr
+msleep_interruptible      56 %    -1 (outside any syscall)
+anon_pipe_read            18 %    0  (read: waiting via wineserver)
+running                   26 %</code></pre>
+      <p><code>msleep_interruptible</code> is an in-kernel sleep function that applications do not call on their own. And with syscall nr -1, the thread is not in a system call — it is <strong>being put to sleep while the kernel handles a CPU exception</strong>. Over the same period the kernel log kept printing this warning for DCS threads:</p>
+      {% endif %}
+<pre class="fix-pre"><code>x86/split lock detection: #AC: Main/2890231 took a split_lock trap at address: 0x6ffff963281a
+x86/split lock detection: #AC: wine_threadpool/2890980 took a split_lock trap at address: 0x6ffff963281a
+split_lock_warn: 18 callbacks suppressed</code></pre>
+      {% if lang == 'ja' %}
+      <p>アドレスは DCS プロセス内の、ファイル名を持たない実行領域にあった。Wine の DLL ではなく、DCS 側のコードと見ている。</p>
+      {% else %}
+      <p>The address is inside an executable region of the DCS process with no backing file name. It is not a Wine DLL; we take it to be DCS-side code.</p>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--root-cause">
+      <h4>Root Cause ({% if lang == 'ja' %}split lock とカーネルのペナルティ{% else %}split locks and the kernel penalty{% endif %})</h4>
+      <h5>{% if lang == 'ja' %}split lock とは{% else %}What a split lock is{% endif %}</h5>
+      {% if lang == 'ja' %}
+      <p>複数のコアから安全に値を書き換えるためのアトミック命令 (lock 付き命令) は、普段は対象データが入っている 64 バイトのキャッシュライン 1 本だけをロックする。ところが対象のデータが 2 本のキャッシュラインにまたがって置かれていると、CPU はメモリバス全体をロックするしかない。これが split lock で、その間は<strong>他のコアのメモリアクセスまで止まる</strong>。1 回の影響は小さいが、多発するとマシン全体が遅くなる。</p>
+      {% else %}
+      <p>Atomic instructions (lock-prefixed instructions), used to update a value safely from multiple cores, normally lock only the single 64-byte cache line holding the data. If the data straddles two cache lines, the CPU has no choice but to lock the whole memory bus. That is a split lock, and while it lasts <strong>other cores' memory accesses stall too</strong>. One is cheap; many of them slow down the entire machine.</p>
+      {% endif %}
+      <h5>{% if lang == 'ja' %}Linux カーネルのペナルティ{% else %}The Linux kernel's penalty{% endif %}</h5>
+      {% if lang == 'ja' %}
+      <p>対応する Intel CPU では、Linux は split lock を CPU 例外 (#AC: alignment check) として捕まえられる。既定の warn モードでは警告を出したうえで実行を続けさせるが、<code>kernel.split_lock_mitigate = 1</code> (既定値) のときは、split lock を起こしたスレッドを<strong>わざと遅くする</strong>。カーネルのソースではこれを "misery" (苦痛) と呼んでいる。他の利用者を守るための仕組みで、共用サーバのように誰が何を動かすか分からない環境を想定している。</p>
+<pre class="fix-pre"><code># split_lock_warn() の動き (arch/x86/kernel/cpu/bus_lock.c を要約)
+1. そのスレッドで初めてなら、警告をカーネルログに出す (2 回目以降は出ない)
+2. split_lock_mitigate = 1 なら
+     ・10 ms 眠らせる                                 ← misery factor #1
+     ・検出を外して実行できるコアを同時に 1 つに絞る   ← misery factor #2
+3. そのコアだけ検出を一時的に止め、命令を実行させる
+4. 2 tick 後に検出を再開する</code></pre>
+      <p>つまり<strong>split lock を 1 回踏むたびに、そのスレッドは 10 ms 止められる</strong>。DCS の専用サーバを Wine + Linux で動かす環境に特有の問題になる。</p>
+      {% else %}
+      <p>On supported Intel CPUs, Linux can catch split locks as a CPU exception (#AC: alignment check). In the default warn mode it logs a warning and lets execution continue, but with <code>kernel.split_lock_mitigate = 1</code> (the default) it <strong>deliberately slows down</strong> the offending thread. The kernel source calls this "misery". It exists to protect other users, aimed at shared machines where you don't know what everyone is running.</p>
+<pre class="fix-pre"><code># What split_lock_warn() does (summarised from arch/x86/kernel/cpu/bus_lock.c)
+1. If this is the thread's first split lock, log a warning (never again for that thread)
+2. If split_lock_mitigate = 1:
+     - sleep 10 ms                                              ← misery factor #1
+     - allow only one core at a time to run with detection off  ← misery factor #2
+3. Turn detection off on this core only and let the instruction run
+4. Turn detection back on 2 ticks later</code></pre>
+      <p>In other words, <strong>every split lock costs the thread a 10 ms stop</strong>. This makes it a problem specific to running the DCS dedicated server on Wine + Linux.</p>
+      {% endif %}
+      <h5>{% if lang == 'ja' %}2.9.30 で何が変わったか{% else %}What changed in 2.9.30{% endif %}</h5>
+      {% if lang == 'ja' %}
+      <p>split lock の警告そのものは、2.9.29 の頃 (9/25 以降のログ) からスレッド起動時などに出ていた。ただし FPS は 117 で、影響はなかった。2.9.30 では、split lock を起こす処理が<strong>シムスレッドがほぼ毎フレーム通る経路に入った</strong>と推定している。1 フレームの実処理 (約 3〜4 ms) に 10 ms 前後の待ちが加わると約 13 ms/フレーム、つまり 77 FPS 前後になり、実測と合う。</p>
+      <p>どの処理なのかは特定していない。ログはスレッドごとに初回しか出ないので、何回踏んだかもログからは数えられない。</p>
+      {% else %}
+      <p>The split lock warnings themselves had already been appearing under 2.9.29 (in logs since 9/25), mostly at thread start, yet FPS stayed at 117 with no impact. Our estimate is that in 2.9.30 the code that triggers the split lock <strong>moved onto a path the sim thread takes almost every frame</strong>. Add ~10 ms of waiting to ~3–4 ms of real per-frame work and you get ~13 ms per frame — about 77 FPS, matching the measurement.</p>
+      <p>We have not identified which code it is. The log fires only once per thread, so the number of hits cannot be counted from it either.</p>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--not-the-cause">
+      <h4>{% if lang == 'ja' %}Not the cause (確認済みの容疑者){% else %}Not the cause (suspects cleared){% endif %}</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li><strong>CPU 不足</strong>: プロセス CPU 約 35%、メインスレッド 26%。1 コアを振り切っていない</li>
+        <li><strong>次の記事の Wine ヒープ劣化の再発</strong>: 時間とともに落ちず、起動直後から横ばい。<code>ntdll.dll</code> も更新前後で同じ LFH パッチ版 (SHA-256 一致)</li>
+        <li><strong>DCSServerBot の更新</strong>: 21:10 に Bot を別件 (Tacview 認識の修正) で新イメージへ切り替え、DCS も再起動したが、再起動後も 77〜78 FPS のまま</li>
+        <li><strong>人数・ミッション</strong>: 無人でも 77。更新前と同じミッション</li>
+        {% else %}
+        <li><strong>CPU shortage</strong>: process CPU ~35%, main thread 26%. Not saturating a core</li>
+        <li><strong>A return of the Wine heap decay from the next article</strong>: no decay over time, flat from launch. <code>ntdll.dll</code> is the same LFH-patched build before and after the update (SHA-256 match)</li>
+        <li><strong>DCSServerBot update</strong>: at 21:10 the Bot was switched to a new image for an unrelated fix (Tacview detection) and DCS restarted, but FPS stayed at 77–78 afterwards</li>
+        <li><strong>Player count / mission</strong>: 77 even when empty. Same mission as before the update</li>
+        {% endif %}
+      </ul>
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--fix">
+      <h4>Fix</h4>
+      {% if lang == 'ja' %}
+      <p>ペナルティだけを外す。設定はすぐに効き、DCS の再起動も要らない。</p>
+<pre class="fix-pre"><code># 即時反映
+sudo sysctl -w kernel.split_lock_mitigate=0
+
+# OS を再起動しても維持する
+echo 'kernel.split_lock_mitigate=0' | sudo tee /etc/sysctl.d/99-split-lock-mitigate.conf
+
+# 元に戻す (上の conf も削除する)
+sudo sysctl -w kernel.split_lock_mitigate=1</code></pre>
+      <p>0 にしても split lock の検出と警告ログは残る。外れるのは 10 ms のスリープと「同時に 1 コアだけ」の制限だけ。その代わり、split lock を多発するプログラムが同じマシンの他の処理を遅くすることは防げなくなる (カーネルのドキュメントもこの点を注意している)。DCS 専用のホストなので、これを許容した。</p>
+      <p>検出そのものを止めたい場合は、カーネル起動パラメータ <code>split_lock_detect=off</code> もある (OS の再起動が必要)。</p>
+      {% else %}
+      <p>Remove just the penalty. The setting takes effect immediately and DCS does not need a restart.</p>
+<pre class="fix-pre"><code># apply now
+sudo sysctl -w kernel.split_lock_mitigate=0
+
+# keep it across OS reboots
+echo 'kernel.split_lock_mitigate=0' | sudo tee /etc/sysctl.d/99-split-lock-mitigate.conf
+
+# revert (and delete the conf above)
+sudo sysctl -w kernel.split_lock_mitigate=1</code></pre>
+      <p>With 0, split lock detection and the warning log stay. Only the 10 ms sleep and the "one core at a time" limit go away. The trade-off is that a program spamming split locks can now slow down everything else on the machine (the kernel documentation warns about this). This host is dedicated to DCS, so we accept that.</p>
+      <p>To turn detection off entirely there is also the kernel boot parameter <code>split_lock_detect=off</code> (requires an OS reboot).</p>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="split-lock-misery--status">
+      <h4>Status / Verification</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li>2026-10-01 21:23 JST: DCS を動かしたまま <code>split_lock_mitigate=0</code> に変更。<strong>次の 1 分値から 116.9 / 117.0 / 117.1 FPS</strong> (1 人、プロセス CPU 40%)。更新前と同じ水準に戻った。</li>
+        <li>メインスレッドの <code>msleep_interruptible</code> は 0% になった。</li>
+        <li>有人時間帯と長時間の挙動は、引き続き記録する。</li>
+        {% else %}
+        <li>2026-10-01 21:23 JST: changed to <code>split_lock_mitigate=0</code> with DCS still running. <strong>From the next per-minute sample: 116.9 / 117.0 / 117.1 FPS</strong> (1 player, process CPU 40%) — back to the pre-update level.</li>
+        <li>The main thread's <code>msleep_interruptible</code> share dropped to 0%.</li>
+        <li>Behaviour during busy hours and over long runs will continue to be recorded.</li>
+        {% endif %}
+      </ul>
+{% if lang == 'ja' %}
+<pre class="fix-pre"><code># メインスレッドの待ちの内訳 (10 秒 / 約 1,900 サンプル)
+                         対処前 (21:13)   対処後 (21:23)
+msleep_interruptible        56 %             0 %
+anon_pipe_read              18 %            70 %
+実行中                      26 %            29 %
+サーバ FPS                  77              117</code></pre>
+{% else %}
+<pre class="fix-pre"><code># Main thread wait breakdown (10 s / ~1,900 samples)
+                         before (21:13)   after (21:23)
+msleep_interruptible        56 %             0 %
+anon_pipe_read              18 %            70 %
+running                     26 %            29 %
+server FPS                  77              117</code></pre>
+{% endif %}
+    </section>
+  </article>
 
   <article class="fix-article" id="wine-heap-lfh-olympus">
     {% if lang == 'ja' %}

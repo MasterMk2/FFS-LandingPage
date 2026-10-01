@@ -8,3 +8,6 @@ __pycache__/
 .idea/
 .vscode/
 .DS_Store
+
+# MyGravityMap ビルド成果物 (scripts/deploy-gravitymap.sh が ../MyGravityMap から都度生成)
+gravitymap/

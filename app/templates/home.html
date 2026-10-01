@@ -3,11 +3,7 @@
 {% block content %}
 <section class="home-intro">
   <h2>Welcome</h2>
-  <p class="lead">
-    FFS は DCS World の専用サーバを運営するコミュニティです。
-    常時稼働しているマルチプレイヤー環境で、飛行訓練・合同作戦・シナリオベースのミッションを行っています。
-    サーバの稼働状況・ミッション・気象・負荷はリアルタイムで公開、飛行時間や戦果のランキングもご覧いただけます。
-  </p>
+  <p class="lead">{{ t('home_lead') }}</p>
 </section>
 
 <section class="home-quick-stats" aria-label="live snapshot">
@@ -32,13 +28,21 @@
 <section class="home-cards">
   <a class="home-card" href="/status">
     <h3>Server Status</h3>
+    {% if lang == 'ja' %}
     <p>現在稼働中のサーバとミッション、気象、接続情報 (LotAtc / Tacview)、サーバ負荷 (FPS / Memory の時系列) を 15 秒毎に更新。</p>
-    <span class="home-card-cta">ステータスを見る →</span>
+    {% else %}
+    <p>Running servers with missions, weather, connection info (LotAtc / Tacview) and server load (FPS / memory history), refreshed every 15 seconds.</p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_status') }}</span>
   </a>
   <a class="home-card" href="/leaderboard">
     <h3>Leaderboard</h3>
+    {% if lang == 'ja' %}
     <p>過去 30 日間の飛行時間 / 撃墜記録 / KD 比 など、パイロット別トップ 10 を表示します。</p>
-    <span class="home-card-cta">ランキングを見る →</span>
+    {% else %}
+    <p>Top 10 pilots over the last 30 days by flight time, kills and K/D ratio.</p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_lb') }}</span>
   </a>
 </section>
 
@@ -46,28 +50,157 @@
 <section class="home-cards">
   <a class="home-card" href="https://sneaker.freedomflight.jp/" target="_blank" rel="noopener">
     <h3>Sneaker — Live Map</h3>
+    {% if lang == 'ja' %}
     <p>
       飛行中の機体位置を 2D マップ上でリアルタイム表示する<strong>戦況モニタ</strong>。
       Tacview テレメトリをブラウザで受信し、味方・敵・中立の動きを追跡できます。
       Discord で地上指揮や AWACS 役をしたいときに便利。
     </p>
-    <span class="home-card-cta">sneaker.freedomflight.jp を開く ↗</span>
+    {% else %}
+    <p>
+      A real-time <strong>situation monitor</strong> plotting airborne aircraft on a 2D map.
+      It receives Tacview telemetry in the browser and tracks friendly, enemy and neutral movement.
+      Handy for ground command or playing AWACS over Discord.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_sneaker') }}</span>
+  </a>
+  <a class="home-card" href="/gca/" target="_blank" rel="noopener">
+    <h3>{{ t('home_card_gca_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      ブラウザで動く<strong>地上管制卓</strong>。Tacview のリアルタイムテレメトリから
+      進入中の機体を拾い、<strong>GCA (PAR)</strong> の方位・降下スコープと
+      トークダウン (&quot;5 miles from touchdown, on course, on glidepath&quot;) を自動生成します。
+      迎撃管制の <strong>GCI</strong>、飛行場管制の <strong>TWR</strong> も同じ画面から。
+      滑走路データは DCS 本体から取得しているので、マップが変わっても手直し不要です。
+    </p>
+    {% else %}
+    <p>
+      A <strong>ground ATC console</strong> that runs in the browser. It picks up inbound traffic from
+      Tacview's real-time telemetry and auto-generates the azimuth / elevation scopes and talkdown of
+      <strong>GCA (PAR)</strong> (&quot;5 miles from touchdown, on course, on glidepath&quot;).
+      Interception control (<strong>GCI</strong>) and aerodrome control (<strong>TWR</strong>) work from the same screen.
+      Runway data is taken from the DCS installation itself, so no rework is needed when the map changes.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_gca') }}</span>
+  </a>
+  <a class="home-card" href="/guide#olympus">
+    <h3>{{ t('home_card_olympus_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      ブラウザからユニットを<strong>配置・操作</strong>できる RTS 風インターフェース。
+      航空機・地上部隊・艦艇をその場でスポーンし、移動や攻撃を指示できます。
+      DCS を起動していなくても参加でき、飛んでいる仲間に合わせてシナリオを作る、
+      味方支援を足す、といった遊び方ができます。
+      サーバーごとに URL が分かれています。ログインに必要なパスワードは Discord の
+      <code>#status-server1</code> (稼働状況の投稿、DCS Olympus 欄) に掲示中。
+    </p>
+    {% else %}
+    <p>
+      An RTS-style interface for <strong>placing and commanding units</strong> from the browser.
+      Spawn aircraft, ground forces and ships on the spot, then task them to move or attack.
+      You can join in without launching DCS — build scenarios around whoever is flying,
+      or add friendly support on the fly.
+      Each server has its own URL. Login passwords are posted on Discord's
+      <code>#status-server1</code> (the auto-updated status post, DCS Olympus section).
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_olympus_how') }}</span>
+  </a>
+  <a class="home-card" href="/landing-teacher/" target="_blank" rel="noopener">
+    <h3>{{ t('home_card_lt_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      Tacview のリアルタイムテレメトリから着陸・着艦を自動検出し、
+      空母着艦は米海軍式 <strong>LSO グレーディング</strong> (OK / OK- / (OK) / CUT ほか)、
+      陸上着陸は簡易採点 (A〜E) で振り返えます。
+      履歴ダッシュボードと GCA スコープ風の進入軌跡ビューをブラウザで確認可能。
+      現時点は server1 のみ対応。
+    </p>
+    {% else %}
+    <p>
+      Auto-detects landings and carrier traps from Tacview's real-time telemetry:
+      carrier traps are graded with the US Navy <strong>LSO scale</strong> (OK / OK- / (OK) / CUT and more),
+      field landings with a simple A–E score.
+      Reviewable in the browser via a history dashboard and a GCA-style approach-path view.
+      Server 1 only for now.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_lt') }}</span>
   </a>
   <a class="home-card" href="https://lardoon.freedomflight.jp/" target="_blank" rel="noopener">
     <h3>Lardoon — Tacview Archive</h3>
+    {% if lang == 'ja' %}
     <p>
       各サーバで自動録画された <strong>Tacview (.acmi)</strong> を一覧・検索・ダウンロードできる Web アーカイブ。
       単一フライトへの trim 機能で必要な部分だけ小さく落とせます。再生は手元の Tacview デスクトップアプリで。
     </p>
-    <span class="home-card-cta">lardoon.freedomflight.jp を開く ↗</span>
+    {% else %}
+    <p>
+      A web archive that lists, searches and serves the <strong>Tacview (.acmi)</strong> recordings
+      captured automatically on each server. Trim to a single flight to download just the part you need.
+      Playback happens in your local Tacview desktop app.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_lardoon') }}</span>
   </a>
   <a class="home-card" href="/tracks">
-    <h3>リプレイダウンロード</h3>
+    <h3>{{ t('home_card_replays_title') }}</h3>
+    {% if lang == 'ja' %}
     <p>
       各サーバで自動保存された DCS の<strong>リプレイファイル (.trk)</strong> を一覧・ダウンロード。
       DCS World の <code>File → Open</code> で再生でき、デブリーフィング / AAR / 機動検証に使えます。
     </p>
-    <span class="home-card-cta">リプレイを見る →</span>
+    {% else %}
+    <p>
+      Lists and serves the DCS <strong>replay files (.trk)</strong> auto-saved on each server.
+      Replay them via <code>File → Open</code> in DCS World — useful for debriefs, AAR and manoeuvre checks.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_view_replays') }}</span>
+  </a>
+</section>
+
+<h2 class="section-title">Other</h2>
+<section class="home-cards">
+  <a class="home-card" href="https://gravitymap.freedomflight.jp/" target="_blank" rel="noopener">
+    <h3>MyGravityMap</h3>
+    {% if lang == 'ja' %}
+    <p>
+      DCS とは無関係の個人プロジェクト。Google マップのタイムライン履歴から、
+      自分がどこに引き寄せられて生きてきたかを可視化するブラウザアプリ。
+      位置データは端末内 (IndexedDB) だけで処理され、サーバには送信されません。
+    </p>
+    {% else %}
+    <p>
+      A personal project unrelated to DCS. A browser app that visualises, from your Google Maps
+      timeline history, which places have kept pulling you back through life.
+      Location data is processed entirely on-device (IndexedDB) and never sent to a server.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_gm') }}</span>
+  </a>
+  <a class="home-card" href="/drivecal/" target="_blank" rel="noopener">
+    <h3>DriveCal</h3>
+    {% if lang == 'ja' %}
+    <p>
+      DCS とは無関係の個人プロジェクト。スマホで記録した GNSS と加速度・ジャイロから、
+      運転を地図・グラフ・G・高度付きの 3D で振り返るブラウザアプリ (記録用の Android アプリは開発中)。
+      実走行のサンプル (夜間の一般道) とサーキットの合成デモで試せます。
+      ファイルは端末内だけで処理され、サーバには送信されません。
+    </p>
+    {% else %}
+    <p>
+      A personal project unrelated to DCS. A browser app for reviewing drives recorded on a phone
+      (GNSS plus accelerometer and gyro): map, charts, g-forces and a 3D view with altitude
+      (the Android recorder is still in development).
+      Try it with a real night drive on local roads or a synthetic circuit demo.
+      Files are processed entirely on-device and never sent to a server.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_drivecal') }}</span>
   </a>
 </section>
 {% endblock %}

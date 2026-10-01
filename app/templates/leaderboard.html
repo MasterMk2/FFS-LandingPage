@@ -4,16 +4,16 @@
 <section class="leaderboard">
   <header class="lb-header">
     <h2>Monthly Leaderboard</h2>
-    <p class="subtle">{{ period_label }} · Top {{ limit }} per category</p>
+    <p class="subtle">{{ t(period_label) }} · Top {{ limit }} per category</p>
   </header>
 
   {% if error %}
-  <div class="error">Leaderboard 取得失敗: {{ error }}</div>
+  <div class="error">{{ t('lb_error') }}{{ error }}</div>
   {% else %}
     <div class="lb-grid">
     {% for cat in cats %}
       <section class="lb-section{% if not cat.entries %} empty{% endif %}">
-        <h3>{{ cat.label }}</h3>
+        <h3>{{ t(cat.label) }}</h3>
         {% if cat.entries %}
         <table class="lb-table">
           <thead>
@@ -36,7 +36,7 @@
           </tbody>
         </table>
         {% else %}
-        <p class="lb-empty">データ蓄積待ち (戦闘ログがまだありません)</p>
+        <p class="lb-empty">{{ t('lb_empty') }}</p>
         {% endif %}
       </section>
     {% endfor %}

@@ -1,0 +1,13 @@
+# ffs-website イメージのビルドコンテキスト。
+#
+# Dockerfile が COPY するのは requirements.txt と app/ だけなので、それ以外は
+# 全部除外する (許可リスト方式)。.env / data/ (Fitbit トークン) / .git / .venv /
+# tests / caddy などが誤ってイメージやビルドキャッシュに入らないようにするため。
+# Dockerfile に COPY を足したら、ここにも `!<パス>` を足すこと。
+*
+!requirements.txt
+!app/
+
+# app/ の中でも実行に要らないもの
+**/__pycache__
+**/*.py[co]

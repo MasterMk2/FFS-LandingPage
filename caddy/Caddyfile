@@ -2,9 +2,11 @@
 # Caddy reverse proxy / static host
 #
 # ネットワーク経路:
-#   [WAN] :80/:443 → [router NAPT] → 192.168.3.170:30080 / :30443
+#   [WAN] :80/:443 → [router NAPT] → <HOST_LAN_IP>:CADDY_HTTP_PORT / CADDY_HTTPS_PORT
 #     → [host] → docker publish → [ffs-caddy] :80 / :443 (container internal)
 # Caddy 自身はコンテナ内で標準の 80/443 を listen する。
+# ホスト側のポート番号と、LAN 内の別ホストにある Webhook 受け口の host:port は
+# .env で与える (docker-compose.yml 参照)。内部アドレスは公開リポジトリに書かない。
 #
 # TLS:
 #   各サイト DNS が host の公開 IP に向いて、かつルータ NAPT が上記経路で
@@ -12,14 +14,20 @@
 #   Let's Encrypt が自動発行する。
 #
 # 振り分け:
-#   iyakusai.com / www.iyakusai.com / 2025.iyakusai.com
-#       → /srv/iyakusai/ の静的ファイル
-#   freedomflight.jp / www.freedomflight.jp
-#       → ffs-website:8000 (FastAPI)
+#   freedomflight.jp
+#       → ffs-website:8000 (FastAPI) + パス振り分けのサブアプリ (/gca/ 等)
+#   sneaker / lardoon / gravitymap .freedomflight.jp
+#       → 各サブドメインのブロック
+#   line.iyakusai.com
+#       → 公式LINE の Webhook 受け口 (/webhook のみ)
 #   catch-all (未登録ホスト / IP 直打ち on :80)
 #       → 404
+#
+#   iyakusai.com / www.iyakusai.com / 2025.iyakusai.com は公開 DNS が別ホストを
+#   向いていて、ここには届かないのでブロックを置かない (置くと検証できない名前の
+#   証明書取得を試み続けるだけになる)。リポジトリの iyakusai/ はコンテンツの
+#   原本として残している。
 ###############################################################################
-
 {
 	admin off
 	email xxxx@gmail.com
@@ -29,24 +37,259 @@
 	}
 }
 
-(iyakusai_common) {
-	root * /srv/iyakusai
-	encode zstd gzip
-	file_server
-	log
-}
-
-iyakusai.com, www.iyakusai.com, 2025.iyakusai.com {
-	import iyakusai_common
+# 共通のセキュリティヘッダ。実在するサイトブロックすべてで import する
+# (:80 の catch-all は 404 を返すだけなので付けない)。
+#
+# - HSTS に includeSubDomains / preload は付けない。freedomflight.jp の配下は
+#   サブドメインごとに上流が別で、証明書を取る前に `http://` で留めて試す
+#   サブドメインを足すことがあるため。preload は一度載ると外すのに数か月かかる。
+# - 値は上流が何を返していても上書きする。上流が無効な値 (X-Frame-Options ALLOWALL、
+#   HSTS max-age=0、Referrer-Policy unsafe-url 等) を返しても素通しにしないため。
+#   上流がより厳しい値 (X-Frame-Options DENY 等) を付けていた場合も同じ値にそろう。
+# - Server / X-Powered-By / Via は Caddy 自身の分も上流の分も消す。`-` を含む header は
+#   応答を書き出す時点で適用されるので、同じブロックの値も上流の値を上書きする。
+# - handle_errors: 上流が落ちているときの 502 や file_server の 404 など、Caddy 自身が
+#   作るエラー応答は上の header を通らないので、同じヘッダをここでも付ける。
+#   応答を書くディレクティブは置いていないので、本文は従来どおり空でステータスだけ返る。
+#   handle_errors で処理したエラーは http.log.error に出なくなる (DEBUG 扱い) ので、
+#   原因 (dial tcp ...: connection refused 等) をアクセスログの error_cause に残す
+#   (log_append は log_skip と同じく Caddy 2.8 以降)。
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+		-X-Powered-By
+		-Via
+	}
+	handle_errors {
+		log_append error_cause {http.error.message}
+		header {
+			Strict-Transport-Security "max-age=31536000"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "SAMEORIGIN"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			-Server
+		}
+	}
 }
 
 # www.freedomflight.jp は DNS 未設定のため TLS 化対象外。
 # A レコード追加後に `freedomflight.jp, www.freedomflight.jp {` に戻す。
 freedomflight.jp {
+	import security_headers
 	encode zstd gzip
-	reverse_proxy ffs-website:8000 {
-		header_up Host {host}
-		header_up X-Real-IP {remote_host}
+
+	# DCS Web GCA (ブラウザ管制コンソール)。実体は ../ffs-dcs-server の compose が
+	# 起動する dcs-web-gca:8080。sneaker/lardoon と違いサブドメインを切っていないので
+	# DNS 追加なしで動く。WebSocket (/gca/ws) も reverse_proxy がそのまま upgrade する。
+	# 末尾スラッシュ無しでも入れるように redir を先に置く (handle_path は /gca/* のみ一致)。
+	redir /gca /gca/
+	handle_path /gca/* {
+		reverse_proxy ffs-dcs-web-gca:8080 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# DCS Landing Teacher (着陸/着艦レビュー・LSO グレーディング)。実体は
+	# ../ffs-dcs-server の compose が起動する dcs-landing-teacher:8000 (server1 専用)。
+	# GCA と同じくパス振り分けなので DNS 追加不要。WebSocket (/landing-teacher/api/ws/landings)
+	# も同じ reverse_proxy がそのまま upgrade する。
+	redir /landing-teacher /landing-teacher/
+	handle_path /landing-teacher/* {
+		reverse_proxy ffs-dcs-landing-teacher:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# DCS Olympus (ブラウザ管制 / ユニット配置)。実体は ../ffs-dcs-server の compose が
+	# 起動する dcs-server-N の netns 内で Node.js が listen している 1818N。
+	# GCA / Landing Teacher と同じくパス振り分けなので DNS 追加不要。
+	#
+	# ★ SPA が資産・API とも全て相対パス (./assets/..., ./api/...) で組み立てているため
+	#   handle_path でプレフィックスを剥がせばサブパスで成立する。絶対パスの fetch は
+	#   ビルド済み JS に 1 件も無いことを確認済み (2026-09-03)。
+	#   末尾スラッシュが無いと相対解決が 1 階層ずれるので redir を必ず先に置く。
+	#
+	# ★★ X-Forwarded-For を落としてはいけない (Caddy 既定で付く)。
+	#   Olympus の frontend/build/utils.js::connectionIsLocal() は
+	#       local = req.headers[config.frontend.proxyHeader] === undefined;
+	#   で判定しており (proxyHeader = "x-forwarded-for")、ヘッダが無いと
+	#   「ローカル接続」とみなして X-Enabled-Command-Modes に全ロールを載せる。
+	#   さらに x-command-mode ヘッダがあれば authorization をそのロールの
+	#   パスワードで上書きするため、権限昇格の経路になる。
+	#   XFF が付いている限り remote 扱いになり、認証したロールだけが有効になる。
+	# Olympus audio backend (SRS 連携) の WebSocket。
+	# frontend (1818N) とは別プロセスで、dcs-server-N の netns 内の 4000 で
+	# listen している (ws の WebSocketServer)。ホストには公開していない。
+	# SPA は location からホスト+パスを取り、その後ろに olympus.json の
+	# audio.WSEndpoint を足して
+	#   wss://freedomflight.jp/olympusN/audio
+	# を開く。よってこのパスだけ 4000 へ振り分ける。
+	# reverse_proxy は Upgrade をそのまま通すので追加設定は要らない。
+	# /olympusN/* より長いパスなので Caddy の specificity ソートで先に評価される。
+	#
+	# ★ この WebSocket 自体には認証が無い (上流実装が素の WebSocketServer)。
+	#   ただし SRS サーバ (1811N) はもともとサーバーパスワード無しで公開されており、
+	#   EXTERNAL_AWACS_MODE も有効なので、露出としては既存の SRS ポートと同等。
+	#   ここを絞りたい場合は SRS 側の設定 (COALITION_AUDIO_SECURITY 等) で行う。
+	handle /olympus1/audio {
+		reverse_proxy ffs-dcs-server-1:4000
+	}
+
+	handle /olympus2/audio {
+		reverse_proxy ffs-dcs-server-2:4000
+	}
+
+	handle /olympus3/audio {
+		reverse_proxy ffs-dcs-server-3:4000
+	}
+
+	redir /olympus1 /olympus1/
+	handle_path /olympus1/* {
+		# ユニットをスポーンできる管制画面なので検索エンジンに拾わせない。
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-1:18181 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	redir /olympus2 /olympus2/
+	handle_path /olympus2/* {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-2:18182 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	redir /olympus3 /olympus3/
+	handle_path /olympus3/* {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-3:18183 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# Google Health Collector (個人ヘルスデータ)。実体は姉妹 repo
+	# ../GoogleHealthCollector の compose が起動する google-health-collector:8000。
+	# ffs-website 側の /health (Owner's Health パネル) とは別物で、こちらは
+	# 全 34 データ型の蓄積・可視化。パスは /health/v2/ なので衝突しない。
+	#
+	# ★ アプリ側で GHC_PASSWORD によるログイン必須。X-Real-IP を渡さないと
+	#   ログイン試行のレート制限が全部同一 IP 扱いになり効かなくなる
+	#   (アプリ側は GHC_TRUST_PROXY=1 でこのヘッダを信頼している)。
+	redir /health/v2 /health/v2/
+	handle_path /health/v2/* {
+		# 個人の健康データなので検索エンジンに拾わせない。
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy google-health-collector:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# Hermes Unified Channel Gateway — 公式LINEの Webhook 受け口 (Phase G.1)
+	#   LINE → :443 → [router NAPT] → ffs-caddy → HERMES_LINE_WEBHOOK_UPSTREAM
+	#   受け口の実体は LAN 内の別ホストのゲートウェイ。
+	#   転送先の host:port は .env の HERMES_LINE_WEBHOOK_UPSTREAM で与える。
+	#   line.iyakusai.com (医薬祭の取り込み口) とは別物。あちらは収集、これは対話。
+	#
+	# ★ 署名検証は「届いたバイト列そのもの」に対して行う。ボディを書き換える
+	#   ディレクティブをこのブロックに足すと、署名が必ず不一致になって全通信が
+	#   403 になる。reverse_proxy は素通しなので、そのままで正しい。
+	# ★ 公開するのはこの 1 パスだけ。Hermes API と Dashboard は
+	#   絶対にここへ足さないこと。
+	# ★ LINE は約 2 秒で応答を要求し、失敗が続くと Webhook を無効化する。
+	#   ゲートウェイは受理して即 200 を返し実処理は非同期に回すので、
+	#   この経路にタイムアウト延長は不要。
+	handle /line/webhook {
+		# LINE は POST しか使わない。他のメソッドは受け口に触れさせない。
+		@notpost not method POST
+		respond @notpost 405
+		reverse_proxy {$HERMES_LINE_WEBHOOK_UPSTREAM}
+	}
+
+	# Hermes Google Calendar push webhook — Phase H.1
+	# Google の通知は変更ヒントのみ。受け口側で channel/resource/token を検証し、
+	# durable queue へ投入して即時応答する。Calendar API/Hermes API は公開しない。
+	# 転送先の host:port は .env の HERMES_GCAL_WEBHOOK_UPSTREAM で与える。
+	handle /google/calendar/watch {
+		# Channel token is an opaque callback authenticator; do not retain it
+		# in public-proxy access logs. The receiving service records only a hash.
+		log_skip
+		@notpost not method POST
+		respond @notpost 405
+		reverse_proxy {$HERMES_GCAL_WEBHOOK_UPSTREAM}
+	}
+
+	# FastBriefing (.miz からブリーフィングを生成するブラウザ内ツール)。実体は
+	# FastBriefing リポジトリの deploy/ の compose が起動する ffs-fastbriefing:80
+	# (nginx + 静的 SPA)。GCA / Landing Teacher と同じくパス振り分けなので
+	# DNS 追加不要。末尾スラッシュが無いと相対解決が 1 階層ずれるので redir を先に置く。
+	#
+	# ★ 成立の条件はビルド時の BASE_PATH="./" (deploy/docker-compose.yml)。
+	#   "/" にすると index.html が /assets/... を絶対参照してサブパスで 404、
+	#   "/briefing/" 固定にすると LAN からのポート直打ちが壊れる。
+	#   "./" だけが両立する。配信物を実測して確認済み (2026-09-07):
+	#     index.html は ./assets/... ./favicon.svg のみ、
+	#     js/css/html に絶対パス参照 0 件、
+	#     worker も new URL("missionParser-*.js", import.meta.url) の相対解決。
+	#   ビルドし直したらこの 3 点を再確認すること。
+	#
+	# ★ .miz の解析は fflate + luaparse でブラウザ内に完結し、ファイルはサーバへ
+	#   送られない。よってここは静的資産を配るだけで、アップロード経路は無い。
+	redir /briefing /briefing/
+	handle_path /briefing/* {
+		reverse_proxy ffs-fastbriefing:80 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	# DriveCal (スマホの GNSS + IMU の記録で運転を振り返るブラウザアプリ、個人プロジェクト)。
+	# 実体は DriveCal リポジトリの web/deploy/deploy.sh が起動する drivecal-web:80
+	# (nginx + 静的 SPA、dcs_network に後から参加)。FastBriefing と同じくビルド時の
+	# base を "./" にしてあり、サブパスでも LAN からのポート直打ちでも動く。
+	# 配信物で確認済み (2026-09-27): index.html は ./assets/... のみ、絶対パス参照 0 件、
+	# worker / wasm / 3D の遅延チャンクは import.meta.url からの相対解決。
+	#
+	# ★ セッションファイルの解析はブラウザ内で完結し、アップロード経路は無い。
+	#   /drivecal/samples/ の実走行サンプルは自宅周辺と自宅前の通りを削除済み
+	#   (DriveCal tools の privacy-trim)。
+	redir /drivecal /drivecal/
+	handle_path /drivecal/* {
+		reverse_proxy drivecal-web:80 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	handle {
+		# CSP は Report-Only で様子を見る段階 (違反はブラウザのコンソールに出るだけで、
+		# 読み込みは止めない)。ffs-website のテンプレートから洗い出した読み込み元:
+		#   script: 自サイト、unpkg.com の htmx (base.html の URL だけを許可。ホスト単位で
+		#           許すと npm の任意パッケージを読めてしまう。版を上げたらここも直す)、
+		#           www.googletagmanager.com (GA、任意)、
+		#           インライン (base.html の gtag 初期化と Discord バー、health.html)
+		#   style : 自サイト (style.css)、style 属性 (fitbit_panel.html)、
+		#           htmx が head に差し込むインジケータ用の <style>
+		#   connect: 自サイト (htmx の /panel/*、health.html の /health/v2/ への fetch)、
+		#           GA の送信先
+		#   img   : GA のビーコン (<img> は使っていない。SVG はインライン)
+		# GA の送信先は Google の CSP ガイド (GA4、Google シグナル無し) に合わせている。
+		# 他のパス (/gca/ 等) は別アプリなのでここでは付けない。
+		#
+		# enforce (Content-Security-Policy) に上げる手順:
+		#   1. インライン script を nonce 化する (ffs-website がリクエストごとに nonce を
+		#      作ってテンプレートと CSP ヘッダの両方に入れる。ヘッダはアプリ側で出す)
+		#      か、外部 .js に移して script-src から 'unsafe-inline' を外す。
+		#   2. style 属性をクラスに置き換え、htmx は includeIndicatorStyles を false
+		#      (または inlineStyleNonce) にして style-src から 'unsafe-inline' を外す。
+		#   3. 主要ページでコンソールに違反が出ないことを確かめてからヘッダ名を変える。
+		header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com/htmx.org@2.0.3 https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' https://www.googletagmanager.com https://*.google-analytics.com; connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.google.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+		reverse_proxy ffs-website:8000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+		}
 	}
 	log
 }
@@ -54,6 +297,7 @@ freedomflight.jp {
 # Sneaker (DCS Live Map) — ffs-sneaklardooon container の 7788 を HTTPS 終端。
 # DNS: sneaker.freedomflight.jp A 111.237.107.64
 sneaker.freedomflight.jp {
+	import security_headers
 	encode zstd gzip
 	reverse_proxy ffs-sneaklardooon:7788 {
 		header_up X-Real-IP {remote_host}
@@ -64,6 +308,7 @@ sneaker.freedomflight.jp {
 # Lardoon (Tacview Replay archive) — ffs-sneaklardooon container の 3883 を HTTPS 終端。
 # DNS: lardoon.freedomflight.jp A 111.237.107.64
 lardoon.freedomflight.jp {
+	import security_headers
 	encode zstd gzip
 	reverse_proxy ffs-sneaklardooon:3883 {
 		header_up X-Real-IP {remote_host}
@@ -71,6 +316,54 @@ lardoon.freedomflight.jp {
 	log
 }
 
+# MyGravityMap (姉妹 repo、Google マップタイムライン可視化) — 完全静的、gravitymap/
+# を scripts/deploy-gravitymap.sh がビルド・同期。ffs-website / DCSSB とは無関係。
+#
+# crypto.subtle (Web Crypto API、ファイルハッシュ判定に使用) が secure context
+# 必須のため、http:// では機能しない。DNS 設定済み (2026-08-21) につき TLS 化。
+# DCS Web GCA をサブドメインで出したくなった場合はここを有効化する
+# (A レコード gca.freedomflight.jp -> 111.237.107.64 を先に追加すること。
+#  /gca/ 側と併存しても問題ない)。
+# gca.freedomflight.jp {
+# 	import security_headers
+# 	encode zstd gzip
+# 	reverse_proxy ffs-dcs-web-gca:8080 {
+# 		header_up X-Real-IP {remote_host}
+# 	}
+# 	log
+# }
+
+gravitymap.freedomflight.jp {
+	import security_headers
+	root * /srv/gravitymap
+	encode zstd gzip
+	handle {
+		file_server
+	}
+	log
+}
+
 :80 {
 	respond "Not Found" 404
+}
+
+###############################################################################
+# 公式LINE(@553herww)の Webhook 受け口
+#   LINE → :443 → [router NAPT] → ffs-caddy → IYAKUSAI_LINE_WEBHOOK_UPSTREAM
+#   受け口の実体は LAN 内の別ホストの取り込みサービス。
+#   転送先の host:port は .env の IYAKUSAI_LINE_WEBHOOK_UPSTREAM で与える。
+#   ★ 独立したサブドメインにしてあるのは、iyakusai.com が XREA へ移っても
+#      この経路が生き残るようにするため(道連れになると受信が無音で止まる)
+###############################################################################
+line.iyakusai.com {
+	import security_headers
+	# 外に出すのは /webhook だけ。受け口の他のパスは認証付きでも
+	# インターネットからは触らせない。
+	handle /webhook {
+		reverse_proxy {$IYAKUSAI_LINE_WEBHOOK_UPSTREAM}
+	}
+	handle {
+		respond 404
+	}
+	log
 }

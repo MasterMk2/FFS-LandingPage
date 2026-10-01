@@ -1,6 +1,11 @@
-fastapi==0.115.4
-uvicorn[standard]==0.32.0
-jinja2==3.1.4
+fastapi==0.141.1
+# FastAPI 側の要求は starlette>=0.46 と幅があるので、CVE-2025-62727 の修正版
+# (>=0.49.1) を確実に入れるため明示的に固定する。
+starlette==1.7.0
+# app/main.py と app/dcssb.py が直接 import する (starlette の依存でも入るが固定しておく)。
+anyio==4.15.1
+uvicorn[standard]==0.54.0
+jinja2==3.1.6
 httpx==0.27.2
 psycopg[binary]==3.2.3
 psutil==6.1.0

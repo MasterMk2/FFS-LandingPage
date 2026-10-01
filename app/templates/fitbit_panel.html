@@ -86,7 +86,7 @@
   {# ── 睡眠バーチャート (7日・実睡眠) ── #}
   {% if d.sleep_7day %}
   <div class="ph-section">
-    <div class="ph-section-label">Sleep · Last 7 Days <span class="ph-section-note">実睡眠 (覚醒除く)</span></div>
+    <div class="ph-section-label">Sleep · Last 7 Days <span class="ph-section-note">{{ t('fit_sleep_note') }}</span></div>
     {%- set ns = namespace(max_min=480) %}
     {%- for day in d.sleep_7day %}
       {%- if day.minutes > ns.max_min %}{% set ns.max_min = day.minutes %}{% endif %}

@@ -6,9 +6,11 @@ WebService (master node) は netns 共有により dcs-server-1 内で listen �
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
+import anyio
 import httpx
 
 DCSSB_BASE_URL = os.getenv("DCSSB_BASE_URL", "http://dcs-server-1:9876")
@@ -86,13 +88,34 @@ async def get_tracks_list(server: str) -> FetchResult:
     return await _get(f"/{server}", prefix=DCSSB_TRACKS_PREFIX)
 
 
-async def fetch_track_file(server: str, filename: str) -> httpx.Response:
-    """Tracks API: GET /tracks/{server}/{filename} — .trk バイナリを同期取得。
+@asynccontextmanager
+async def stream_track_file(server: str, filename: str):
+    """Yield an unread Tracks response; own and close it even on cancellation.
 
-    呼び出し側で status_code を確認すること (200 以外なら 404/400 等を伝搬)。
+    Only validated path segments from the replay route may be passed here.
+    Redirects are disabled so the API key cannot escape to another endpoint.
     """
-    url = (
-        f"{DCSSB_BASE_URL.rstrip('/')}{DCSSB_TRACKS_PREFIX}/{server}/{filename}"
+    url = f"{DCSSB_BASE_URL.rstrip('/')}{DCSSB_TRACKS_PREFIX}/{server}/{filename}"
+    headers = {
+        **_headers(),
+        "Accept": "application/octet-stream",
+        "Accept-Encoding": "identity",
+    }
+    client = httpx.AsyncClient(
+        timeout=httpx.Timeout(60.0, connect=DCSSB_TIMEOUT),
+        follow_redirects=False,
+        trust_env=False,
+        limits=httpx.Limits(max_connections=1, max_keepalive_connections=0),
     )
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        return await client.get(url, headers=_headers())
+    try:
+        async with client.stream("GET", url, headers=headers) as response:
+            try:
+                yield response
+            finally:
+                # Starlette/AnyIO disconnect cancellation stays active at every
+                # await. Shield close so the socket is actually released.
+                with anyio.CancelScope(shield=True):
+                    await response.aclose()
+    finally:
+        with anyio.CancelScope(shield=True):
+            await client.aclose()

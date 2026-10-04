@@ -147,7 +147,7 @@ base URL は `http://dcs-server-1:9876` (dcs_network 内)。認証は `X-API-Key
 | prefix | 用途 | 実装関数 |
 |---|---|---|
 | `/stats` (`DCSSB_API_PREFIX`) | RestAPI plugin: `/servers`, `/highscore` 等 | `get_servers()`, `get_highscore()` 他 |
-| `/tracks` (`DCSSB_TRACKS_PREFIX`) | Tracks 配布 endpoint: `/`, `/{server}`, `/{server}/{filename}` | `get_tracks_summary()`, `get_tracks_list()`, `fetch_track_file()` |
+| `/tracks` (`DCSSB_TRACKS_PREFIX`) | Tracks 配布 endpoint: `/`, `/{server}`, `/{server}/{filename}` | `get_tracks_summary()`, `get_tracks_list()`, `stream_track_file()` |
 
 API key は**本 repo と姉妹 repo の .env で同値必須**。不一致だと 401。
 
@@ -185,7 +185,7 @@ GRANT SELECT ON serverstats TO ffs_landing_ro;
 CSS `width:100%` ストレッチ。stroke は `vector-effect="non-scaling-stroke"` で
 アスペクト比崩れを回避。閾値色分けは html 側では行わず、CSS `.fps-chart` 等で色配当。
 
-## 10. Tracks 配布 ([dcssb.py fetch_track_file](../../../app/dcssb.py) + [main.py proxy_track_download](../../../app/main.py))
+## 10. Tracks 配布 ([dcssb.py stream_track_file](../../../app/dcssb.py) + [main.py proxy_track_download](../../../app/main.py))
 
 DCSSB `/tracks/{server}/{filename}` は `X-API-Key` 必須なので**ブラウザ直 DL 不可**。
 landing 側に proxy endpoint を立て、api_key ヘッダを注入してバイナリを転送:
@@ -200,7 +200,11 @@ landing 側に proxy endpoint を立て、api_key ヘッダを注入してバイ
 ### セキュリティ (proxy 側)
 - server 名: `^[A-Za-z0-9_-]+$` でホワイトリスト
 - filename: `^[A-Za-z0-9._-]+\.trk$` で path traversal 拒否
-- DCSSB が返す 404/400 はそのまま伝搬
+- DCSSB が返す 404/400 は固定エラー文言で伝搬 (上流本文は非公開)
+- `app/track_downloads.py` で 64 KiB 生バイト転送、`Content-Length` 検証、切断時の後始末
+- `TRACK_DOWNLOAD_LIMIT` は 1 プロセス当たり (既定 2)、超過は即 503。複数 worker で上限も倍増
+- `FFS_WEBSITE_MEM_LIMIT` は website コンテナのメモリ上限 (既定 256m)。詳細は README
+- 回帰確認は `python -m unittest discover -s tests -v` (実サーバを呼ばない)
 
 ## 11. Docker compose
 

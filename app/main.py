@@ -11,11 +11,12 @@ from zoneinfo import ZoneInfo
 from datetime import datetime as _datetime
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import cache, db, dcssb, fitbit as _fitbit, sysmon
+from .track_downloads import TrackDownloadResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -532,26 +533,11 @@ async def tracks_page(request: Request):
 async def proxy_track_download(server: str, filename: str):
     """.trk ダウンロードプロキシ。api_key をヘッダ注入して DCSSB から取得、
     ブラウザに attachment として返す。"""
-    if not _TRACK_SERVER_RE.match(server):
+    if not _TRACK_SERVER_RE.fullmatch(server):
         raise HTTPException(400, "invalid server name")
-    if not _TRACK_FILENAME_RE.match(filename):
+    if not _TRACK_FILENAME_RE.fullmatch(filename):
         raise HTTPException(400, "invalid filename")
-    try:
-        r = await dcssb.fetch_track_file(server, filename)
-    except Exception as e:
-        raise HTTPException(502, f"upstream error: {type(e).__name__}: {e}")
-    if r.status_code == 404:
-        raise HTTPException(404, "track not found")
-    if r.status_code != 200:
-        raise HTTPException(502, f"upstream HTTP {r.status_code}")
-    return Response(
-        content=r.content,
-        media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Cache-Control": "private, max-age=0",
-        },
-    )
+    return TrackDownloadResponse(server, filename)
 
 
 @app.get("/leaderboard", response_class=HTMLResponse)

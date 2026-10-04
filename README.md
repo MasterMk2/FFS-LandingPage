@@ -152,6 +152,48 @@ HTTP handler は upstream (DCSSB / postgres) に直接触らず、**バックグ
 `CachedValue` は最新 1 件のみ保持。上流障害時も直近成功値を serve 続行し、復旧時に
 自動で差し替わるのでダウンタイムに強い。
 
+## リプレイ DL の負荷制限
+
+`/proxy/tracks/{server}/{filename}` は上流の `.trk` を **64 KiB 単位**で転送し、
+ファイル全体をメモリに保持しません。送信先が遅い間は次の上流チャンクを読まず、
+クライアント切断時は上流接続とダウンロード枠を解放します (接続待ち中も対象)。
+
+- `TRACK_DOWNLOAD_LIMIT`: Python プロセス当たりの同時 DL 上限。既定 **2**、設定範囲 1–64。
+  接続待ちから転送・後始末完了まで 1 枠を使います。超過は待ち行列に入れず **503** と
+  `Retry-After: 5` を返します。環境変数の変更にはアプリ再起動が必要です。
+- 現行 Dockerfile は 1 worker。worker/コンテナを増やすと合計上限も増えます
+  (`worker 数 × replica 数 × TRACK_DOWNLOAD_LIMIT`)。ホスト全体の上限が必要なら
+  共有リミッタを別途導入してください。これは IP ごとのレート制限ではありません。
+- `FFS_WEBSITE_MEM_LIMIT`: Compose の website コンテナだけのメモリ上限。既定 **256m**。
+  全パネル有効時の実測で調整してください。上限を超えるとコンテナが OOM kill される可能性が
+  あります。Caddy や姉妹 repo の DCS コンテナの上限は変更しません。
+- 上流の接続 timeout は既存の `DCSSB_TIMEOUT`、読み取りの無通信 timeout は **60 秒**。
+  大きいリプレイ用に転送全体の時間制限は設けていません。遅いクライアントも転送終了まで
+  枠を占有するので、必要なら前段の流量・接続制限と合わせて調整してください。
+- 上流には `Accept-Encoding: identity` を送り、圧縮応答は拒否します。検証済みの
+  `Content-Length` だけを引き継ぎ、生のバイト数が一致しない場合は転送を中断します。
+  長さがない場合はストリーミング転送し、長さを推測しません。
+- 上流 400/404 は固定文言で伝搬し、それ以外の開始前エラーは詳細を含まない 502。
+  転送開始後のエラーは HTTP ステータスを変更できないため接続を中断し、ファイルに JSON を
+  追記しません。ダウンローダー側でも失敗・不完全ファイルを扱ってください。
+- リダイレクトを追わず、環境変数の HTTP proxy も使いません。上流の API key、Cookie、
+  Content-Disposition、エラー本文や内部 URL はダウンロード応答に転送しません。
+
+### オフライン回帰テスト
+
+Python 3.12 と `requirements.txt` の依存を入れた開発環境で:
+
+```bash
+python -m unittest discover -s tests -v
+python -m compileall -q app tests
+```
+
+上流は HTTPX MockTransport または読み取り専用のインメモリ fixture に置き換えます。
+実サーバへのアクセスや lifespan のバックグラウンド取得は行いません。同時実行・超過拒否・
+切断・キャンセル・送信/上流失敗・長さ不一致・入力検証・256 MiB の遅延生成転送を確認します。
+メモリ試験は Python の割り当て量であり、本番ホストの RSS / Caddy / Docker の負荷試験を
+代替しません。依存が不足すると full-app テストは skip されるので、skip を確認してください。
+
 ## TLS 自動更新
 
 Caddy v2 の `certmagic` が 30 日前に LE 証明書を自動更新。証明書と ACME アカウントは

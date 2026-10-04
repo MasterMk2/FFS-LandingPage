@@ -32,6 +32,8 @@ services:
       context: .
     image: ffs-website:latest
     container_name: ffs-website
+    # Bound this website independently of the DCS server on the same host.
+    mem_limit: "${FFS_WEBSITE_MEM_LIMIT:-256m}"
     restart: unless-stopped
     environment:
       TZ: "Asia/Tokyo"
@@ -39,6 +41,7 @@ services:
       DCSSB_API_PREFIX: "${DCSSB_API_PREFIX:-/stats}"
       DCSSB_API_KEY: "${DCSSB_API_KEY:-}"
       DCSSB_TIMEOUT: "3.0"
+      TRACK_DOWNLOAD_LIMIT: "${TRACK_DOWNLOAD_LIMIT:-2}"
       DCSSB_DB_URL: "${DCSSB_DB_URL:-}"
       # psutil にホスト側 /proc を読ませて、コンテナ namespace でなく
       # ホスト全体の CPU / mem / loadavg を計測する。

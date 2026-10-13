@@ -69,6 +69,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "リプレイダウンロード",
         "en": "Replay Downloads",
     },
+    "home_card_gatchan_title": {
+        "ja": "GATCHAN — 大判ポスターの分割印刷",
+        "en": "GATCHAN — Tiled Poster Printing",
+    },
     "cta_status": {"ja": "ステータスを見る →", "en": "View status →"},
     "cta_lb": {"ja": "ランキングを見る →", "en": "View leaderboard →"},
     "cta_open_sneaker": {
@@ -88,6 +92,7 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Open gravitymap.freedomflight.jp ↗",
     },
     "cta_open_drivecal": {"ja": "DriveCal を開く ↗", "en": "Open DriveCal ↗"},
+    "cta_open_gatchan": {"ja": "GATCHAN を開く ↗", "en": "Open GATCHAN ↗"},
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

@@ -202,5 +202,22 @@
     {% endif %}
     <span class="home-card-cta">{{ t('cta_open_drivecal') }}</span>
   </a>
+  <a class="home-card" href="/gatchan/" target="_blank" rel="noopener">
+    <h3>{{ t('home_card_gatchan_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      A0・A1 などの大きなデザインを、A4・A3 などの用紙に分割して印刷するブラウザアプリ。
+      印刷余白とのりしろを設定し、貼り合わせ用の PDF を作れます。
+      原稿はブラウザ内で処理し、サーバには送信されません。
+    </p>
+    {% else %}
+    <p>
+      Split large designs, including A0 and A1 posters, across A4, A3 or custom sheets.
+      Set printer margins and overlap for joining, then download a tiled PDF.
+      Designs are processed in your browser and never uploaded to the server.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_gatchan') }}</span>
+  </a>
 </section>
 {% endblock %}

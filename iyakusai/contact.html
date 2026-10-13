@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お問い合わせ - 医薬祭2026 - 富山大学</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --c-bg: #faf6ec;
+      --c-bg-warm: #f4ead2;
+      --c-surface: #ffffff;
+      --c-surface-soft: #fbf5e1;
+      --c-accent: #4CAF50;
+      --c-accent-deep: #2E7D32;
+      --c-accent-soft: #C8E6C9;
+      --c-leaf-pale: #e8f3e1;
+      --c-text: #3a4a31;
+      --c-text-soft: #5b6b50;
+      --c-text-muted: #87937a;
+      --c-border: #ece1c4;
+      --c-border-strong: #d8caa3;
+      --shadow-sm: 0 2px 6px rgba(80, 100, 50, 0.06);
+      --shadow-md: 0 10px 28px rgba(80, 100, 50, 0.08);
+      --font-display: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif;
+      --font-body: 'Noto Sans JP', 'Zen Maru Gothic', sans-serif;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--c-bg);
+      color: var(--c-text);
+      min-height: 100vh;
+      line-height: 1.85;
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+
+    /* ─── Soft decorative blobs ─── */
+    .deco {
+      position: fixed; inset: 0; z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .deco .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.45;
+    }
+    .deco .blob-1 {
+      width: 460px; height: 460px;
+      background: var(--c-leaf-pale);
+      top: -10%; left: -8%;
+    }
+    .deco .blob-2 {
+      width: 380px; height: 380px;
+      background: #ffe8c0;
+      bottom: -10%; right: -10%;
+    }
+
+    /* ─── Top nav ─── */
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(250, 246, 236, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--c-border);
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 1rem;
+      letter-spacing: 0.06em;
+      color: var(--c-text);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-logo .nav-leaf {
+      display: inline-block;
+      width: 14px; height: 14px;
+      background: var(--c-accent);
+      border-radius: 50% 0 50% 50%;
+      transform: rotate(-25deg);
+    }
+    .nav-tabs {
+      list-style: none;
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .nav-tabs a {
+      display: inline-block;
+      min-width: 5.4em;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--c-text-soft);
+      text-decoration: none;
+      padding: 0.5rem 0.95rem;
+      border-radius: 999px;
+      transition: color 0.2s, background 0.2s;
+    }
+    .nav-tabs a:hover {
+      color: var(--c-accent-deep);
+      background: var(--c-leaf-pale);
+    }
+    .nav-tabs a.active {
+      color: #fff;
+      background: var(--c-accent);
+      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.25);
+    }
+
+    .content { position: relative; z-index: 2; }
+
+    /* ─── Page header ─── */
+    .page-header {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 5rem 2rem 2rem;
+      text-align: center;
+    }
+    .page-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: #fff;
+      border: 1px solid var(--c-border);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--c-accent-deep);
+      letter-spacing: 0.06em;
+      margin-bottom: 1.6rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .page-badge .dot {
+      width: 7px; height: 7px;
+      background: var(--c-accent);
+      border-radius: 50%;
+    }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900;
+      line-height: 1.4;
+      color: var(--c-text);
+      margin-bottom: 0.6rem;
+    }
+    .page-subtitle {
+      font-size: clamp(0.85rem, 1.5vw, 1rem);
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--c-text-muted);
+    }
+
+    /* ─── Section ─── */
+    .section {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2.5rem 2rem;
+    }
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--c-accent-deep);
+      margin-bottom: 0.8rem;
+    }
+    .section-label::before {
+      content: '';
+      display: inline-block;
+      width: 12px; height: 12px;
+      background: var(--c-accent);
+      border-radius: 50% 0 50% 50%;
+      transform: rotate(-25deg);
+    }
+    .section-heading {
+      font-family: var(--font-display);
+      font-size: clamp(1.4rem, 3vw, 1.85rem);
+      font-weight: 900;
+      margin-bottom: 1.2rem;
+      line-height: 1.5;
+      color: var(--c-text);
+    }
+    .section-body {
+      color: var(--c-text-soft);
+      font-size: 1rem;
+      line-height: 2;
+    }
+
+    /* ─── Contact cards ─── */
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.4rem;
+      margin-top: 1.8rem;
+    }
+    .contact-card {
+      background: var(--c-surface);
+      border: 1px solid var(--c-border);
+      border-radius: 20px;
+      padding: 1.7rem;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .contact-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+    }
+    .contact-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: var(--c-leaf-pale);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 0.9rem;
+      font-size: 1.15rem;
+    }
+    .contact-icon.ig {
+      background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%);
+      color: #fff;
+    }
+    .contact-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--c-text-muted);
+      margin-bottom: 0.4rem;
+    }
+    .contact-sub {
+      font-size: 0.7rem;
+      color: var(--c-text-muted);
+      letter-spacing: 0.04em;
+      font-weight: 500;
+    }
+    .contact-value {
+      font-size: 1rem;
+      color: var(--c-text);
+      line-height: 1.7;
+      font-weight: 500;
+    }
+    .contact-value a {
+      color: var(--c-accent-deep);
+      text-decoration: none;
+      border-bottom: 1px dashed var(--c-accent-soft);
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .contact-value a:hover {
+      color: var(--c-accent);
+      border-bottom-color: var(--c-accent);
+    }
+    .contact-note {
+      margin-top: 0.8rem;
+      padding-top: 0.7rem;
+      border-top: 1px dashed var(--c-border);
+      font-size: 0.78rem;
+      color: var(--c-text-muted);
+      line-height: 1.7;
+    }
+
+
+    /* ─── Organization block ─── */
+    .org-block {
+      margin-top: 1.4rem;
+      padding: 1.8rem 2rem;
+      background: var(--c-surface-soft);
+      border: 1px solid var(--c-border);
+      border-radius: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.4rem;
+    }
+    .org-block .contact-label { margin-bottom: 0.3rem; }
+    .org-block .contact-value { font-size: 0.95rem; line-height: 1.7; font-weight: 500; }
+
+    /* ─── Footer ─── */
+    footer {
+      text-align: center;
+      padding: 3.5rem 2rem 2.5rem;
+      font-size: 0.82rem;
+      color: var(--c-text-muted);
+      border-top: 1px solid var(--c-border);
+      background: var(--c-surface-soft);
+      margin-top: 3rem;
+    }
+    /* ─── Footer SNS row ─── */
+    .footer-sns {
+      display: inline-flex;
+      gap: 10px;
+      margin-bottom: 1.2rem;
+    }
+    .footer-sns-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: #fff;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: 900;
+    }
+    .footer-sns-icon.ig {
+      background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%);
+    }
+    .footer-sns-icon.x {
+      background: #0f1419;
+      font-family: var(--font-display);
+    }
+    .footer-sns-icon:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 14px rgba(80, 100, 50, 0.2);
+    }
+    footer .footer-logo {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+      color: var(--c-text);
+      letter-spacing: 0.04em;
+    }
+
+    @media (max-width: 600px) {
+      .top-nav { padding: 0.7rem 1rem; }
+      .nav-logo { font-size: 0.82rem; }
+      .nav-tabs { gap: 0.2rem; }
+      .nav-tabs a { font-size: 0.75rem; padding: 0.35rem 0.6rem; min-width: 0; }
+      .page-header { padding: 3rem 1.5rem 1.5rem; }
+      .section { padding: 2rem 1.5rem; }
+      .contact-card { padding: 1.5rem; }
+      .org-block { padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top nav -->
+  <nav class="top-nav">
+    <a class="nav-logo" href="index.html">
+      <span class="nav-leaf"></span>
+      IYAKUSAI 2026
+    </a>
+    <ul class="nav-tabs">
+      <li><a href="index.html">ホーム</a></li>
+      <li><a href="recruitment.html">新歓募集</a></li>
+      <li><a href="exhibitor-briefing.html">出展説明会</a></li>
+      <li><a href="sponsorship.html">ご協賛</a></li>
+      <li><a href="contact.html" class="active">お問い合わせ</a></li>
+    </ul>
+  </nav>
+
+  <!-- Soft decorative blobs -->
+  <div class="deco">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <div class="content">
+
+    <header class="page-header">
+      <div class="page-badge">
+        <span class="dot"></span>
+        Contact
+      </div>
+      <h1 class="page-title">お問い合わせ</h1>
+      <p class="page-subtitle">University of Toyama — Medicine &amp; Pharmacy Festival</p>
+    </header>
+
+    <!-- Contact methods -->
+    <section class="section">
+      <div class="section-label">Contact</div>
+      <h2 class="section-heading">連絡先一覧</h2>
+      <p class="section-body">
+        ご質問・お問い合わせはお気軽に以下のいずれかにご連絡ください。
+      </p>
+
+      <div class="contact-grid">
+
+        <div class="contact-card">
+          <div class="contact-icon">📞</div>
+          <div class="contact-label">電話番号</div>
+          <div class="contact-value">
+            <a href="tel:080-7806-3171">080-7806-3171</a>
+          </div>
+          <div class="contact-note">
+            ※担当委員が受講・実習中の場合は受話できないことがあります。しばらく経ってからおかけ直しいただくか、メールにてご連絡ください。
+          </div>
+        </div>
+
+        <div class="contact-card">
+          <div class="contact-icon">📠</div>
+          <div class="contact-label">FAX番号</div>
+          <div class="contact-value">
+            050-1704-1626
+          </div>
+          <div class="contact-note">
+            送信いただいた内容はメールで担当者に届きます。お急ぎの場合はお電話・メールもご利用ください。
+          </div>
+        </div>
+
+        <div class="contact-card">
+          <div class="contact-icon">✉️</div>
+          <div class="contact-label">団体代表 Email</div>
+          <div class="contact-sub">一般のお問い合わせ</div>
+          <div class="contact-value" style="margin-top:0.5rem;">
+            <a href="mailto:contact@iyakusai.com">contact@iyakusai.com</a>
+          </div>
+        </div>
+
+        <div class="contact-card">
+          <div class="contact-icon">✉️</div>
+          <div class="contact-label">企画課 Email</div>
+          <div class="contact-sub">出展・イベント関連</div>
+          <div class="contact-value" style="margin-top:0.5rem;">
+            <a href="mailto:planning@iyakusai.com">planning@iyakusai.com</a>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+
+    <!-- Organization -->
+    <section class="section">
+      <div class="section-label">Organization</div>
+      <h2 class="section-heading">組織情報</h2>
+
+      <div class="org-block">
+        <div>
+          <div class="contact-label">組織名</div>
+          <div class="contact-value">富山大学 医学薬学祭実行委員会</div>
+        </div>
+        <div>
+          <div class="contact-label">委員長</div>
+          <div class="contact-value">西野 耀史</div>
+        </div>
+        <div>
+          <div class="contact-label">所在地</div>
+          <div class="contact-value">〒930-0194<br>富山市杉谷2630番地<br>富山大学杉谷キャンパス</div>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="footer-sns">
+        <a class="footer-sns-icon ig" href="https://www.instagram.com/iyakusai/" target="_blank" rel="noopener" aria-label="Instagram">📷</a>
+        <a class="footer-sns-icon x" href="https://x.com/iyakusai" target="_blank" rel="noopener" aria-label="X (Twitter)">𝕏</a>
+      </div>
+      <div class="footer-logo">IYAKUSAI 2026</div>
+      <p>© 2026 富山大学 医学薬学祭実行委員会</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

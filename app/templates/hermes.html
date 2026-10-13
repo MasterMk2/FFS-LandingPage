@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Hermes Personal Assistant — Application Information{% endblock %}
+{% block head %}<meta name="robots" content="noindex, nofollow, noarchive">{% endblock %}
+{% block content %}
+<article class="legal-page">
+  <header>
+    <h2>Hermes Personal Assistant</h2>
+    {% if lang == 'ja' %}
+    <p class="legal-lead">所有者本人の情報を整理し、日々の予定と対応事項を提示する非公開の個人用アシスタントです。</p>
+    {% else %}
+    <p class="legal-lead">A private personal assistant that organizes its owner's information and presents daily plans and action items.</p>
+    {% endif %}
+  </header>
+
+  {% if lang == 'ja' %}
+  <h3>アプリの機能</h3>
+  <p>Hermes Personal Assistant は、所有者本人が管理する機器上で動作します。Google Calendar の予定と Gmail のメッセージを読み取り、日次予定、対応事項、期限の見落とし防止に利用します。第三者向けのサービスではなく、一般ユーザーの登録機能もありません。</p>
+
+  <h3>Google ユーザーデータの利用</h3>
+  <ul>
+    <li>Google Calendar の予定を読み取り、日次予定を作成します。</li>
+    <li>購読しているカレンダーの一覧と名称などのメタデータを読み取り、所有者が選択したカレンダーだけを同期します。</li>
+    <li>Gmail のメッセージを読み取り、所有者が対応すべき事項を抽出します。</li>
+    <li>Google 上の予定やメールを作成、変更、削除する権限は使用しません。</li>
+    <li>取得したデータを広告、販売、または信用評価に使用しません。</li>
+  </ul>
+
+  <h3>データの保護</h3>
+  <p>取得したデータと派生情報は、所有者が管理する機器に保存されます。アクセスは所有者本人および動作に必要な限定されたサービスに制限されます。</p>
+
+  <h3>外部サービスの利用</h3>
+  <p>日次予定や通知は所有者本人へ Discord 経由で配信され、緊急度の高い通知には LINE を使用する場合があります。所有者が対話形式の回答を求めた場合、回答に必要な情報またはその要約を、所有者が設定した AI モデルサービスで処理する場合があります。定時の日次予定はローカルの決定論的テンプレートで生成され、AI モデルサービスへは送信されません。</p>
+
+  <p class="legal-note">このページは Google OAuth のアプリ情報として公開しています。Hermes の操作画面、保存データ、API、および内部システムは、このウェブサイトでは公開していません。</p>
+  {% else %}
+  <h3>What the application does</h3>
+  <p>Hermes Personal Assistant runs on equipment controlled by its owner. It reads Google Calendar events and Gmail messages to prepare daily plans, identify action items, and help the owner avoid missed deadlines. It is not offered as a service to third parties and has no public user registration.</p>
+
+  <h3>Use of Google user data</h3>
+  <ul>
+    <li>It reads Google Calendar events to prepare daily plans.</li>
+    <li>It reads the subscribed calendar list and metadata such as calendar names so that only calendars selected by the owner are synchronized.</li>
+    <li>It reads Gmail messages to identify items that require the owner's attention.</li>
+    <li>It does not use permission to create, modify, or delete events or email in Google services.</li>
+    <li>It does not use collected data for advertising, sale, or credit assessment.</li>
+  </ul>
+
+  <h3>Data protection</h3>
+  <p>Collected data and derived information are stored on equipment controlled by the owner. Access is limited to the owner and the restricted services required for operation.</p>
+
+  <h3>Use of external services</h3>
+  <p>Daily plans and notifications are delivered to the owner through Discord, and LINE may be used for high-priority notifications. When the owner requests a conversational answer, information needed for the answer or a summary of it may be processed by an AI model service configured by the owner. The scheduled daily plan is generated locally from a deterministic template and is not sent to an AI model service.</p>
+
+  <p class="legal-note">This page is published as the application's Google OAuth information. The Hermes interface, stored data, APIs, and internal systems are not exposed through this website.</p>
+  {% endif %}
+
+  <nav class="legal-actions" aria-label="Hermes legal information">
+    <a href="/hermes/privacy">{% if lang == 'ja' %}プライバシーポリシー{% else %}Privacy Policy{% endif %}</a>
+    <a href="/">{% if lang == 'ja' %}FFS ホームへ戻る{% else %}Back to FFS home{% endif %}</a>
+  </nav>
+</article>
+{% endblock %}

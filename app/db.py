@@ -5,6 +5,7 @@ SVG スパークライン用パスを返す。
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,6 +14,8 @@ import psycopg
 from psycopg.rows import dict_row
 
 from .charts import Spark, sparkline
+
+log = logging.getLogger(__name__)
 
 DCSSB_DB_URL = os.getenv("DCSSB_DB_URL", "")
 
@@ -60,7 +63,12 @@ async def get_server_load_series() -> LoadResult:
                 await cur.execute(HISTORY_SQL)
                 rows = await cur.fetchall()
     except psycopg.Error as e:
-        return LoadResult(ok=False, error=f"{type(e).__name__}: {e}")
+        # 例外の文字列には DB の接続先アドレス等が入るのでログにだけ残し、
+        # error は汎用の分類にする。
+        log.warning("db: serverstats query failed: %s: %s", type(e).__name__, e)
+        if isinstance(e, psycopg.OperationalError):
+            return LoadResult(ok=False, error="connection error")
+        return LoadResult(ok=False, error="database error")
 
     by_server: dict[str, list[dict]] = {}
     for r in rows:

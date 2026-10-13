@@ -132,7 +132,8 @@ async def sample() -> dict:
     cpu_count = psutil.cpu_count() or 0
 
     now = time.time()
-    rx_total, tx_total, net_ifaces = _read_host_net_totals()
+    # 集計した NIC 名は公開ページに出さない (ホスト構成の手がかりになるため)。
+    rx_total, tx_total, _ = _read_host_net_totals()
     if _prev_net is not None:
         dt = max(now - _prev_net["t"], 0.001)
         # counter wrap / iface set 変化で負になりうるので clamp。
@@ -174,7 +175,6 @@ async def sample() -> dict:
         "net_tx_rate_str": _fmt_rate(tx_rate),
         "net_rx_total_str": _fmt_bytes(rx_total),
         "net_tx_total_str": _fmt_bytes(tx_total),
-        "net_ifaces": ", ".join(net_ifaces) if net_ifaces else "-",
         "cpu_spark": sparkline(list(_hist_cpu)),
         "mem_spark": sparkline(list(_hist_mem)),
         "swap_spark": sparkline(list(_hist_swap)),

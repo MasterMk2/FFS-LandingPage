@@ -73,6 +73,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "GATCHAN — 大判ポスターの分割印刷",
         "en": "GATCHAN — Tiled Poster Printing",
     },
+    "home_card_komagire_title": {
+        "ja": "こま切れ印刷 — PDFの小分け印刷",
+        "en": "KOMAGIRE — Small-batch PDF Printing",
+    },
     "cta_status": {"ja": "ステータスを見る →", "en": "View status →"},
     "cta_lb": {"ja": "ランキングを見る →", "en": "View leaderboard →"},
     "cta_open_sneaker": {
@@ -93,6 +97,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     },
     "cta_open_drivecal": {"ja": "DriveCal を開く ↗", "en": "Open DriveCal ↗"},
     "cta_open_gatchan": {"ja": "GATCHAN を開く ↗", "en": "Open GATCHAN ↗"},
+    "cta_open_komagire": {"ja": "こま切れ印刷をダウンロード", "en": "Download KOMAGIRE"},
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

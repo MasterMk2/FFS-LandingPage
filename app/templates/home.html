@@ -219,5 +219,22 @@
     {% endif %}
     <span class="home-card-cta">{{ t('cta_open_gatchan') }}</span>
   </a>
+  <a class="home-card" href="/komagire/{% if lang == 'en' %}en/{% endif %}">
+    <h3>{{ t('home_card_komagire_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      長い PDF を10ページ程度の小さなジョブに分け、1部ずつ順番に印刷する Windows アプリ。
+      自動両面の長辺・短辺とじ、ジョブ間の休止、停止と再開位置の指定に対応しています。
+      原稿は PC 内で処理します。まず少ないページで試し刷りしてください。
+    </p>
+    {% else %}
+    <p>
+      A Windows desktop app that prints long PDFs in small, sequential jobs, one complete copy at a time.
+      Supports automatic duplex, delays between jobs, pausing and an explicit starting job for resuming.
+      PDFs are processed on your PC. Start with a short test print. The app interface is in Japanese.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_komagire') }}</span>
+  </a>
 </section>
 {% endblock %}

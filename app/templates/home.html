@@ -178,6 +178,25 @@
     {% endif %}
     <span class="home-card-cta">{{ t('cta_open_dsv') }}</span>
   </a>
+  <a class="home-card" href="/skyrunner">
+    <h3>{{ t('home_card_skyrunner_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      夕焼けの低ポリ世界をジェットで飛び、浮かぶリングを順にくぐるブラウザ・フライトゲーム。
+      見た目は軽めですが、中身は<strong>6 自由度の飛行力学</strong>
+      (揚力・抗力・舵のモーメント・慣性テンソル・ISA 大気) で、失速も G 制限も本物の挙動です。
+      HUD 付き。キーボードでもスマホのタッチでも操縦できます。
+    </p>
+    {% else %}
+    <p>
+      A browser flight game: fly a jet over an endless low-poly sunset world and thread the floating rings in order.
+      Light on the outside, but underneath runs a <strong>6-DOF flight model</strong>
+      (lift, drag, control moments, inertia tensor, ISA atmosphere), so stalls and g-limits behave like the real thing.
+      HUD included; keyboard or touch controls.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_skyrunner') }}</span>
+  </a>
 </section>
 
 <h2 class="section-title">Other</h2>

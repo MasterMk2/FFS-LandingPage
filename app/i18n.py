@@ -77,6 +77,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "こま切れ印刷 — PDFの小分け印刷",
         "en": "KOMAGIRE — Small-batch PDF Printing",
     },
+    "home_card_dsv_title": {
+        "ja": "DCS Skin Viewer — リバリー制作用 3D・UV ビューアー",
+        "en": "DCS Skin Viewer — 3D/UV Viewer for Livery Painting",
+    },
     "cta_status": {"ja": "ステータスを見る →", "en": "View status →"},
     "cta_lb": {"ja": "ランキングを見る →", "en": "View leaderboard →"},
     "cta_open_sneaker": {
@@ -98,6 +102,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "cta_open_drivecal": {"ja": "DriveCal を開く ↗", "en": "Open DriveCal ↗"},
     "cta_open_gatchan": {"ja": "GATCHAN を開く ↗", "en": "Open GATCHAN ↗"},
     "cta_open_komagire": {"ja": "こま切れ印刷をダウンロード", "en": "Download KOMAGIRE"},
+    "cta_open_dsv": {"ja": "DCS Skin Viewer をダウンロード", "en": "Download DCS Skin Viewer"},
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

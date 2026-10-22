@@ -161,6 +161,23 @@
     {% endif %}
     <span class="home-card-cta">{{ t('cta_view_replays') }}</span>
   </a>
+  <a class="home-card" href="/dcs-skin-viewer/{% if lang == 'en' %}en/{% endif %}">
+    <h3>{{ t('home_card_dsv_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      リバリー（塗装）制作を手伝う Windows アプリ。画像編集ソフトでリバリーの画像を保存すると自動で読み直し、
+      変わった場所を<strong>3D の機体と UV 画像の両方</strong>に色付きで示します。
+      手元の DCS World のモデルとリバリーを読み取り専用で使います。試用版。
+    </p>
+    {% else %}
+    <p>
+      A Windows desktop app for livery painters. Save a livery image in your image editor and it reloads automatically,
+      highlighting what changed on <strong>both the 3D aircraft and the UV image</strong>.
+      It reads models and liveries from your own DCS World install without changing them. Trial version; the interface is in Japanese.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_dsv') }}</span>
+  </a>
 </section>
 
 <h2 class="section-title">Other</h2>

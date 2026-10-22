@@ -16,7 +16,7 @@ from datetime import datetime as _datetime
 import anyio
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -425,6 +425,17 @@ async def privacy_page(request: Request):
 @app.get("/known-issues", response_class=HTMLResponse)
 async def known_issues(request: Request):
     return render(request, "known_issues.html")
+
+
+# Sunset Skyrunner (ブラウザ・フライトゲーム)。全画面の 1 ページ完結アプリで
+# base.html のヒーローやナビを持たないため、Jinja を通さず静的ファイルをそのまま返す。
+# JS 本体と飛行力学は /static/skyrunner/ 配下 (StaticFiles が配信)。
+_SKYRUNNER_INDEX = BASE_DIR / "static" / "skyrunner" / "index.html"
+
+
+@app.get("/skyrunner", response_class=HTMLResponse)
+async def skyrunner_page():
+    return FileResponse(_SKYRUNNER_INDEX, media_type="text/html; charset=utf-8")
 
 
 @app.get("/status", response_class=HTMLResponse)

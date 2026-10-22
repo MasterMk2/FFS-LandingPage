@@ -81,6 +81,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "DCS Skin Viewer — リバリー制作用 3D・UV ビューアー",
         "en": "DCS Skin Viewer — 3D/UV Viewer for Livery Painting",
     },
+    "home_card_skyrunner_title": {
+        "ja": "Sunset Skyrunner — ブラウザ・フライトゲーム",
+        "en": "Sunset Skyrunner — Browser Flight Game",
+    },
     "cta_status": {"ja": "ステータスを見る →", "en": "View status →"},
     "cta_lb": {"ja": "ランキングを見る →", "en": "View leaderboard →"},
     "cta_open_sneaker": {
@@ -103,6 +107,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "cta_open_gatchan": {"ja": "GATCHAN を開く ↗", "en": "Open GATCHAN ↗"},
     "cta_open_komagire": {"ja": "こま切れ印刷をダウンロード", "en": "Download KOMAGIRE"},
     "cta_open_dsv": {"ja": "DCS Skin Viewer をダウンロード", "en": "Download DCS Skin Viewer"},
+    "cta_open_skyrunner": {"ja": "離陸する →", "en": "Take off →"},
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

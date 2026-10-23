@@ -18,6 +18,10 @@
  * fm.pos/vel/q/omega are the state of record: writing them between steps (teleport, snapshot restore)
  * takes effect on the next step(). After editing fm.params call fm.setParams() (and reset() to re-trim).
  * No AoA limiter: below corner speed (~195 m/s at 1000 m) full aft stick reaches CLmax and stalls.
+ * Landing gear (controls.gear, needs fm.groundHeight): three spring-damper struts, active only when fully down and
+ * locked. The ground normal is taken as +Y (level runway). Tyre friction is tanh-saturated (no stick-slip chatter);
+ * brakes act on the mains, the yaw pedal steers the nose wheel (angle limited by speed). A weight-on-wheels
+ * interlock stops retraction on the ground. fm.gLoad stays aero + thrust only (the SAS reads it); fm.nz adds gear.
  */
 (function (root) {
   'use strict';
@@ -83,6 +87,22 @@
     sasWashoutTau: 1.0,    // s
     gMax: 9, gMin: -3,     // g-limiter
     sasGFeedback: 0.02,    // rad elevator per g of overshoot beyond the limits
+    // configuration drag
+    CDgear: 0.025,         // added CD with the gear fully down
+    CDspeedBrake: 0.05,    // added CD with the speed brake fully out
+    gearTime: 3,           // s, gear extension / retraction
+    speedBrakeTau: 0.8,    // s
+    // landing gear: tyre contact points with the strut fully extended (body axes, m). CG is 1.6 m ahead of the
+    // mains, so ~29% of the weight sits on the nose wheel; tail strike at ~14 deg pitch on the mains.
+    gearY: -2.0, gearNoseZ: -4.0, gearMainZ: 1.6, gearTrack: 3.2,
+    gearKNose: 135000, gearKMain: 170000, // N/m, ~0.2 m static compression
+    gearDamp: 0.15,        // s, strut damping = gearDamp * stiffness (zeta ~0.5)
+    gearStroke: 0.5,       // m, the strut bottoms out beyond this (10x stiffer)
+    muRoll: 0.02, muBrake: 0.6, muSide: 0.8, // rolling, full-brake (mains) and cornering friction coefficients
+    vSlip: 0.4,            // m/s, tyre friction saturates over this slip speed
+    noseSteerMax: 30 * DEG, // nose-wheel angle at full pedal ...
+    noseSteerLatG: 0.3,    //   ... limited so the kinematic turn stays under this lateral g (the nose/main wheel
+                           //   triangle tips over at ~0.5 g): ~15 deg at 8 m/s, ~0.3 deg at 60 m/s
     // integration
     substep: 1 / 240,      // s, max internal RK4 step
   };
@@ -111,7 +131,7 @@
       this.q = new THREE.Quaternion();
       this.omega = new THREE.Vector3();
       this.wind = new THREE.Vector3();   // world wind (m/s), air-relative velocity = vel - wind
-      this.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, afterburner: false };
+      this.controls = { pitch: 0, roll: 0, yaw: 0, throttle: 0, afterburner: false, brake: 0, speedBrake: false, gear: false };
       this.sas = true;
       this.groundHeight = null;          // optional (x, z) => terrain y
       // state: 0-2 pos, 3-5 vel (world), 6-9 quat x,y,z,w (body->world), 10-12 omega (body)
@@ -123,11 +143,15 @@
       // effectors
       this.elevator = 0; this.aileron = 0; this.rudder = 0; this.elevatorTrim = 0;
       this.throttleActual = 0; this.afterburnerLevel = 0; this.thrust = 0;
+      this.gearPos = 0; this.speedBrakePos = 0; this._brake = 0; this._steer = 0;
       this._qLP = 0; this._rLP = 0;      // washout filter states
       // readouts
-      this.tas = 0; this.ias = 0; this.mach = 0; this.alpha = 0; this.beta = 0; this.gLoad = 1;
+      this.tas = 0; this.ias = 0; this.mach = 0; this.alpha = 0; this.beta = 0; this.gLoad = 1; this.nz = 1;
       this.vs = 0; this.heading = 0; this.pitch = 0; this.bank = 0; this.stalled = false;
-      this.rho = RHO0; this.agl = 0; this.qbar = 0;
+      this.rho = RHO0; this.agl = 0; this.qbar = 0; this.groundSpeed = 0;
+      this.wow = 0;                           // gear legs in ground contact (0..3: nose, left main, right main)
+      this.gearComp = new Float64Array(3);    // strut compression, m
+      this.gearPts = new Float64Array(9);     // tyre contact points, world x,y,z per leg
       this.rollRate = 0; this.pitchRate = 0; this.yawRate = 0;
       this._derive();
       this.reset();
@@ -154,7 +178,12 @@
       d.Ix = p.Iyy; d.Iy = p.Izz; d.Iz = p.Ixx; d.Iyz = -p.Ixz;
       const det = d.Iy * d.Iz - d.Iyz * d.Iyz;
       d.iYY = d.Iz / det; d.iZZ = d.Iy / det; d.iYZ = -d.Iyz / det;
+      // gear legs: body contact point x, y, z and strut stiffness (nose, left main, right main)
+      d.gear = [[0, p.gearY, p.gearNoseZ, p.gearKNose],
+        [-p.gearTrack / 2, p.gearY, p.gearMainZ, p.gearKMain], [p.gearTrack / 2, p.gearY, p.gearMainZ, p.gearKMain]];
     }
+
+    _configDrag() { const p = this.params; return p.CDgear * this.gearPos + p.CDspeedBrake * this.speedBrakePos; }
 
     // post-stall parabola coefficient so the blended CL hits ratio*peak at alpha a
     _postK(peak, a, sgn) {
@@ -223,7 +252,7 @@
       const de = this.elevator, da = this.aileron, dr = this.rudder;
       // coefficients
       const CL = this.clAlpha(alpha) + p.CLde * de + p.CLq * qh;
-      const CD = this.cdTotal(alpha, CL, beta, mach);
+      const CD = this.cdTotal(alpha, CL, beta, mach) + this._configDrag();
       const CY = p.CYb * beta + p.CYdr * dr;
       const Cl = p.Clb * beta + p.Clp * ph + p.Clr * rh + p.Clda * da + p.Cldr * dr;
       const Cm = p.Cm0 + p.Cma * Math.sin(alpha) + p.Cmq * qh + p.Cmde * de;
@@ -236,18 +265,49 @@
         const ns = Math.sqrt(vb * vb + wb * wb);
         if (ns > 1e-9) { fy -= L * wb / ns; fz += L * vb / ns; }
       }
+      // landing gear: force summed in world axes (gx, gy, gz), moment about the CG in body axes (gmx, gmy, gmz)
+      let gx = 0, gy = 0, gz = 0, gmx = 0, gmy = 0, gmz = 0, gearBodyY = 0, wow = 0;
+      if (this.gearPos >= 1 && typeof this.groundHeight === 'function') {
+        rot(qx, qy, qz, qw, wx, wy, wz); const Wx = RV[0], Wy = RV[1], Wz = RV[2];  // body rates in world axes
+        rot(qx, qy, qz, qw, 0, 0, -1); let hx = RV[0], hz = RV[2];                // nose direction, levelled
+        const hl = Math.sqrt(hx * hx + hz * hz) || 1; hx /= hl; hz /= hl;
+        let gtx = 0, gty = 0, gtz = 0;
+        for (let i = 0; i < 3; i++) {
+          const g = d.gear[i];
+          rot(qx, qy, qz, qw, g[0], g[1], g[2]); const ox = RV[0], oy = RV[1], oz = RV[2];
+          const px = s[0] + ox, py = s[1] + oy, pz = s[2] + oz, pen = this.groundHeight(px, pz) - py;
+          if (store) { this.gearComp[i] = pen > 0 ? pen : 0; this.gearPts[3 * i] = px; this.gearPts[3 * i + 1] = py; this.gearPts[3 * i + 2] = pz; }
+          if (!(pen > 0)) continue;
+          const vx = s[3] + Wy * oz - Wz * oy, vy = s[4] + Wz * ox - Wx * oz, vz = s[5] + Wx * oy - Wy * ox; // tyre velocity
+          const k = g[3], Fn = k * pen + (pen > p.gearStroke ? 9 * k * (pen - p.gearStroke) : 0) - p.gearDamp * k * vy;
+          if (!(Fn > 0)) continue;                                   // a rebounding strut never pulls
+          wow++;
+          let ux = hx, uz = hz;                                      // rolling direction; nose wheel steered right +
+          if (i === 0 && this._steer !== 0) { const c = Math.cos(this._steer), sn = Math.sin(this._steer); ux = c * hx - sn * hz; uz = c * hz + sn * hx; }
+          const vl = vx * ux + vz * uz, vr = vz * ux - vx * uz;      // tyre velocity along / to the right of the wheel
+          const Fl = -(p.muRoll + (i > 0 ? p.muBrake * this._brake : 0)) * Fn * Math.tanh(vl / p.vSlip);
+          const Fr = -p.muSide * Fn * Math.tanh(vr / p.vSlip);
+          const Fx = Fl * ux - Fr * uz, Fz = Fl * uz + Fr * ux;
+          gx += Fx; gy += Fn; gz += Fz;
+          gtx += oy * Fz - oz * Fn; gty += oz * Fx - ox * Fz; gtz += ox * Fn - oy * Fx;
+        }
+        if (wow) {
+          rot(-qx, -qy, -qz, qw, gtx, gty, gtz); gmx = RV[0]; gmy = RV[1]; gmz = RV[2];
+          rot(-qx, -qy, -qz, qw, gx, gy, gz); gearBodyY = RV[1];
+        }
+      } else if (store) this.gearComp.fill(0);
       // translational EOM written in world axes (equivalent to body form u' = F/m - w x u + R^T g)
       rot(qx, qy, qz, qw, fx, fy, fz);
       const m = p.mass;
       out[0] = s[3]; out[1] = s[4]; out[2] = s[5];
-      out[3] = RV[0] / m; out[4] = RV[1] / m - G0; out[5] = RV[2] / m;
+      out[3] = (RV[0] + gx) / m; out[4] = (RV[1] + gy) / m - G0; out[5] = (RV[2] + gz) / m;
       // quaternion kinematics q' = 1/2 q (x) (0, omega)
       out[6] = 0.5 * (qw * wx + qy * wz - qz * wy);
       out[7] = 0.5 * (qw * wy + qz * wx - qx * wz);
       out[8] = 0.5 * (qw * wz + qx * wy - qy * wx);
       out[9] = -0.5 * (qx * wx + qy * wy + qz * wz);
       // moments: aerospace (L,M,N) -> Three body axes (M, -N, -L)
-      const mx = qS * p.cbar * Cm, my = -qS * p.b * Cn, mz = -qS * p.b * Cl;
+      const mx = qS * p.cbar * Cm + gmx, my = -qS * p.b * Cn + gmy, mz = -qS * p.b * Cl + gmz;
       // rotational EOM in body axes: I w' = M - w x (I w)
       const hx = d.Ix * wx, hy = d.Iy * wy + d.Iyz * wz, hz = d.Iyz * wy + d.Iz * wz;
       const tx = mx - (wy * hz - wz * hy), ty = my - (wz * hx - wx * hz), tz = mz - (wx * hy - wy * hx);
@@ -257,6 +317,7 @@
       if (store) {
         this.tas = V; this.alpha = alpha; this.beta = beta; this.rho = rho; this.mach = mach;
         this.qbar = qbar; this.gLoad = fy / (m * G0);   // aero+thrust specific force along body +Y
+        this.nz = (fy + gearBodyY) / (m * G0); this.wow = wow; // ... and what an accelerometer reads (+ gear)
       }
     }
 
@@ -300,7 +361,8 @@
         da -= p.sasRollDamp * P;                                    // roll damper
         dr += p.sasBeta * this.beta + p.sasRollToRudder * P         // turn coordination
           - p.sasYawDamp * (R - this._rLP);                         // yaw damper (washed out)
-        if (this.gLoad > p.gMax) de -= p.sasGFeedback * (this.gLoad - p.gMax); // overshoot feedback
+        if (this.wow) { /* on the wheels: no g-overshoot feedback (touchdown loads are not a manoeuvre) */ }
+        else if (this.gLoad > p.gMax) de -= p.sasGFeedback * (this.gLoad - p.gMax); // overshoot feedback
         else if (this.gLoad < p.gMin) de += p.sasGFeedback * (p.gMin - this.gLoad);
       }
       de = clamp(de, -p.elevMax, p.elevMax); da = clamp(da, -p.ailMax, p.ailMax);
@@ -314,6 +376,13 @@
       this.throttleActual += ((ab ? 1 : thr) - this.throttleActual) * (1 - Math.exp(-h / p.spoolTau));
       this.afterburnerLevel += ((ab ? 1 : 0) - this.afterburnerLevel) * (1 - Math.exp(-h / p.abTau));
       this.thrust = this._thrustAt(this.rho, this.throttleActual, this.afterburnerLevel);
+      // gear runs at a constant rate (no retraction with weight on wheels), speed brake first order
+      if (c.gear) this.gearPos = Math.min(1, this.gearPos + h / p.gearTime);
+      else if (!this.wow) this.gearPos = Math.max(0, this.gearPos - h / p.gearTime);
+      this.speedBrakePos += ((c.speedBrake ? 1 : 0) - this.speedBrakePos) * (1 - Math.exp(-h / p.speedBrakeTau));
+      this._brake = clamp(num(c.brake, 0), 0, 1);
+      const v2 = s[3] * s[3] + s[5] * s[5], wb = p.gearMainZ - p.gearNoseZ;  // turn radius = wheelbase / tan(steer)
+      this._steer = yaw * Math.min(p.noseSteerMax, Math.atan(p.noseSteerLatG * G0 * wb / (v2 + 1e-9)));
     }
 
     _thrustAt(rho, spool, abLevel) {
@@ -330,15 +399,24 @@
       if (c.yaw !== undefined) k.yaw = clamp(num(c.yaw, 0), -1, 1);
       if (c.throttle !== undefined) k.throttle = clamp(num(c.throttle, 0), 0, 1);
       if (c.afterburner !== undefined) k.afterburner = !!c.afterburner;
+      if (c.brake !== undefined) k.brake = clamp(num(c.brake, 0), 0, 1);
+      if (c.speedBrake !== undefined) k.speedBrake = !!c.speedBrake;
+      if (c.gear !== undefined) k.gear = !!c.gear;
     }
 
-    /** Place the aircraft in trimmed, wings-level, unaccelerated flight. */
+    /**
+     * Place the aircraft in trimmed, wings-level, unaccelerated flight. opts: pos, heading, speed,
+     * gamma (flight path angle, rad, + = climbing; e.g. -3 deg for a glide path), gear (true = down and locked).
+     */
     reset(opts) {
       opts = opts || {};
       const p = this.params;
       this._derive();
       const px = opts.pos ? opts.pos.x : 0, py = opts.pos ? opts.pos.y : 1000, pz = opts.pos ? opts.pos.z : 0;
-      const psi = num(opts.heading, 0), V = Math.max(num(opts.speed, 180), 1);
+      const psi = num(opts.heading, 0), V = Math.max(num(opts.speed, 180), 1), gam = num(opts.gamma, 0);
+      this.controls.gear = !!opts.gear; this.gearPos = opts.gear ? 1 : 0;
+      this.controls.brake = 0; this.controls.speedBrake = false; this.speedBrakePos = 0; this._brake = 0; this._steer = 0;
+      this.wow = 0; this.gearComp.fill(0);
       this._wx = this.wind.x; this._wy = this.wind.y; this._wz = this.wind.z;
       this._atmo(py);
       const rho = this._rho, mach = V / this._a, qS = 0.5 * rho * V * V * p.S, W = p.mass * G0;
@@ -346,7 +424,7 @@
       const clOf = (a) => this.clAlpha(a) + p.CLde * deOf(a);
       let T = 0, alpha = 0;
       for (let it = 0; it < 12; it++) {
-        const CLreq = (W - T * Math.sin(alpha)) / qS;                 // L + T sin(a) = W
+        const CLreq = (W * Math.cos(gam) - T * Math.sin(alpha)) / qS; // L + T sin(a) = W cos(gamma)
         let lo = p.alphaStallNeg, hi = p.alphaStall;
         if (CLreq >= clOf(hi)) alpha = hi;
         else if (CLreq <= clOf(lo)) alpha = lo;
@@ -354,15 +432,17 @@
           for (let j = 0; j < 60; j++) { const m = 0.5 * (lo + hi); if (clOf(m) < CLreq) lo = m; else hi = m; }
           alpha = 0.5 * (lo + hi);
         }
-        T = qS * this.cdTotal(alpha, clOf(alpha), 0, mach) / Math.cos(alpha); // T cos(a) = D
+        // T cos(a) = D + W sin(gamma)
+        T = (qS * (this.cdTotal(alpha, clOf(alpha), 0, mach) + this._configDrag()) + W * Math.sin(gam)) / Math.cos(alpha);
       }
       const de = clamp(deOf(alpha), -p.elevMax, p.elevMax);
       const thr = clamp(T / this._thrustAt(rho, 1, 0), 0, 1);
-      // attitude: yaw (-heading about world Y) then pitch = alpha about body X
-      const cy = Math.cos(-psi / 2), sy = Math.sin(-psi / 2), cp = Math.cos(alpha / 2), sp = Math.sin(alpha / 2);
+      // attitude: yaw (-heading about world Y) then pitch = gamma + alpha about body X
+      const th = gam + alpha;
+      const cy = Math.cos(-psi / 2), sy = Math.sin(-psi / 2), cp = Math.cos(th / 2), sp = Math.sin(th / 2);
       const s = this._s;
       s[0] = px; s[1] = py; s[2] = pz;
-      s[3] = Math.sin(psi) * V + this._wx; s[4] = this._wy; s[5] = -Math.cos(psi) * V + this._wz;
+      s[3] = Math.sin(psi) * Math.cos(gam) * V + this._wx; s[4] = Math.sin(gam) * V + this._wy; s[5] = -Math.cos(psi) * Math.cos(gam) * V + this._wz;
       s[6] = cy * sp; s[7] = cp * sy; s[8] = -sy * sp; s[9] = cy * cp;
       s[10] = 0; s[11] = 0; s[12] = 0;
       this.elevatorTrim = de; this.elevator = de; this.aileron = 0; this.rudder = 0;
@@ -374,7 +454,7 @@
       // trim report: limited = speed outside the trimmable range (alpha at a stall bound, surface or throttle clamped)
       this.trimAlpha = alpha;
       this.trimLimited = alpha >= p.alphaStall || alpha <= p.alphaStallNeg || de !== deOf(alpha)
-        || T > this._thrustAt(rho, 1, 0) * 1.0001;
+        || T > this._thrustAt(rho, 1, 0) * 1.0001 || T < 0;
       this._deriv(s, this._k[0], true);
       this._publish();
     }
@@ -419,7 +499,7 @@
       this.omega.set(s[10], s[11], s[12]);
       this.rollRate = -s[12]; this.pitchRate = s[10]; this.yawRate = -s[11];
       this.ias = this.tas * Math.sqrt(this.rho / RHO0);
-      this.vs = s[4];
+      this.vs = s[4]; this.groundSpeed = Math.sqrt(s[3] * s[3] + s[5] * s[5]);
       this.stalled = this.alpha > p.alphaStall || this.alpha < p.alphaStallNeg;
       const qx = s[6], qy = s[7], qz = s[8], qw = s[9];
       rot(qx, qy, qz, qw, 0, 0, -1);                       // nose direction

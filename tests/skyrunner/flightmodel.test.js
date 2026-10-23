@@ -1,4 +1,4 @@
-// flightmodel.test.js - deterministic Node checks for app/static/skyrunner/flightmodel.js.  Run: node tests/skyrunner/flightmodel.test.js
+// flightmodel.test.js - deterministic Node checks for ../flightmodel.js.  Run: node test/flightmodel.test.js (or npm test)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -284,6 +284,88 @@ for (const [speed, alt] of [[110, 500], [140, 6000], [250, 8000], [300, 0], [340
   });
   report('14 g-limiter, 120 s random pitch/roll/throttle/AB, no rudder (SAS on)', ok && gHi <= 9.5 && gLo >= -4,
     `g ${f2(gLo)}..${f2(gHi)} (limits +9/-3)`);
+}
+
+// ---------------------------------------------------------------- landing gear (flat ground at y = 0)
+function onGround(opts) {
+  const fm = new FlightModel(); fm.groundHeight = () => 0;
+  fm.reset(Object.assign({ pos: new Vector3(0, 1.85, 0), speed: 1, gear: true }, opts || {}));
+  fm.q.set(0, 0, 0, 1); fm.omega.set(0, 0, 0); fm.vel.set(0, 0, 0); fm.setControls({ throttle: 0 });
+  return fm;
+}
+
+// 15. parked: settles on all three struts, level, still, accelerometer reads 1 g
+{
+  const fm = onGround();
+  fm.pos.set(0, 2.3, 0);   // drop from 0.5 m above the uncompressed struts
+  let ok = true, late = 0;
+  run(fm, 10, (f, t) => { if (!finiteState(f)) { ok = false; return false; } if (t > 5) late = Math.max(late, f.vel.length(), f.omega.length()); });
+  const c = Array.from(fm.gearComp);
+  report('15 parked on the gear: settles level and still', ok && fm.wow === 3 && late < 0.01 && c.every((x) => x > 0.1 && x < 0.3) &&
+    Math.abs(fm.pitch) < 1 * DEG && Math.abs(fm.bank) < 0.1 * DEG && Math.abs(fm.nz - 1) < 0.02,
+    `CG ${f3(fm.pos.y)} m, compression ${c.map(f3).join('/')} m, pitch ${f2(fm.pitch * R2D)} deg, nz ${f3(fm.nz)}, max |v|,|w| after 5 s ${late.toExponential(1)}`);
+}
+
+// 16. touchdown at 75 m/s: mains first, no bounce, struts within stroke, for gentle to hard sink rates
+for (const sink of [0.6, 3]) {
+  const fm = new FlightModel(); fm.groundHeight = () => 0;
+  fm.reset({ pos: new Vector3(0, 2.3 + sink, 0), heading: 90 * DEG, speed: 75, gamma: -Math.asin(sink / 75), gear: true });
+  fm.setControls({ throttle: 0 });
+  let ok = true, first = '', comp = 0, bounces = 0, last = 0, vsTd = 0, prev = 0;
+  run(fm, 10, (f) => {
+    if (!finiteState(f)) { ok = false; return false; }
+    if (f.wow && !first) { first = Array.from(f.gearComp).map((x) => (x > 0 ? 1 : 0)).join(''); vsTd = prev; }
+    if (first && last && !f.wow) bounces++;
+    last = f.wow; prev = f.vs; comp = Math.max(comp, f.gearComp[0], f.gearComp[1], f.gearComp[2]);
+  });
+  report(`16 touchdown at 75 m/s, sink ${sink} m/s`, ok && first === '011' && bounces === 0 && comp < fm.params.gearStroke && fm.wow === 3,
+    `sink at contact ${f2(-vsTd)} m/s, first contact (nose/L/R) ${first}, max compression ${f3(comp)} m, bounces ${bounces}, ` +
+    `after 10 s: ${f1(fm.groundSpeed)} m/s, pitch ${f1(fm.pitch * R2D)} deg`);
+}
+
+// 17. ground roll hands-off tracks straight; brakes stop it; at rest it stays finite and still (V -> 0)
+{
+  const fm = onGround(); fm.vel.set(0, 0, -60);
+  let ok = true;
+  run(fm, 10, (f) => { if (!finiteState(f)) { ok = false; return false; } });
+  const drift = Math.abs(fm.pos.x), dpsi = Math.abs(wrapPi(fm.heading));
+  const v10 = fm.groundSpeed, z10 = fm.pos.z;
+  fm.setControls({ brake: 1 });
+  let tStop = -1;
+  run(fm, 30, (f, t) => { if (!finiteState(f)) { ok = false; return false; } if (tStop < 0 && f.groundSpeed < 0.3) tStop = t; });
+  const stopDist = z10 - fm.pos.z;
+  report('17 hands-off ground roll, then full brakes', ok && drift < 0.5 && dpsi < 0.5 * DEG && v10 > 50 && tStop > 0 && stopDist < 700 &&
+    fm.groundSpeed < 0.05 && fm.wow === 3,
+    `10 s roll from 60 m/s: ${f1(v10)} m/s, lateral drift ${f3(drift)} m, heading change ${f3(dpsi * R2D)} deg; ` +
+    `braking stop in ${f1(tStop)} s over ${stopDist.toFixed(0)} m, final ${fm.groundSpeed.toExponential(1)} m/s`);
+}
+
+// 18. nose-wheel steering turns the right way; no retraction with weight on wheels; gear drag costs thrust
+{
+  const fm = onGround(); fm.setControls({ throttle: 0.3, yaw: 1, gear: false });
+  let ok = true, turned = 0, hd = fm.heading, wowMin = 3, bankMax = 0;
+  run(fm, 8, (f, t) => {
+    if (!finiteState(f)) { ok = false; return false; }
+    turned += wrapPi(f.heading - hd); hd = f.heading;
+    if (t > 0.5) { wowMin = Math.min(wowMin, f.wow); bankMax = Math.max(bankMax, Math.abs(f.bank)); }
+  });
+  const up = trimmed({ pos: new Vector3(0, 500, 0), speed: 110 }), dn = trimmed({ pos: new Vector3(0, 500, 0), speed: 110, gear: true });
+  report('18 nose-wheel steering, WOW interlock, gear drag', ok && turned > 20 * DEG && fm.gearPos === 1 && wowMin === 3 &&
+    bankMax < 8 * DEG && dn.controls.throttle > up.controls.throttle * 1.2,
+    `pedal right 8 s at taxi power: heading +${f1(turned * R2D)} deg at ${f1(fm.groundSpeed)} m/s, all wheels down ${wowMin === 3}, ` +
+    `max bank ${f2(bankMax * R2D)} deg, gear ${fm.gearPos} (up commanded); ` +
+    `trim throttle @110 m/s gear up ${f3(up.controls.throttle)} / down ${f3(dn.controls.throttle)}`);
+}
+
+// 19. reset with a flight path angle: trimmed on a 3 deg glide path, gear down, at approach speed
+{
+  const fm = trimmed({ pos: new Vector3(0, 400, 0), heading: 90 * DEG, speed: 85, gamma: -3 * DEG, gear: true });
+  const y0 = fm.pos.y, expect = -10 * 85 * Math.sin(3 * DEG);
+  let ok = true, dv = 0;
+  run(fm, 10, (f) => { if (!finiteState(f)) { ok = false; return false; } dv = Math.max(dv, Math.abs(f.tas - 85)); });
+  report('19 trim on a -3 deg glide path, gear down, 85 m/s', ok && !fm.trimLimited && Math.abs(fm.pos.y - y0 - expect) < 3 && dv < 2,
+    `alpha ${f2(fm.trimAlpha * R2D)} deg, throttle ${f3(fm.controls.throttle)}, 10 s height change ${f1(fm.pos.y - y0)} m ` +
+    `(glide path ${f1(expect)} m), max |dTAS| ${f2(dv)} m/s`);
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nALL CHECKS PASSED');

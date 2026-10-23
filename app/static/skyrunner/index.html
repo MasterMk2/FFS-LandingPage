@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sunset Skyrunner — FFS</title>
-<meta name="description" content="夕焼けの低ポリ世界を6自由度の飛行力学で飛び、リングをくぐるブラウザ・フライトゲーム。">
+<meta name="description" content="夕焼けの低ポリ世界を6自由度の飛行力学で飛ぶブラウザ・フライトゲーム。リング、パイロンのエアレース、島の滑走路への着陸。">
 </head>
 <body>
 <style>
@@ -43,7 +43,17 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
 .go:hover{background:#ffc470}
 .touchnote{font-size:13px;color:var(--fg-dim);margin:10px 0 0}
 .touchnote a{color:var(--accent)}
-#msg{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16%);transform:translateX(-50%);font-family:var(--font-mono);font-size:clamp(16px,3vw,24px);letter-spacing:.2em;color:var(--accent);text-align:center;pointer-events:none;opacity:0;transition:opacity .25s;text-shadow:0 0 12px rgba(255,179,71,.6);white-space:nowrap}
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 6px}
+.mode{display:flex;flex-direction:column;gap:6px;text-align:left;font-family:var(--font-display);color:var(--fg);background:rgba(230,238,252,.05);border:1px solid var(--line);border-radius:5px;padding:12px 12px 10px;cursor:pointer;min-width:0}
+.mode:hover{border-color:var(--accent);background:rgba(255,179,71,.08)}
+.mode:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mode b{font-size:19px;font-weight:700;letter-spacing:.04em;color:var(--accent)}
+.mode span{font-size:13px;line-height:1.5;color:var(--fg-dim)}
+.mode em{font-style:normal;font-family:var(--font-mono);font-size:12px;color:var(--fg);margin-top:auto;font-variant-numeric:tabular-nums}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.go.alt{background:transparent;color:var(--fg);border-color:var(--line)}
+.go.alt:hover{background:transparent;border-color:var(--accent)}
+#msg{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16%);transform:translateX(-50%);font-family:var(--font-mono);font-size:clamp(16px,3vw,24px);letter-spacing:.2em;color:var(--accent);text-align:center;pointer-events:none;opacity:0;transition:opacity .25s;text-shadow:0 0 12px rgba(255,179,71,.6);width:max-content;max-width:calc(100vw - 32px);text-wrap:balance}
 #msg.show{opacity:1}
 #result{display:none}
 #result.show{display:grid}
@@ -55,23 +65,23 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
 .zones span{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-family:var(--font-mono);font-size:11px;letter-spacing:.18em;color:var(--hud-dim)}
 .zones .l{left:max(16px,env(safe-area-inset-left,0px))}
 .zones .r{right:max(16px,env(safe-area-inset-right,0px))}
-@media (max-width:520px){ .card{padding:20px} .keys{font-size:13px} .btns button kbd{display:none} .stats b{font-size:22px} }
+@media (max-width:620px){ .modes{grid-template-columns:1fr} .chip{max-width:calc(45vw - 16px);flex-direction:column;gap:2px} .btns{max-width:calc(55vw - 24px)} }
+@media (max-width:520px){ .card{padding:20px} .keys{font-size:13px} .btns button kbd{display:none} .stats b{font-size:clamp(16px,4.6vw,22px)} .row{grid-template-columns:1fr} }
 @media (prefers-reduced-motion:reduce){ #msg{transition:none} }
 </style>
 
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 
-<div class="chip" id="chip" hidden>
-  <span>GATES <b id="cGates">0</b></span>
-  <span>TIME <b id="cTime">00:00</b></span>
-  <span>BEST <b id="cBest">0</b></span>
-</div>
+<div class="chip" id="chip" hidden></div><!-- filled per mode by game.js -->
 <div class="btns" id="btns" hidden>
+  <button type="button" id="bGear" hidden>脚<kbd>G</kbd></button>
+  <button type="button" id="bBrake" hidden>ブレーキ<kbd>B</kbd></button>
   <button type="button" id="bView">視点<kbd>V</kbd></button>
   <button type="button" id="bTime">時刻<kbd>T</kbd></button>
   <button type="button" id="bMute">音<kbd>M</kbd></button>
   <button type="button" id="bReset">やり直す<kbd>R</kbd></button>
+  <button type="button" id="bMenuTop">メニュー<kbd>Esc</kbd></button>
 </div>
 <div class="zones" id="zones" hidden><span class="l">左半分: スティック</span><span class="r">右半分: 上下でスロットル</span></div>
 <div id="msg"></div>
@@ -79,35 +89,47 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
 <div id="overlay">
   <div class="card" id="start">
     <h1><small>LOW-POLY FLIGHT</small>Sunset Skyrunner</h1>
-    <p>夕焼けの無限に続く山と海の上を、ジェットで飛びます。前方に浮かぶリングを順番にくぐるタイムアタック。地面に当たると墜落です。</p>
+    <p>夕焼けの無限に続く山と海の上を、ジェットで飛びます。地面や海に当たると墜落です。モードを選んでください。</p>
+    <div class="modes">
+      <button type="button" class="mode" data-mode="ring"><b>リング・ラン</b><span>前方に次々と現れるリングを順番にくぐる。外さずにどこまで行けるか。</span><em id="bestRing">BEST 0</em></button>
+      <button type="button" class="mode" data-mode="race"><b>エアレース</b><span>海峡に立つパイロン 9 ゲートを 1 周するタイムアタック。ゲート外・高すぎ・接触は +3 秒、大きく外したら戻ってくぐり直し。</span><em id="bestRace">BEST --</em></button>
+      <button type="button" class="mode" data-mode="land"><b>着陸</b><span>6 km 手前の進入コースから、人工島の滑走路 09 へ。接地の柔らかさと正確さで採点。</span><em id="bestLand">BEST --</em></button>
+    </div>
     <div class="keys">
       <kbd>↑ ↓ / W S</kbd><div>操縦桿 前後（↓で機首上げ。飛行機の流儀）</div>
       <kbd>← → / A D</kbd><div>ロール</div>
       <kbd>Q E</kbd><div>ラダー</div>
       <kbd>Shift / Z</kbd><div>スロットル 上げ / 下げ（PageUp / PageDown でも可）</div>
       <kbd>Space</kbd><div>アフターバーナー（押している間）</div>
+      <kbd>G</kbd><div>脚（ギア）の上げ下げ。着陸モードは脚を下ろした状態で始まります</div>
+      <kbd>B</kbd><div>ブレーキ（押している間。地上はホイールブレーキ、空中はスピードブレーキ）。地上では Q E で前輪ステア</div>
       <kbd>V</kbd><div>HUD視点 ⇄ 外部視点</div>
       <kbd>T</kbd><div>時刻を切り替え（夕焼け・昼・夜）</div>
       <kbd>M / R / P</kbd><div>音 / やり直す / 一時停止</div>
+      <kbd>Esc</kbd><div>モード選択に戻る</div>
     </div>
-    <button type="button" class="go" id="bGo">離陸する</button>
-    <p class="touchnote">スマホでは画面左半分をドラッグで操縦、右半分を上下ドラッグでスロットルです。</p>
+    <p class="touchnote">スマホでは画面左半分をドラッグで操縦、右半分を上下ドラッグでスロットルです。着陸モードでは右上に脚とブレーキのボタンが出ます。</p>
     <p class="touchnote"><a href="/">← freedomflight.jp に戻る</a></p>
   </div>
   <div class="card" id="result">
-    <h1><small>CRASHED</small>墜落</h1>
+    <h1><small id="rKicker">CRASHED</small><span id="rTitle">墜落</span></h1>
     <div class="stats">
-      <div><b id="rGates">0</b><span>GATES</span></div>
-      <div><b id="rTime">00:00</b><span>TIME</span></div>
-      <div><b id="rBest">0</b><span>BEST</span></div>
+      <div><b id="rV0">0</b><span id="rL0">GATES</span></div>
+      <div><b id="rV1">00:00</b><span id="rL1">TIME</span></div>
+      <div><b id="rV2">0</b><span id="rL2">BEST</span></div>
     </div>
-    <p id="rNote">同じ場所の上空に戻って、リングも新しく配置されます。</p>
-    <button type="button" class="go" id="bAgain">もう一度飛ぶ</button>
+    <p id="rNote"></p>
+    <div class="row">
+      <button type="button" class="go" id="bAgain">もう一度飛ぶ</button>
+      <button type="button" class="go alt" id="bMenu">モード選択</button>
+    </div>
   </div>
 </div>
 
 <script src="/static/skyrunner/three.min.js?v=r128"></script>
-<script src="/static/skyrunner/flightmodel.js?v=1"></script>
-<script src="/static/skyrunner/game.js?v=1"></script>
+<script src="/static/skyrunner/world.js?v=1"></script>
+<script src="/static/skyrunner/flightmodel.js?v=2"></script>
+<script src="/static/skyrunner/aircraft.js?v=1"></script>
+<script src="/static/skyrunner/game.js?v=2"></script>
 </body>
 </html>

@@ -27,7 +27,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://freedomflight.jp/status` | サーバ状況 + Server Load 時系列 |
 | `https://freedomflight.jp/leaderboard` | 月次リーダーボード |
 | `https://freedomflight.jp/tracks` | DCS リプレイ (.trk) 一覧 + ダウンロード |
-| `https://freedomflight.jp/skyrunner` | Sunset Skyrunner — ブラウザ・フライトゲーム (6 自由度の飛行力学 + HUD)。`app/static/skyrunner/` の静的 1 ページを FastAPI が返す。飛行力学は `tests/skyrunner/flightmodel.test.js` (`node` で実行) で検証 |
+| `https://freedomflight.jp/skyrunner` | Sunset Skyrunner — ブラウザ・フライトゲーム (6 自由度の飛行力学 + HUD)。モードはリング・ラン / エアレース (パイロン) / 着陸。`app/static/skyrunner/` の静的 1 ページを FastAPI が返す (`world.js` が地形・島の飛行場・レースコース、`aircraft.js` が自機の機体モデル)。飛行力学は `tests/skyrunner/flightmodel.test.js`、飛行場・コース・着陸は `tests/skyrunner/world.test.js` (どちらも `node` で実行) で検証 |
 | `https://freedomflight.jp/gca/` | Web GCA 管制卓 — 実体は姉妹 repo [DCSWebGCA](https://github.com/MasterMk2/DCSWebGCA) のコンテナ (`ffs-dcs-web-gca:8080`)。サブドメインではなく `handle_path /gca/*` で出しているので DNS 追加不要。WebSocket も同経路 |
 | `https://line.iyakusai.com/webhook` | 医薬祭 公式LINE の Webhook 受け口 (LAN 内の別ホストへ転送、他のパスは 404)。`iyakusai.com` 本体は別ホストで配信していて、この Caddy には届かない |
 | `https://sneaker.freedomflight.jp/` | Sneaker (Live Map) — 実体は姉妹 repo コンテナ |

@@ -178,6 +178,23 @@
     {% endif %}
     <span class="home-card-cta">{{ t('cta_open_dsv') }}</span>
   </a>
+  <a class="home-card" href="/dcs-mission-studio/{% if lang == 'en' %}en/{% endif %}">
+    <h3>{{ t('home_card_dms_title') }}</h3>
+    {% if lang == 'ja' %}
+    <p>
+      既存のミッション（.miz）を開いて、グループ・ゾーン・天候・トリガーの文言・無線・AI タスクなどを編集し、
+      <strong>原本を残したまま別名で保存</strong>する Windows アプリ。Lua は実行しません。
+      開発中のアルファ版です。編集したミッションは DCS の Mission Editor で確認してから使ってください。
+    </p>
+    {% else %}
+    <p>
+      A Windows app that opens an existing mission (.miz), edits groups, zones, weather, trigger texts, radios, AI tasks and more,
+      and <strong>saves under a new name, keeping the original</strong>. It never runs Lua.
+      Alpha under development; check edited missions in the DCS Mission Editor before use. The interface is in Japanese.
+    </p>
+    {% endif %}
+    <span class="home-card-cta">{{ t('cta_open_dms') }}</span>
+  </a>
   <a class="home-card" href="/skyrunner">
     <h3>{{ t('home_card_skyrunner_title') }}</h3>
     {% if lang == 'ja' %}

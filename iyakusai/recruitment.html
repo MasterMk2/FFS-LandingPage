@@ -100,10 +100,12 @@
       list-style: none;
       display: flex;
       gap: 0.4rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .nav-tabs a {
       display: inline-block;
-      min-width: 6.2em;
+      min-width: 5.4em;
       text-align: center;
       font-size: 0.9rem;
       font-weight: 500;
@@ -554,6 +556,36 @@
       background: var(--c-surface-soft);
       margin-top: 3rem;
     }
+    /* ─── Footer SNS row ─── */
+    .footer-sns {
+      display: inline-flex;
+      gap: 10px;
+      margin-bottom: 1.2rem;
+    }
+    .footer-sns-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      color: #fff;
+      text-decoration: none;
+      transition: transform 0.2s, box-shadow 0.2s;
+      font-weight: 900;
+    }
+    .footer-sns-icon.ig {
+      background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%);
+    }
+    .footer-sns-icon.x {
+      background: #0f1419;
+      font-family: var(--font-display);
+    }
+    .footer-sns-icon:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 14px rgba(80, 100, 50, 0.2);
+    }
     footer .footer-logo {
       font-family: var(--font-display);
       font-weight: 900;
@@ -567,7 +599,7 @@
       .top-nav { padding: 0.7rem 1rem; }
       .nav-logo { font-size: 0.85rem; }
       .nav-tabs { gap: 0.2rem; }
-      .nav-tabs a { font-size: 0.78rem; padding: 0.4rem 0.7rem; }
+      .nav-tabs a { font-size: 0.78rem; padding: 0.35rem 0.6rem; min-width: 0; }
       .page-header { padding: 3rem 1.5rem 1.5rem; }
       .section { padding: 2rem 1.5rem; }
       .greeting-card { padding: 1.6rem 1.5rem; }
@@ -581,14 +613,16 @@
 
   <!-- Top nav -->
   <nav class="top-nav">
-    <a class="nav-logo" href="/">
+    <a class="nav-logo" href="index.html">
       <span class="nav-leaf"></span>
       IYAKUSAI 2026
     </a>
     <ul class="nav-tabs">
-      <li><a href="/">ホーム</a></li>
-      <li><a href="/recruitment.html" class="active">新歓募集</a></li>
-      <li><a href="/exhibitor-briefing.html">出展説明会</a></li>
+      <li><a href="index.html">ホーム</a></li>
+      <li><a href="recruitment.html" class="active">新歓募集</a></li>
+      <li><a href="exhibitor-briefing.html">出展説明会</a></li>
+      <li><a href="sponsorship.html">ご協賛</a></li>
+      <li><a href="contact.html">お問い合わせ</a></li>
     </ul>
   </nav>
 
@@ -613,6 +647,11 @@
     <section class="section">
       <div class="section-label">Message</div>
       <h2 class="section-heading">新入生の皆さんへ</h2>
+      <div class="lead-card">
+        <h3>🌱 委員はいつでも募集中です！</h3>
+        <p>5月10日の新歓会＆説明会は<strong>終了しました</strong>。ご参加いただいた皆さん、ありがとうございました！<br>
+        医薬祭実行委員会では、<strong>年間を通じて新しいメンバーを募集しています。</strong>「今からでも参加したい」「まずは話を聞いてみたい」という方は、下の連絡先や公式SNSまでお気軽にご連絡ください。学年・学部は問いません。</p>
+      </div>
       <div class="greeting-card">
         <div class="greeting-meta">
           <span class="greeting-tag">FROM</span>
@@ -622,7 +661,7 @@
           <p>新入生の皆さん、こんにちは！<br>医薬祭実行委員会 総務部です。</p>
           <p>まずは皆さん！<br>数あるサークルの中から医薬祭実行委員会を候補に入れて下さってありがとうございます！<br>医薬祭実行委員会は、メンバーそれぞれの「頑張りたい！」という気持ちを大切にしている組織です。</p>
           <p>「ガッツリ運営に携わりたい！」という方も、「自分のペースで楽しく手伝いたい！」という方も、<strong>大歓迎です！！</strong></p>
-          <p>……さて、そうは言っても具体的な活動内容や雰囲気など、分からない点も多いかと思います。そこで、親睦を深めるためにも<strong>新歓会 兼 説明会</strong>を行いたいと思います！<br>みんなでご飯を囲んで、楽しく交流しましょう！<br>一人でも友達と一緒でもOK！皆さんに会えるのを楽しみにしています。</p>
+          <p>……さて、そうは言っても具体的な活動内容や雰囲気など、分からない点も多いかと思います。委員会の様子や活動内容は、<strong>いつでもお問い合わせや公式SNSでお伝えできます。</strong><br>一人でも友達と一緒でもOK！少しでも興味があれば気軽にのぞいてみてください。皆さんとご一緒できるのを楽しみにしています。</p>
         </div>
       </div>
     </section>
@@ -630,9 +669,10 @@
     <!-- イベント詳細 -->
     <section class="section">
       <div class="section-label">Event</div>
-      <h2 class="section-heading">新歓会＆説明会</h2>
+      <h2 class="section-heading">【終了】新歓会＆説明会（5/10）</h2>
       <p class="section-body">
-        以下の日程で開催します。<strong>飲食付き・参加無料</strong>、手ぶらでお越しください。
+        こちらのイベントは <strong>終了しました</strong>。たくさんのご参加ありがとうございました。<br>
+        （以下は開催時のご案内です）
       </p>
 
       <div class="detail-grid">
@@ -670,16 +710,17 @@
 
     <!-- 申込 CTA -->
     <section class="section">
-      <div class="section-label">Application</div>
-      <h2 class="section-heading">参加申込フォーム</h2>
+      <div class="section-label">Join us</div>
+      <h2 class="section-heading">委員会に参加したい方へ</h2>
       <p class="section-body">
-        参加を希望される方は、以下のフォームから情報の入力をお願いします。
+        医薬祭実行委員会は<strong>通年でメンバーを募集中</strong>です。<br>
+        「話だけ聞いてみたい」「見学したい」でも大歓迎。以下の連絡先や公式SNSのDMからお気軽にご連絡ください。
       </p>
       <div class="cta-card">
-        <h3>医学薬学祭2026 新歓申し込みフォーム</h3>
-        <p>Google フォームが新しいタブで開きます</p>
-        <a class="cta-button" href="https://docs.google.com/forms/d/e/1FAIpQLScCq813d02qSc101mesxMkp6d73FpEM2yC8ehtsrIqjYSCAxg/viewform?usp=publish-editor" target="_blank" rel="noopener">
-          フォームを開く
+        <h3>入会・見学のお問い合わせ</h3>
+        <p>電話・Email の連絡先をご案内しています。SNSのDMでもOKです。</p>
+        <a class="cta-button" href="contact.html">
+          お問い合わせページへ
           <span class="arrow">→</span>
         </a>
       </div>
@@ -688,9 +729,9 @@
     <!-- ポスター -->
     <section class="section">
       <div class="section-label">Poster</div>
-      <h2 class="section-heading">告知ポスター</h2>
+      <h2 class="section-heading">参考：新歓ポスター</h2>
       <p class="section-body">
-        画像をクリックすると拡大表示されます。SNSでのシェア・印刷もお気軽にどうぞ。
+        5月の新歓イベントで使用したポスターです。委員会の雰囲気の参考にご覧ください。画像をクリックすると拡大表示されます。
       </p>
 
       <div class="poster-grid">
@@ -715,55 +756,11 @@
       </div>
     </section>
 
-    <!-- Contact -->
-    <section class="section">
-      <div class="section-label">Contact</div>
-      <h2 class="section-heading">本件に関する連絡先</h2>
-      <p class="section-body">
-        ご質問・お問合せは以下までお気軽にご連絡ください。
-      </p>
-
-      <div class="contact-grid">
-        <div class="contact-card">
-          <div class="contact-icon">📞</div>
-          <div class="contact-label">電話番号</div>
-          <div class="contact-value">
-            <a href="tel:080-7806-3171">080-7806-3171</a>
-          </div>
-        </div>
-        <div class="contact-card">
-          <div class="contact-icon">✉️</div>
-          <div class="contact-label">団体代表 Email</div>
-          <div class="contact-value">
-            <a href="mailto:contact@iyakusai.jp">contact@iyakusai.jp</a>
-          </div>
-        </div>
-        <div class="contact-card">
-          <div class="contact-icon">📷</div>
-          <div class="contact-label">Instagram</div>
-          <div class="contact-value">
-            <a href="https://www.instagram.com/iyakusai/" target="_blank" rel="noopener">@iyakusai</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="org-block">
-        <div>
-          <div class="contact-label">組織名</div>
-          <div class="contact-value">富山大学 医学薬学祭実行委員会</div>
-        </div>
-        <div>
-          <div class="contact-label">担当</div>
-          <div class="contact-value">総務部</div>
-        </div>
-        <div>
-          <div class="contact-label">所在地</div>
-          <div class="contact-value">〒930-0194<br>富山市杉谷2630番地<br>富山大学杉谷キャンパス</div>
-        </div>
-      </div>
-    </section>
-
     <footer>
+      <div class="footer-sns">
+        <a class="footer-sns-icon ig" href="https://www.instagram.com/iyakusai/" target="_blank" rel="noopener" aria-label="Instagram">📷</a>
+        <a class="footer-sns-icon x" href="https://x.com/iyakusai" target="_blank" rel="noopener" aria-label="X (Twitter)">𝕏</a>
+      </div>
       <div class="footer-logo">IYAKUSAI 2026</div>
       <p>© 2026 富山大学 医学薬学祭実行委員会</p>
     </footer>

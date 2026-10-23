@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HP掲載アイコン サイズ確認 - 協賛 - 医薬祭2026 - 富山大学</title>
+<style>
+
+  /* ─────────────────────────────────────────────────────────
+     ページ枠（サイト共通のナビ / フッター）
+     ※ 外部フォント・外部CSS/JS は使用しない方針のため、
+        すべてシステムフォント + インラインスタイルで完結させる。
+        アイコンサイズ確認ウィジェット本体は下の
+        .iyakusai-sponsor-preview スコープ内に閉じている。
+     ───────────────────────────────────────────────────────── */
+  body{
+    margin:0;
+    background:#faf6ec;
+    color:#111111;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Arial, sans-serif;
+  }
+
+  .isp-top-nav{
+    position:sticky;
+    top:0;
+    z-index:20;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 24px;
+    background:#faf6ec;
+    border-bottom:1px solid #ece1c4;
+  }
+  .isp-nav-logo{
+    font-weight:800;
+    font-size:15px;
+    letter-spacing:0.06em;
+    color:#3a4a31;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    white-space:nowrap;
+  }
+  .isp-nav-leaf{
+    display:inline-block;
+    width:14px;height:14px;
+    background:#4CAF50;
+    border-radius:50% 0 50% 50%;
+    transform:rotate(-25deg);
+  }
+  .isp-nav-tabs{
+    list-style:none;margin:0;padding:0;
+    display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;
+  }
+  .isp-nav-tabs a{
+    display:inline-block;
+    font-size:13px;font-weight:500;
+    color:#5b6b50;text-decoration:none;
+    padding:7px 14px;border-radius:999px;
+    transition:color .2s, background .2s;
+  }
+  .isp-nav-tabs a:hover{color:#2E7D32;background:#e8f3e1;}
+  .isp-nav-tabs a.isp-active-tab{
+    color:#fff;
+    background:#4CAF50;
+    box-shadow:0 4px 12px rgba(76,175,80,0.25);
+  }
+
+  .isp-site-footer{
+    text-align:center;
+    padding:32px 24px;
+    font-size:12px;
+    color:#87937a;
+    border-top:1px solid #ece1c4;
+    background:#faf6ec;
+  }
+  .isp-site-footer-sns{display:inline-flex;gap:10px;margin-bottom:14px;}
+  .isp-site-footer-sns a{
+    width:38px;height:38px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;
+    color:#fff;text-decoration:none;font-weight:800;
+    transition:transform .2s;
+  }
+  .isp-site-footer-sns a:hover{transform:translateY(-2px);}
+  .isp-site-footer-sns .ig{background:linear-gradient(135deg,#f58529 0%,#dd2a7b 50%,#8134af 100%);}
+  .isp-site-footer-sns .x{background:#0f1419;}
+  .isp-site-footer-logo{font-weight:800;font-size:15px;color:#3a4a31;margin-bottom:6px;letter-spacing:0.04em;}
+
+
+  /* ─────────────────────────────────────────────────────────
+     アイコンサイズ確認ウィジェット本体（.iyakusai-sponsor-preview スコープ）
+     元の isp- 接頭辞・スコープ設計を維持。
+     ───────────────────────────────────────────────────────── */
+  .iyakusai-sponsor-preview,
+  .iyakusai-sponsor-preview *{
+    box-sizing:border-box;
+  }
+  .iyakusai-sponsor-preview{
+    margin:0;
+    padding:0;
+    background:#ffffff;
+    color:#111111;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Arial, sans-serif;
+    line-height:1.6;
+  }
+  .iyakusai-sponsor-preview .isp-wrap{max-width:960px; margin:0 auto; padding:0 20px;}
+  .iyakusai-sponsor-preview .isp-frame-outer{padding:0 20px; overflow-x:auto;} /* [3] 指定幅を実寸表示 → 横スクロールで確認 */
+  .iyakusai-sponsor-preview section{padding:40px 0; border-bottom:1px solid #ddd;}
+  .iyakusai-sponsor-preview section:last-child{border-bottom:none;}
+  .iyakusai-sponsor-preview h1{font-size:24px; margin:0 0 8px;}
+  .iyakusai-sponsor-preview h2{font-size:18px; margin:0 0 8px;}
+  .iyakusai-sponsor-preview p{color:#333; margin:0 0 20px;}
+  .iyakusai-sponsor-preview header{padding:32px 0; border-bottom:1px solid #ddd;}
+
+  .iyakusai-sponsor-preview .isp-compare-row{
+    display:flex;
+    align-items:flex-end;
+    gap:32px;
+    flex-wrap:wrap;
+  }
+  .iyakusai-sponsor-preview .isp-compare-item{display:flex; flex-direction:column; align-items:center; gap:8px;}
+  .iyakusai-sponsor-preview .isp-mark{
+    background:#f0f0f0;
+    border:1px solid #999;
+    display:flex;align-items:center;justify-content:center;
+    color:#555;
+    font-size:12px;
+  }
+  .iyakusai-sponsor-preview .isp-compare-item[data-tier="large"] .isp-mark{width:150px;height:150px;}
+  .iyakusai-sponsor-preview .isp-compare-item[data-tier="medium"] .isp-mark{width:104px;height:104px;}
+  .iyakusai-sponsor-preview .isp-compare-item[data-tier="small"] .isp-mark{width:66px;height:66px;}
+  .iyakusai-sponsor-preview .isp-compare-label{font-size:13px; text-align:center; color:#333;}
+
+  .iyakusai-sponsor-preview .isp-upload-panel{
+    display:flex;
+    gap:24px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+  }
+  /* [8] エラー文をドロップゾーンの外に出すための縦積みラッパ */
+  .iyakusai-sponsor-preview .isp-upload-col{
+    flex:1 1 240px;
+    min-width:240px;
+    display:flex;
+    flex-direction:column;
+  }
+  .iyakusai-sponsor-preview .isp-drop-zone{
+    border:1px dashed #999;
+    padding:24px;
+    text-align:center;
+    cursor:pointer;
+  }
+  .iyakusai-sponsor-preview .isp-drop-zone.isp-dragover{background:#f5f5f5;}
+  .iyakusai-sponsor-preview .isp-drop-zone input[type=file]{display:none;}
+  .iyakusai-sponsor-preview .isp-error-msg{
+    display:none;
+    margin-top:12px;
+    color:#b00020;
+    font-size:12.5px;
+  }
+  .iyakusai-sponsor-preview .isp-error-msg.isp-show{display:block;}
+  .iyakusai-sponsor-preview .isp-btn{
+    font-size:13px;
+    background:#fff;
+    border:1px solid #333;
+    color:#111;
+    padding:8px 16px;
+    cursor:pointer;
+  }
+  .iyakusai-sponsor-preview .isp-btn:hover{background:#eee;}
+  .iyakusai-sponsor-preview .isp-btn.isp-active{background:#111; color:#fff; border-color:#111;}
+
+  .iyakusai-sponsor-preview .isp-preview-side{flex:1 1 240px; min-width:240px;}
+  .iyakusai-sponsor-preview .isp-mini-row{display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:16px;}
+  .iyakusai-sponsor-preview .isp-mini-tile{
+    background:#ffffff;                 /* [2] 透過ロゴが背景に埋もれないよう白背景 */
+    border:1px solid #999;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+    color:#555;
+    font-size:13px;
+  }
+  .iyakusai-sponsor-preview .isp-mini-tile img{width:100%;height:100%;object-fit:contain;} /* [2] 切り抜かず全体表示 */
+  /* [1] 実寸プレビュー：ラベル表記(150/104/66px)と一致させる */
+  .iyakusai-sponsor-preview #isp-miniLarge{width:150px;height:150px;}
+  .iyakusai-sponsor-preview #isp-miniMedium{width:104px;height:104px;}
+  .iyakusai-sponsor-preview #isp-miniSmall{width:66px;height:66px;}
+  .iyakusai-sponsor-preview .isp-mini-col{display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .iyakusai-sponsor-preview .isp-mini-col-label{font-size:11px; color:#555;}
+
+  /* [5] 入稿スペック（フラットな枠線ベース・装飾控えめ） */
+  .iyakusai-sponsor-preview .isp-spec-note{
+    margin-top:24px;
+    border:1px solid #ccc;
+    padding:16px 18px;
+  }
+  .iyakusai-sponsor-preview .isp-spec-note h3{font-size:13px; font-weight:700; margin:0 0 10px; color:#111;}
+  .iyakusai-sponsor-preview .isp-spec-note dl{
+    margin:0;
+    display:grid;
+    grid-template-columns:max-content 1fr;
+    gap:8px 16px;
+  }
+  .iyakusai-sponsor-preview .isp-spec-note dt{font-size:12.5px; color:#555; white-space:nowrap;}
+  .iyakusai-sponsor-preview .isp-spec-note dd{margin:0; font-size:12.5px; color:#222; line-height:1.7;}
+
+  .iyakusai-sponsor-preview .isp-sim-controls{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; align-items:center;}
+  .iyakusai-sponsor-preview .isp-sim-controls span{font-size:12px; color:#555;}
+
+  .iyakusai-sponsor-preview .isp-viewport-frame{
+    border:1px solid #999;
+    margin:0 auto;
+    resize:horizontal;          /* 手動リサイズは維持 */
+    overflow:auto;
+  }                              /* [3] max-width:100% を除去し、指定 width を実寸維持 */
+  .iyakusai-sponsor-preview .isp-viewport-inner{padding:20px; background:#fff;}
+  .iyakusai-sponsor-preview .isp-vp-title{font-size:11px; color:#555; margin-bottom:14px; padding-bottom:8px; border-bottom:1px solid #ddd;}
+
+  .iyakusai-sponsor-preview .isp-sponsor-tier-block{margin-bottom:20px;}
+  .iyakusai-sponsor-preview .isp-sponsor-tier-block:last-child{margin-bottom:0;}
+  .iyakusai-sponsor-preview .isp-sponsor-tier-heading{font-size:12px; color:#555; margin-bottom:8px; display:flex; justify-content:space-between;}
+  .iyakusai-sponsor-preview .isp-sponsor-grid{display:grid; gap:10px;}
+  .iyakusai-sponsor-preview .isp-sponsor-grid.isp-tier-large{grid-template-columns:repeat(auto-fill,150px);}
+  .iyakusai-sponsor-preview .isp-sponsor-grid.isp-tier-medium{grid-template-columns:repeat(auto-fill,104px);}
+  .iyakusai-sponsor-preview .isp-sponsor-grid.isp-tier-small{grid-template-columns:repeat(auto-fill,66px);}
+
+  .iyakusai-sponsor-preview .isp-sponsor-cell{
+    background:#ffffff;                 /* [2] 透過ロゴが背景に埋もれないよう白背景 */
+    border:1px solid #ccc;
+    aspect-ratio:1/1;
+    display:flex;align-items:center;justify-content:center;
+    overflow:hidden;
+    color:#555;
+    font-size:10px;
+  }
+  .iyakusai-sponsor-preview .isp-sponsor-cell img{width:100%;height:100%;object-fit:contain;} /* [2] 切り抜かず全体表示 */
+  .iyakusai-sponsor-preview .isp-sponsor-cell.isp-is-you{border:2px solid #111;}
+
+  .iyakusai-sponsor-preview table.isp-spec-table{width:100%; border-collapse:collapse; font-size:14px;}
+  .iyakusai-sponsor-preview table.isp-spec-table th,
+  .iyakusai-sponsor-preview table.isp-spec-table td{border:1px solid #ccc; padding:10px 12px; text-align:left;}
+  .iyakusai-sponsor-preview table.isp-spec-table th{font-size:12px; color:#333; background:#f5f5f5;}
+
+  .iyakusai-sponsor-preview .isp-back-link{
+    display:inline-block;
+    border:1px solid #333;
+    padding:10px 20px;
+    font-size:13px;
+    color:#111;
+    text-decoration:none;
+    background:#fff;
+  }
+  .iyakusai-sponsor-preview .isp-back-link:hover{background:#eee;}
+
+  .iyakusai-sponsor-preview footer{padding:24px 0; color:#555; font-size:12px;}
+</style>
+</head>
+<body>
+
+<!-- ページ枠：サイト共通ナビ -->
+<nav class="isp-top-nav">
+  <a class="isp-nav-logo" href="index.html">
+    <span class="isp-nav-leaf"></span>
+    IYAKUSAI 2026
+  </a>
+  <ul class="isp-nav-tabs">
+    <li><a href="index.html">ホーム</a></li>
+    <li><a href="recruitment.html">新歓募集</a></li>
+    <li><a href="exhibitor-briefing.html">出展説明会</a></li>
+    <li><a href="sponsorship.html" class="isp-active-tab">ご協賛</a></li>
+    <li><a href="contact.html">お問い合わせ</a></li>
+  </ul>
+</nav>
+
+<div class="iyakusai-sponsor-preview">
+
+<header>
+  <div class="isp-wrap">
+    <h1>医薬祭協賛アイコン掲載サイズ確認</h1>
+    <p>ご協賛は一口1,000円単位で、10口で小サイズ、30口で中サイズ、50口で大サイズのアイコン掲載サイズを選択いただけます。アイコン画像をアップロードすると、実際の掲載サイズと他社アイコンと並んだ際の見え方を確認できます。</p>
+  </div>
+</header>
+
+<section id="isp-compare">
+  <div class="isp-wrap">
+    <h2>サイズ比較</h2>
+    <div class="isp-compare-row">
+      <div class="isp-compare-item" data-tier="large">
+        <div class="isp-mark">150 × 150px</div>
+        <div class="isp-compare-label">大サイズ<br>50口〜（¥50,000〜）</div>
+      </div>
+      <div class="isp-compare-item" data-tier="medium">
+        <div class="isp-mark">104 × 104px</div>
+        <div class="isp-compare-label">中サイズ<br>30口〜（¥30,000〜）</div>
+      </div>
+      <div class="isp-compare-item" data-tier="small">
+        <div class="isp-mark">66 × 66px</div>
+        <div class="isp-compare-label">小サイズ<br>10口〜（¥10,000〜）</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="isp-upload">
+  <div class="isp-wrap">
+    <h2>アイコンをアップロードして確認</h2>
+    <p>お手元のアイコン画像（PNG / JPG / SVG）をアップロードすると、大・中・小それぞれの掲載サイズでどのように表示されるかを、その場で確認できます。正方形に近い画像を推奨します。縦横比が異なる場合は、余白を追加して正方形の枠内に収めて表示されます。</p>
+
+    <div class="isp-upload-panel">
+      <div class="isp-upload-col">
+        <div class="isp-drop-zone" id="isp-dropZone">
+          <div>アイコン画像をドラッグ＆ドロップ<br>または</div>
+          <br>
+          <button class="isp-btn" type="button" id="isp-browseBtn">ファイルを選択</button>
+          <input type="file" id="isp-fileInput" accept="image/*">
+        </div>
+        <!-- [8] エラー文はドロップゾーンの外（クリックしてもダイアログが開かない） -->
+        <div class="isp-error-msg" id="isp-errorMsg" role="alert"></div>
+      </div>
+      <div class="isp-preview-side">
+        <div class="isp-mini-row">
+          <div class="isp-mini-col">
+            <div class="isp-mini-tile" id="isp-miniLarge">大</div>
+            <div class="isp-mini-col-label">大 / 150px</div>
+          </div>
+          <div class="isp-mini-col">
+            <div class="isp-mini-tile" id="isp-miniMedium">中</div>
+            <div class="isp-mini-col-label">中 / 104px</div>
+          </div>
+          <div class="isp-mini-col">
+            <div class="isp-mini-tile" id="isp-miniSmall">小</div>
+            <div class="isp-mini-col-label">小 / 66px</div>
+          </div>
+        </div>
+        <button class="isp-btn" id="isp-resetBtn" type="button">リセット</button>
+      </div>
+    </div>
+
+    <!-- [5] 入稿スペック -->
+    <div class="isp-spec-note">
+      <h3>入稿スペック（協賛企業のみなさまへ）</h3>
+      <dl>
+        <dt>推奨サイズ</dt>
+        <dd>300 × 300px 以上の正方形（掲載サイズの2倍以上を推奨。高解像度ディスプレイでもくっきり表示されます）</dd>
+        <dt>形式</dt>
+        <dd>PNG（背景透過可）/ JPG / SVG</dd>
+        <dt>表示</dt>
+        <dd>掲載時は、正方形の枠内に収まるよう縮小して表示されます</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section id="isp-simulate">
+  <div class="isp-wrap">
+    <h2>掲載ページのシミュレーション</h2>
+    <p>他社アイコンと並んだ状態での見え方と、画面幅による並び方の変化（レスポンシブ）を確認できます。枠の右下をドラッグする、またはブラウザ幅を変えることでも確認できます。</p>
+
+    <div class="isp-sim-controls">
+      <span>表示幅：</span>
+      <button class="isp-btn isp-active" data-w="1080">PC / 1080px</button>
+      <button class="isp-btn" data-w="720">タブレット / 720px</button>
+      <button class="isp-btn" data-w="375">スマートフォン / 375px</button>
+      <span id="isp-wLabel">1080px</span>
+    </div>
+  </div>
+
+  <div class="isp-frame-outer">
+    <div class="isp-viewport-frame" id="isp-vpFrame" style="width:1080px;">
+      <div class="isp-viewport-inner">
+        <div class="isp-vp-title">協賛企業一覧（サンプル）</div>
+
+        <div class="isp-sponsor-tier-block">
+          <div class="isp-sponsor-tier-heading"><span>大サイズ枠（50口〜）</span><span>150px基準</span></div>
+          <div class="isp-sponsor-grid isp-tier-large" id="isp-gridLarge"></div>
+        </div>
+
+        <div class="isp-sponsor-tier-block">
+          <div class="isp-sponsor-tier-heading"><span>中サイズ枠（30口〜）</span><span>104px基準</span></div>
+          <div class="isp-sponsor-grid isp-tier-medium" id="isp-gridMedium"></div>
+        </div>
+
+        <div class="isp-sponsor-tier-block">
+          <div class="isp-sponsor-tier-heading"><span>小サイズ枠（10口〜）</span><span>66px基準</span></div>
+          <div class="isp-sponsor-grid isp-tier-small" id="isp-gridSmall"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="isp-spec">
+  <div class="isp-wrap">
+    <h2>サイズ仕様表</h2>
+    <p>各プランにおける掲載サイズ・必要口数です。</p>
+
+    <table class="isp-spec-table">
+      <thead>
+        <tr>
+          <th>プラン</th>
+          <th>必要口数</th>
+          <th>目安ご協賛金額（1口1,000円）</th>
+          <th>アイコン掲載サイズ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>大サイズ</td>
+          <td>50口〜</td>
+          <td>¥50,000〜</td>
+          <td>150 × 150 px</td>
+        </tr>
+        <tr>
+          <td>中サイズ</td>
+          <td>30口〜</td>
+          <td>¥30,000〜</td>
+          <td>104 × 104 px</td>
+        </tr>
+        <tr>
+          <td>小サイズ</td>
+          <td>10口〜</td>
+          <td>¥10,000〜</td>
+          <td>66 × 66 px</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="isp-back">
+  <div class="isp-wrap">
+    <h2>ご協賛メニュー・お申し込みについて</h2>
+    <p>協賛プラン（口数・金額・特典）、申込方法・締切、お問い合わせ先は「ご協賛のお願い」ページに掲載しております。</p>
+    <a class="isp-back-link" href="sponsorship.html">ご協賛のご案内へ　→</a>
+  </div>
+</section>
+
+<footer>
+  <div class="isp-wrap">
+    本ページはアイコン掲載サイズの見え方をご確認いただくための確認用ページです。実際の金額・掲載枠数・レイアウトは協賛プランのご案内資料に準じます。
+  </div>
+</footer>
+
+</div><!-- /.iyakusai-sponsor-preview -->
+
+<!-- ページ枠：サイト共通フッター -->
+<footer class="isp-site-footer">
+  <div class="isp-site-footer-sns">
+    <a class="ig" href="https://www.instagram.com/iyakusai/" target="_blank" rel="noopener" aria-label="Instagram">📷</a>
+    <a class="x" href="https://x.com/iyakusai" target="_blank" rel="noopener" aria-label="X (Twitter)">𝕏</a>
+  </div>
+  <div class="isp-site-footer-logo">IYAKUSAI 2026</div>
+  <div>© 2026 富山大学 医学薬学祭実行委員会</div>
+</footer>
+
+<script>
+(function(){
+  const fileInput = document.getElementById('isp-fileInput');
+  const dropZone = document.getElementById('isp-dropZone');
+  const browseBtn = document.getElementById('isp-browseBtn');
+  const resetBtn = document.getElementById('isp-resetBtn');
+  const errorMsg = document.getElementById('isp-errorMsg');
+
+  const miniLarge = document.getElementById('isp-miniLarge');
+  const miniMedium = document.getElementById('isp-miniMedium');
+  const miniSmall = document.getElementById('isp-miniSmall');
+
+  const gridLarge = document.getElementById('isp-gridLarge');
+  const gridMedium = document.getElementById('isp-gridMedium');
+  const gridSmall = document.getElementById('isp-gridSmall');
+
+  const OTHER_COUNTS = { large: 4, medium: 7, small: 13 };
+
+  function buildPlaceholderGrids(){
+    fillGrid(gridLarge, OTHER_COUNTS.large);
+    fillGrid(gridMedium, OTHER_COUNTS.medium);
+    fillGrid(gridSmall, OTHER_COUNTS.small);
+  }
+
+  function fillGrid(container, count){
+    container.innerHTML = '';
+    for(let i=0;i<count;i++){
+      const cell = document.createElement('div');
+      cell.className = 'isp-sponsor-cell';
+      cell.textContent = 'A社';
+      container.appendChild(cell);
+    }
+    const you = document.createElement('div');
+    you.className = 'isp-sponsor-cell isp-is-you';
+    you.textContent = '貴社アイコン';
+    container.insertBefore(you, container.children[Math.min(1, container.children.length)]);
+  }
+
+  // [7] innerHTML 連結ではなく createElement で img を生成し src / alt をプロパティ設定
+  function makeImg(dataUrl, altText){
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.alt = altText;
+    return img;
+  }
+
+  function applyLogo(dataUrl){
+    [miniLarge, miniMedium, miniSmall].forEach(el=>{
+      el.textContent = '';
+      el.appendChild(makeImg(dataUrl, 'アップロードしたアイコン'));
+    });
+    document.querySelectorAll('.iyakusai-sponsor-preview .isp-sponsor-cell.isp-is-you').forEach(cell=>{
+      cell.textContent = '';
+      cell.appendChild(makeImg(dataUrl, '貴社アイコン'));
+    });
+  }
+
+  function showError(msg){
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('isp-show');
+  }
+
+  function clearError(){
+    errorMsg.textContent = '';
+    errorMsg.classList.remove('isp-show');
+  }
+
+  function resetLogo(){
+    miniLarge.textContent='大'; miniMedium.textContent='中'; miniSmall.textContent='小';
+    buildPlaceholderGrids();
+    fileInput.value = '';
+    clearError();
+  }
+
+  function handleFile(file){
+    if(!file){ return; }
+    if(!file.type.startsWith('image/')){
+      showError('画像ファイル（PNG / JPG / SVG など）を選択してください。「' + file.name + '」は対応していない形式です。');
+      fileInput.value = '';
+      return;
+    }
+    clearError();
+    const reader = new FileReader();
+    reader.onload = (e)=> applyLogo(e.target.result);
+    reader.readAsDataURL(file);
+    fileInput.value = ''; // [6] 同じファイルを選び直しても change が再発火するようクリア
+  }
+
+  browseBtn.addEventListener('click', ()=> fileInput.click());
+  dropZone.addEventListener('click', (e)=>{ if(e.target !== browseBtn) fileInput.click(); });
+  fileInput.addEventListener('change', (e)=> handleFile(e.target.files[0]));
+
+  ['dragenter','dragover'].forEach(evt=>{
+    dropZone.addEventListener(evt, (e)=>{ e.preventDefault(); dropZone.classList.add('isp-dragover'); });
+  });
+  ['dragleave','drop'].forEach(evt=>{
+    dropZone.addEventListener(evt, (e)=>{ e.preventDefault(); dropZone.classList.remove('isp-dragover'); });
+  });
+  dropZone.addEventListener('drop', (e)=>{
+    handleFile(e.dataTransfer.files[0]);
+  });
+
+  resetBtn.addEventListener('click', resetLogo);
+
+  const vpFrame = document.getElementById('isp-vpFrame');
+  const wLabel = document.getElementById('isp-wLabel');
+  document.querySelectorAll('.iyakusai-sponsor-preview .isp-sim-controls .isp-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.iyakusai-sponsor-preview .isp-sim-controls .isp-btn').forEach(b=>b.classList.remove('isp-active'));
+      btn.classList.add('isp-active');
+      const w = btn.dataset.w;
+      vpFrame.style.width = w + 'px';
+      wLabel.textContent = w + 'px';
+    });
+  });
+
+  buildPlaceholderGrids();
+})();
+</script>
+
+</body>
+</html>

@@ -77,6 +77,11 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
 <div class="btns" id="btns" hidden>
   <button type="button" id="bGear" hidden>脚<kbd>G</kbd></button>
   <button type="button" id="bBrake" hidden>ブレーキ<kbd>B</kbd></button>
+  <button type="button" id="bSmoke" hidden>スモーク<kbd>F</kbd></button>
+  <button type="button" id="bTrimDn" hidden aria-label="トリム 機首下げ">トリム▼<kbd>Y</kbd></button>
+  <button type="button" id="bTrimUp" hidden aria-label="トリム 機首上げ">トリム▲<kbd>H</kbd></button>
+  <button type="button" id="bTrimAuto" hidden>オートトリム<kbd>J</kbd></button>
+  <button type="button" id="bLook" hidden aria-label="次の目標を目で追う（押している間）">目標を見る<kbd>L</kbd></button>
   <button type="button" id="bView">視点<kbd>V</kbd></button>
   <button type="button" id="bTime">時刻<kbd>T</kbd></button>
   <button type="button" id="bMute">音<kbd>M</kbd></button>
@@ -92,7 +97,7 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
     <p>夕焼けの無限に続く山と海の上を、ジェットで飛びます。地面や海に当たると墜落です。モードを選んでください。</p>
     <div class="modes">
       <button type="button" class="mode" data-mode="ring"><b>リング・ラン</b><span>前方に次々と現れるリングを順番にくぐる。外さずにどこまで行けるか。</span><em id="bestRing">BEST 0</em></button>
-      <button type="button" class="mode" data-mode="race"><b>エアレース</b><span>海峡に立つパイロン 9 ゲートを 1 周するタイムアタック。ゲート外・高すぎ・接触は +3 秒、大きく外したら戻ってくぐり直し。</span><em id="bestRace">BEST --</em></button>
+      <button type="button" class="mode" data-mode="race"><b>エアレース</b><span>実際のレース規定（2019 年）で、プロペラのレース機を飛ばす 2 周のタイムアタック。25 m のパイロン、水平飛行ゲート、シケイン、縦旋回（VTM）、200 kt の進入制限と G 制限。</span><em id="bestRace">BEST --</em></button>
       <button type="button" class="mode" data-mode="land"><b>着陸</b><span>6 km 手前の進入コースから、人工島の滑走路 09 へ。接地の柔らかさと正確さで採点。</span><em id="bestLand">BEST --</em></button>
     </div>
     <div class="keys">
@@ -100,15 +105,20 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
       <kbd>← → / A D</kbd><div>ロール</div>
       <kbd>Q E</kbd><div>ラダー</div>
       <kbd>Shift / Z</kbd><div>スロットル 上げ / 下げ（PageUp / PageDown でも可）</div>
-      <kbd>Space</kbd><div>アフターバーナー（押している間）</div>
+      <kbd>Space</kbd><div>アフターバーナー（押している間。ジェットのみ）</div>
+      <kbd>Y H</kbd><div>ピッチトリム 機首下げ / 機首上げ（押している間）</div>
+      <kbd>J</kbd><div>オートトリム（いまの速度と上昇・降下角を手放しで保つ）</div>
+      <kbd>F</kbd><div>スモーク ON / OFF（エアレース。OFF のまま飛ぶと +1 秒）</div>
       <kbd>G</kbd><div>脚（ギア）の上げ下げ。着陸モードは脚を下ろした状態で始まります</div>
       <kbd>B</kbd><div>ブレーキ（押している間。地上はホイールブレーキ、空中はスピードブレーキ）。地上では Q E で前輪ステア</div>
-      <kbd>V</kbd><div>HUD視点 ⇄ 外部視点</div>
+      <kbd>V</kbd><div>視点の切り替え（HUD → コックピット → 外部）</div>
+      <kbd>右ドラッグ / ホイール</kbd><div>コックピット視点で見回す / ズーム</div>
+      <kbd>U O I K / L</kbd><div>左後ろ・右後ろ・上・計器盤を見る / 次の目標を目で追う（押している間）</div>
       <kbd>T</kbd><div>時刻を切り替え（夕焼け・昼・夜）</div>
       <kbd>M / R / P</kbd><div>音 / やり直す / 一時停止</div>
       <kbd>Esc</kbd><div>モード選択に戻る</div>
     </div>
-    <p class="touchnote">スマホでは画面左半分をドラッグで操縦、右半分を上下ドラッグでスロットルです。着陸モードでは右上に脚とブレーキのボタンが出ます。</p>
+    <p class="touchnote">スマホでは画面左半分をドラッグで操縦、右半分を上下ドラッグでスロットルです。右上にトリムのボタン、着陸モードでは脚とブレーキ、エアレースではスモーク、コックピット視点では「目標を見る」のボタンが出ます。</p>
     <p class="touchnote"><a href="/">← freedomflight.jp に戻る</a></p>
   </div>
   <div class="card" id="result">
@@ -127,9 +137,12 @@ h1 small{display:block;font-size:.3em;letter-spacing:.32em;color:var(--accent);m
 </div>
 
 <script src="/static/skyrunner/three.min.js?v=r128"></script>
-<script src="/static/skyrunner/world.js?v=1"></script>
-<script src="/static/skyrunner/flightmodel.js?v=2"></script>
-<script src="/static/skyrunner/aircraft.js?v=1"></script>
-<script src="/static/skyrunner/game.js?v=2"></script>
+<script src="/static/skyrunner/world.js?v=2"></script>
+<script src="/static/skyrunner/flightmodel.js?v=3"></script>
+<script src="/static/skyrunner/aircraft.js?v=2"></script>
+<script src="/static/skyrunner/racer.js?v=1"></script>
+<script src="/static/skyrunner/cockpit.js?v=1"></script>
+<script src="/static/skyrunner/sound.js?v=1"></script>
+<script src="/static/skyrunner/game.js?v=3"></script>
 </body>
 </html>

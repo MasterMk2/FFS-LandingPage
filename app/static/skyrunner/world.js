@@ -71,82 +71,103 @@
     return Math.abs(rwyAlong(x, z)) <= RWY.length / 2 + m && Math.abs(rwyAcross(x, z)) <= RWY.width / 2 + m;
   }
 
-  // ---------------------------------------------------------------- air-race course
-  // A clockwise stadium over the channel north of the airfield: north straight eastbound, south straight
-  // westbound, joined by two semicircles. Gaussian lateral jinks on the straights make the slalom; a gate sits at
-  // the centre of each jink, at the start/finish line and at each turn apex. One lap, start = finish gate.
-  // Turn radius 620 m, jinks of 130 m over sigma 350 m (radius ~940 m): a keyboard-limited pilot holds the line at
-  // ~165 m/s (test/world.test.js flies it). Jinks sit >= 1300 m from the straight ends so their Gaussian tails leave
-  // the joins with the semicircles smooth.
-  var COURSE = {
-    xW: -26600, xE: -20600, zc: 8650, R: 620,
-    gateWidth: 70, pylonHeight: 75, sigma: 350,
-    judgeWindow: 150,   // a crossing farther than this from the gate centre is not judged: the gate stays next
-                        // (wide enough that skipping a 130 m jink still counts as a miss, narrow enough that
-                        // cutting inside a turn apex cannot buy back more than the penalty)
-    // gates: segment ('N' north straight, 'E' east turn, 'S' south straight, 'W' west turn),
-    // position along it (m along a straight from its start / degrees through a turn), lateral jink (m, + = right)
-    layout: [['N', 600, 0], ['N', 1800, 130], ['N', 3200, -130], ['N', 4600, 130], ['E', 90, 0],
-      ['S', 1350, 130], ['S', 2850, -130], ['S', 4350, 130], ['W', 90, 0]],
-    spawnBack: 1800, spawnAlt: 50, spawnSpeed: 175, penalty: 3
+  // ---------------------------------------------------------------- air-race track (2019 Master Class rules)
+  // Pylons: inflatable 25 m cones, 5 m across the base and 0.75 m at the tip. An Air Gate is two of them with
+  // vertical inner faces 15 m apart and a flight window up to 15 m: the pilot's head must stay below the red top
+  // section. The chicane is three single pylons flown as a slalom. Track frame: u = m east of the start/finish
+  // gate, v = m north of the start line (world x = x0 + u, z = z0 - v). One lap: start gate, gate, chicane, VTM
+  // gate, vertical turn to the left onto the return line 200 m north, two gates, VTM gate, vertical turn to the
+  // left back onto the start line. Two laps, then the start gate once more is the finish.
+  var TRACK = {
+    x0: -24250, z0: 9750,          // start/finish gate centre, over 85 m of water
+    pylonHeight: 25, baseR: 2.5, topR: 0.375, gateWidth: 15, windowTop: 15, headUp: 0.9, // pilot's head above the CG
+    ret: 200,                      // return line, m north of the start line
+    // physical gates: id, u, v, kind ('gate' = two pylons, 'pylon' = single chicane pylon)
+    places: [['G1', 0, 0, 'gate'], ['G2', 150, 0, 'gate'], ['C1', 320, 0, 'pylon'], ['C2', 480, 0, 'pylon'], ['C3', 640, 0, 'pylon'],
+      ['G3', 950, 0, 'gate'], ['G4', 600, 200, 'gate'], ['G5', 200, 200, 'gate'], ['G6', -250, 200, 'gate']],
+    // one lap of the run: place index, direction (+1 east, -1 west), chicane side (-1 = pass with the pylon on your
+    // right, +1 = on your left), VTM (a vertical turn follows this gate)
+    lap: [[0, 1], [1, 1], [2, 1, -1], [3, 1, 1], [4, 1, -1], [5, 1, 0, true], [6, -1], [7, -1], [8, -1, 0, true]],
+    laps: 2,
+    bounds: { u0: -800, u1: 1450, v0: -300, v1: 500 }, // leaving this box after the start is a course deviation
+    spawnBack: 1500, spawnAlt: 25, spawnSpeed: 95    // straight-in from the west, below the 200 kt limit
   };
-  (function (C) {
-    var L = C.xE - C.xW, arc = Math.PI * C.R;
-    C.straight = L; C.length = 2 * L + 2 * arc;
-    C.bumps = { N: [], S: [] };
-    for (var i = 0; i < C.layout.length; i++) { var g = C.layout[i]; if ((g[0] === 'N' || g[0] === 'S') && g[2]) C.bumps[g[0]].push([g[1], g[2]]); }
-  })(COURSE);
-  function jink(seg, u) { // lateral offset (+ = right of travel) and its slope along a straight
-    var b = COURSE.bumps[seg], off = 0, slope = 0, s2 = COURSE.sigma * COURSE.sigma;
-    for (var i = 0; i < b.length; i++) { var d = u - b[i][0], e = b[i][1] * Math.exp(-d * d / (2 * s2)); off += e; slope -= e * d / s2; }
-    return [off, slope];
-  }
-  /** Centreline point at arc length s from the start of the north straight: {x, z, hx, hz} (unit heading). */
-  function coursePoint(s) {
-    var C = COURSE, L = C.straight, arc = Math.PI * C.R, x, z, hx, hz, j, n;
-    s = ((s % C.length) + C.length) % C.length;
-    if (s < L) {                       // north straight, eastbound (right = +z)
-      j = jink('N', s); n = Math.sqrt(1 + j[1] * j[1]);
-      x = C.xW + s; z = C.zc - C.R + j[0]; hx = 1 / n; hz = j[1] / n;
-    } else if (s < L + arc) {          // east semicircle, turning right
-      var a = (s - L) / C.R;           // 0..pi
-      x = C.xE + C.R * Math.sin(a); z = C.zc - C.R * Math.cos(a); hx = Math.cos(a); hz = Math.sin(a);
-    } else if (s < 2 * L + arc) {      // south straight, westbound (right = -z)
-      var u = s - L - arc; j = jink('S', u); n = Math.sqrt(1 + j[1] * j[1]);
-      x = C.xE - u; z = C.zc + C.R - j[0]; hx = -1 / n; hz = -j[1] / n;
-    } else {                           // west semicircle
-      var b = (s - 2 * L - arc) / C.R;
-      x = C.xW - C.R * Math.sin(b); z = C.zc + C.R * Math.cos(b); hx = -Math.cos(b); hz = -Math.sin(b);
+  var RULES = {                    // penalties in seconds; DNF where stated
+    startKt: 200, startPenKt: 1.99, startPen: 1,      // over the limit at the start gate: +1 s, by 1.99 kt or more DNF
+    pylonPen: 3, pylonDnf: 3,                         // +3 s per pylon hit, the third is a DNF
+    levelDeg: 10, levelPen: 2,                        // gates: bank and climb / descent angle within 10 deg
+    highPen: 2,                                       // through a gate above the window, or over a pylon
+    overG: 11, overGPen: 1, maxG: 12,                 // reaching 11 g +1 s, 12 g DNF
+    smokePen: 1,                                      // smoke off during the run
+    vtmPitch: 45, vtmPen: 1, vtmDnfPitch: 15          // our reading of "the briefed VTM": nose up 45 deg or more;
+  };                                                  //   +1 s below that, DNF if it was flown as a flat turn
+  (function (T) {
+    T.gates = T.places.map(function (p) { return { id: p[0], x: T.x0 + p[1], z: T.z0 - p[2], u: p[1], v: p[2], kind: p[3] }; });
+    T.run = [];                    // the whole run, start to finish: one element per gate crossing
+    for (var l = 0; l < T.laps; l++) T.lap.forEach(function (e) { T.run.push({ g: e[0], dir: e[1], pass: e[2] || 0, vtm: !!e[3], lap: l + 1 }); });
+    T.run.push({ g: 0, dir: 1, pass: 0, vtm: false, lap: T.laps });
+    T.run.forEach(function (e, i) { e.role = i === 0 ? 'start' : i === T.run.length - 1 ? 'finish' : T.gates[e.g].kind; e.hx = e.dir; e.hz = 0; });
+    // pylons: inner-face base point and outward unit vector (single chicane pylons are plain cones: no offset)
+    T.pylons = [];
+    T.gates.forEach(function (g, gi) {
+      if (g.kind === 'pylon') { T.pylons.push({ gate: gi, x: g.x, z: g.z, ox: 0, oz: 0 }); return; }
+      [-1, 1].forEach(function (sd) { T.pylons.push({ gate: gi, x: g.x, z: g.z + sd * T.gateWidth / 2, ox: 0, oz: sd }); }); // south, north faces
+    });
+    var e0 = T.run[0], g0 = T.gates[e0.g];
+    T.spawn = { x: g0.x - T.spawnBack, z: g0.z, heading: Math.PI / 2 };
+  })(TRACK);
+  /** Pylon radius at height y (the cone narrows from the base to the tip). */
+  function pylonR(y) { var T = TRACK; return T.baseR + (T.topR - T.baseR) * clamp01(y / T.pylonHeight); }
+  function clamp01(t) { return t < 0 ? 0 : t > 1 ? 1 : t; }
+  /** Index of the pylon that the point (x, y, z) is inside of (grown by pad m), or -1. */
+  function pylonContact(x, y, z, pad) {
+    var T = TRACK, P = T.pylons, m = pad || 0;
+    if (y < -m || y > T.pylonHeight + m) return -1;
+    var r = pylonR(y);
+    for (var i = 0; i < P.length; i++) {
+      var p = P[i], dx = x - (p.x + p.ox * r), dz = z - (p.z + p.oz * r);
+      if (dx * dx + dz * dz < (r + m) * (r + m)) return i;
     }
-    return { x: x, z: z, hx: hx, hz: hz };
+    return -1;
   }
-  // gates: centre, unit direction of travel and the two pylon bases (a = left, b = right)
-  COURSE.gates = COURSE.layout.map(function (g) {
-    var C = COURSE, L = C.straight, arc = Math.PI * C.R;
-    var s = g[0] === 'N' ? g[1] : g[0] === 'E' ? L + g[1] / 180 * arc : g[0] === 'S' ? L + arc + g[1] : 2 * L + arc + g[1] / 180 * arc;
-    var p = coursePoint(s), w = C.gateWidth / 2, rx = -p.hz, rz = p.hx;
-    return { s: s, x: p.x, z: p.z, hx: p.hx, hz: p.hz, ax: p.x - rx * w, az: p.z - rz * w, bx: p.x + rx * w, bz: p.z + rz * w };
-  });
-  /** Aircraft position relative to gate gi: s = m past its plane along the travel direction, lat = m right of centre. */
-  function gateFrame(gi, x, z) {
-    var g = COURSE.gates[gi], dx = x - g.x, dz = z - g.z;
-    return { s: dx * g.hx + dz * g.hz, lat: dz * g.hx - dx * g.hz };
+  /** Position relative to run element ei: s = m past its gate plane in the direction of travel, lat = m right of centre. */
+  function gateFrame(ei, x, z) {
+    var e = TRACK.run[ei], g = TRACK.gates[e.g], dx = x - g.x, dz = z - g.z;
+    return { s: dx * e.hx + dz * e.hz, lat: dz * e.hx - dx * e.hz };
   }
-  /** Verdict for a crossing of a gate plane at lateral offset lat and height y: 'pass' | 'high' | 'miss' | null (not judged). */
-  function gateVerdict(lat, y) {
-    var a = Math.abs(lat);
-    if (a > COURSE.judgeWindow) return null;
-    if (a > COURSE.gateWidth / 2) return 'miss';
-    return y > COURSE.pylonHeight ? 'high' : 'pass';
+  function inBounds(x, z) {
+    var b = TRACK.bounds, u = x - TRACK.x0, v = TRACK.z0 - z;
+    return u >= b.u0 && u <= b.u1 && v >= b.v0 && v <= b.v1;
   }
-  (function (C) { // start straight-in from the west, on the extension of the north straight
-    var g = C.gates[0];
-    C.spawn = { x: g.x - g.hx * (g.s + C.spawnBack), z: g.z - g.hz * (g.s + C.spawnBack), heading: Math.atan2(g.hx, -g.hz) };
-  })(COURSE);
+  /**
+   * Judge the crossing of run element ei's plane. lat (m right of centre), cgY (m), bank and gamma (rad), kt (true
+   * airspeed). Returns { dnf: reason or null, pens: [[seconds, code], ...] }. Codes: 'speed', 'level', 'high';
+   * DNF reasons: 'missed' (outside the gate: course deviation), 'side' (chicane pylon on the wrong side), 'speed'.
+   * Crossings farther than 150 m off the centre return null (not this gate: someone flying past its plane elsewhere).
+   */
+  function judgeCrossing(ei, lat, cgY, bank, gamma, kt) {
+    var T = TRACK, R = RULES, e = T.run[ei], out = { dnf: null, pens: [] }, head = cgY + T.headUp;
+    if (Math.abs(lat) > 150) return null;
+    if (e.role === 'pylon') {
+      if (lat * e.pass < 0) out.dnf = 'side';
+      else if (cgY > T.pylonHeight) out.pens.push([R.highPen, 'high']);
+      return out;
+    }
+    if (Math.abs(lat) > T.gateWidth / 2 + 2 * T.baseR) { out.dnf = 'missed'; return out; }
+    if (e.role === 'start' && kt > R.startKt) { if (kt - R.startKt < R.startPenKt) out.pens.push([R.startPen, 'speed']); else { out.dnf = 'speed'; return out; } }
+    if (Math.abs(bank) > R.levelDeg * Math.PI / 180 || Math.abs(gamma) > R.levelDeg * Math.PI / 180) out.pens.push([R.levelPen, 'level']);
+    if (head > T.windowTop) out.pens.push([R.highPen, 'high']);
+    return out;
+  }
+  // race-plane points checked against the pylons and the water (body axes as in flightmodel.js, m): wingtips,
+  // propeller disc, spinner, tailplane tips, fin top, rudder heel, wheels, tail wheel
+  var RACER_PTS = [[-3.7, 0, 0.25], [3.7, 0, 0.25], [0, 0.95, -2.3], [0, -0.95, -2.3], [-0.95, 0, -2.3], [0.95, 0, -2.3], [0, 0, -2.65],
+    [-1.3, 0.12, 3.2], [1.3, 0.12, 3.2], [0, 1.15, 3.45], [0, -0.3, 3.55], [-0.9, -1.2, -0.75], [0.9, -1.2, -0.75], [0, -0.55, 3.15]];
 
   root.World = {
     snoise: snoise, naturalHeight: naturalHeight, terrainHeight: terrainHeight, groundHeight: groundHeight,
     RWY: RWY, rwyAlong: rwyAlong, rwyAcross: rwyAcross, airfieldWeight: airfieldWeight, onRunway: onRunway,
-    COURSE: COURSE, coursePoint: coursePoint, gateFrame: gateFrame, gateVerdict: gateVerdict
+    TRACK: TRACK, RULES: RULES, RACER_PTS: RACER_PTS, pylonR: pylonR, pylonContact: pylonContact, gateFrame: gateFrame,
+    inBounds: inBounds, judgeCrossing: judgeCrossing
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

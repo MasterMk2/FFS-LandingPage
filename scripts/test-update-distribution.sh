@@ -133,5 +133,30 @@ docker run --rm -v "$REPO/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$WORK/emp
 check "full Caddyfile validates" 0 "$valid"
 [ "$valid" = 0 ] || tail -5 "$WORK/validate.log"
 
+# --- Caddyfile 全体で起動して、/updates/ が他の経路に隠れないことと caddy/local/ の読み込みを確かめる。
+# TLS を使わないよう、試験のコピーだけ freedomflight.jp を http の :8080 に置き換える。
+sed -e 's/\r$//' -e 's/^\tadmin off$/\tadmin off\n\tauto_https off/' -e 's/^freedomflight\.jp {/http:\/\/freedomflight.jp:8080 {/' \
+  -e 's/^\temail .*$//' "$REPO/caddy/Caddyfile" > "$WORK/full.Caddyfile"
+mkdir -p "$WORK/local/freedomflight.jp" "$WORK/local/sites"
+printf '\thandle /localtest/* {\n\t\trespond "local route" 200\n\t}\n' > "$WORK/local/freedomflight.jp/10-test.caddy"
+printf 'http://local.test:8080 {\n\trespond "local site" 200\n}\n' > "$WORK/local/sites/10-test.caddy"
+chmod -R a+rX "$WORK/local" "$WORK/full.Caddyfile"
+docker rm -f "$NAME" >/dev/null
+docker run -d --name "$NAME" -p "127.0.0.1:$PORT:8080" \
+  -e HERMES_LINE_WEBHOOK_UPSTREAM=127.0.0.1:1 -e HERMES_GCAL_WEBHOOK_UPSTREAM=127.0.0.1:2 -e IYAKUSAI_LINE_WEBHOOK_UPSTREAM=127.0.0.1:3 \
+  -v "$WORK/full.Caddyfile:/etc/caddy/Caddyfile:ro" -v "$WORK/updates:/srv/updates:ro" \
+  -v "$WORK/passes:/etc/caddy/update-passes:ro" -v "$WORK/local:/etc/caddy/local:ro" "$IMAGE" >/dev/null
+H=(-H 'Host: freedomflight.jp')
+for _ in $(seq 1 50); do curl -s -o /dev/null "${H[@]}" "$B/updates/" && break; sleep 0.2; done
+check "full: protected needs pass" 401 "$(code "${H[@]}" "$B/updates/eddiepdf/update.json")"
+check "full: dev pass" 200 "$(code "${H[@]}" -u dev-bob:bobpass "$B/updates/eddiepdf/update.json")"
+check "full: public product" 200 "$(code "${H[@]}" "$B/updates/dcs-mission-studio/update.json")"
+check "full: unknown under /updates" 404 "$(code "${H[@]}" "$B/updates/nothing")"
+check "full: site still proxies (upstream down here)" 502 "$(code "${H[@]}" "$B/")"
+check "full: gca still proxies" 502 "$(code "${H[@]}" "$B/gca/")"
+check "full: local route imported" "local route" "$(curl -s "${H[@]}" "$B/localtest/x")"
+check "full: local site imported" "local site" "$(curl -s -H 'Host: local.test' "$B/")"
+check "full: security headers on /updates" 1 "$(curl -s -D - -o /dev/null "${H[@]}" "$B/updates/dcs-mission-studio/update.json" | grep -ci '^x-content-type-options: nosniff')"
+
 echo "passed $pass, failed $fail"
 [ "$fail" = 0 ]

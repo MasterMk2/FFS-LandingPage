@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import os
 import re
@@ -34,7 +35,7 @@ SITE_LOCAL = "freedomflight.jp"
 
 
 def git_show(repo: Path, rev: str) -> list[str]:
-    text = subprocess.check_output(["git", "show", f"{rev}:caddy/Caddyfile"], cwd=repo, text=True)
+    text = subprocess.check_output(["git", "show", f"{rev}:caddy/Caddyfile"], cwd=repo, text=True, encoding="utf-8")
     return text.replace("\r\n", "\n").split("\n")
 
 
@@ -104,6 +105,68 @@ def adapt(image: str, caddyfile: Path, local_dir: Path | None, env: dict[str, st
     return json.loads(result.stdout)
 
 
+def _paths(route: dict) -> list[str]:
+    return [p for m in route.get("match", []) if isinstance(m, dict) for p in m.get("path", [])]
+
+
+def _overlap(a: str, b: str) -> bool:
+    a, b = a.rstrip("*"), b.rstrip("*")
+    return a.startswith(b) or b.startswith(a)
+
+
+def canonical_config(config: dict) -> tuple[str, set]:
+    """adapt の JSON を、意味の同じものが同じ形になるように直す。
+
+    - group の名前は連番で、経路を足すとずれるので、グループの中身から付け直す。
+    - 同じ group の経路は排他 (先に一致したものだけ動く) なので、パスが重ならない限り順序に意味がない。
+      グループの中は並べ替える。重なるパスの組 (先, 後) は別に集めて、前後で同じことを確かめる。
+    """
+    pairs: set = set()
+
+    def walk(node):
+        if isinstance(node, list):
+            return [walk(item) for item in node]
+        if not isinstance(node, dict):
+            return node
+        out = {key: walk(value) for key, value in node.items() if key != "routes"}
+        if "routes" in node:
+            routes = [walk(route) for route in node["routes"]]
+            members: dict[str, list] = {}
+            for route in routes:
+                if "group" in route:
+                    members.setdefault(route["group"], []).append(route)
+            names = {}
+            for group, items in members.items():
+                body = sorted(json.dumps({k: v for k, v in r.items() if k != "group"}, sort_keys=True) for r in items)
+                names[group] = "g-" + hashlib.sha256("\n".join(body).encode()).hexdigest()[:16]
+                for i, first in enumerate(items):
+                    for second in items[i + 1:]:
+                        for p in _paths(first):
+                            for q in _paths(second):
+                                if _overlap(p, q):
+                                    pairs.add((p, q))
+            result, run = [], []
+            for route in routes + [None]:
+                group = names.get(route.get("group")) if route else None
+                if run and (route is None or group != run[0].get("group")):
+                    matched = [r for r in run if r.get("match")]
+                    rest = [r for r in run if not r.get("match")]
+                    result.extend(sorted(matched, key=lambda r: json.dumps(r, sort_keys=True)) + rest)
+                    run = []
+                if route is None:
+                    break
+                route = dict(route)
+                if "group" in route:
+                    route["group"] = names[route["group"]]
+                    run.append(route)
+                else:
+                    result.append(route)
+            out["routes"] = result
+        return out
+
+    return json.dumps(walk(config), sort_keys=True, indent=1), pairs
+
+
 def strip_updates(config: dict) -> dict:
     """adapt の結果から /updates/ の経路を除く (新しい版にだけある)。"""
     def walk(node):
@@ -119,7 +182,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--base-rev", default="HEAD")
-    parser.add_argument("--new-rev", required=True)
+    parser.add_argument("--new-rev")
+    # 試験用: git の代わりにファイルで渡す
+    parser.add_argument("--base-file")
+    parser.add_argument("--new-file")
     parser.add_argument("--live", default="caddy/Caddyfile")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--out", required=True)
@@ -131,7 +197,11 @@ def main() -> None:
     if out.exists() and any(out.iterdir()):
         sys.exit(f"{out} is not empty")
 
-    base = git_show(repo, args.base_rev)
+    if not (args.new_rev or args.new_file):
+        sys.exit("--new-rev is required")
+    read = lambda path: Path(path).read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")  # noqa: E731
+    base = read(args.base_file) if args.base_file else git_show(repo, args.base_rev)
+    new = read(args.new_file) if args.new_file else git_show(repo, args.new_rev)
     live = live_path.read_text(encoding="utf-8").replace("\r\n", "\n").split("\n")
     in_site, top, env_moves, problems = split(base, live)
     if problems:
@@ -149,10 +219,12 @@ def main() -> None:
     new_env = {**env, **env_moves}
     with tempfile.TemporaryDirectory() as tmp:
         new_file = Path(tmp) / "Caddyfile"
-        new_file.write_text("\n".join(git_show(repo, args.new_rev)), encoding="utf-8")
+        new_file.write_text("\n".join(new), encoding="utf-8")
         before = strip_updates(adapt(args.image, live_path.resolve(), None, env))
         after = strip_updates(adapt(args.image, new_file, out.resolve(), new_env))
-    same = json.dumps(before, sort_keys=True) == json.dumps(after, sort_keys=True)
+    before_text, before_pairs = canonical_config(before)
+    after_text, after_pairs = canonical_config(after)
+    same = before_text == after_text and before_pairs == after_pairs
 
     print(f"freedomflight.jp の中: {len(in_site)} 行 -> {out / SITE_LOCAL / '50-server.caddy'}")
     print(f"最上位のサイトブロック: {len(top)} 行 -> {out / 'sites' / '50-server.caddy'}")
@@ -160,8 +232,10 @@ def main() -> None:
         print(f".env に足す (今は Caddyfile に直書き): {key}={value}")
     print("adapt の一致 (/updates/ を除く):", "一致" if same else "不一致")
     if not same:
-        for name, data in (("before", before), ("after", after)):
-            (out.parent / f"{out.name}-{name}.json").write_text(json.dumps(data, sort_keys=True, indent=1), encoding="utf-8")
+        for name, text in (("before", before_text), ("after", after_text)):
+            (out.parent / f"{out.name}-{name}.json").write_text(text, encoding="utf-8")
+        if before_pairs != after_pairs:
+            print("重なるパスの前後が変わった:", sorted(before_pairs ^ after_pairs))
         print(f"差は {out.name}-before.json / -after.json を比べる")
         sys.exit(1)
 

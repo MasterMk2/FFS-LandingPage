@@ -1,7 +1,7 @@
 (function(){
 'use strict';
-// ================= World: terrain, island airfield and race course (world.js, shared with the Node tests) =================
-var snoise=World.snoise, terrainHeight=World.terrainHeight, groundHeight=World.groundHeight, RWY=World.RWY, COURSE=World.COURSE;
+// ================= World: terrain, island airfield and air-race track (world.js, shared with the Node tests) =================
+var snoise=World.snoise, terrainHeight=World.terrainHeight, groundHeight=World.groundHeight, RWY=World.RWY, TRACK=World.TRACK, RULES=World.RULES;
 var R2D=180/Math.PI, KT=1.94384, FPM=196.85;
 
 // ================= Renderer / scene =================
@@ -96,26 +96,134 @@ function updateChunks(px,pz){
 
 // ================= Flight model instance =================
 var UP=new THREE.Vector3(0,1,0), tmpV=new THREE.Vector3(), tmpV2=new THREE.Vector3(), tmpQ=new THREE.Quaternion();
-var fm=new FlightModel(); fm.groundHeight=groundHeight;
+// Two airframes, two flight-model instances (the race plane's parameter overrides must never leak into the jet):
+// the jet for rings and landing, the propeller race plane for the air race. `fm` is whichever one is flying.
+var fmJet=new FlightModel(), fmRacer=new FlightModel(FlightModel.raceplaneParams), fm=fmJet;
+fmJet.groundHeight=fmRacer.groundHeight=groundHeight;
 var START_POS=new THREE.Vector3(0,0,0);
 var mode="ring"; // "ring" endless rings | "race" pylon air race | "land" landing on runway 09
 // Each mode starts somewhere else: rings high over the origin, the race straight-in to the start gate, the landing
 // on the 3 deg glide path with the gear down.
 function spawnState(){
-  if(mode==="race"){ var sp=COURSE.spawn; return {pos:new THREE.Vector3(sp.x,COURSE.spawnAlt,sp.z), heading:sp.heading, speed:COURSE.spawnSpeed}; }
+  if(mode==="race"){ var sp=TRACK.spawn; return {pos:new THREE.Vector3(sp.x,TRACK.spawnAlt,sp.z), heading:sp.heading, speed:TRACK.spawnSpeed}; }
   if(mode==="land"){ var d=RWY.spawnDist; return {pos:new THREE.Vector3(RWY.thrX-RWY.fx*d, RWY.elev+(d+RWY.aim)*Math.tan(RWY.glide), RWY.thrZ-RWY.fz*d), heading:RWY.heading, speed:RWY.spawnSpeed, gamma:-RWY.glide, gear:true}; }
   var gy=groundHeight(START_POS.x,START_POS.z);
   return {pos:new THREE.Vector3(START_POS.x, Math.max(gy+900, 700), START_POS.z), heading:0, speed:205};
 }
 function spawnAircraft(){
+  fm=mode==="race"?fmRacer:fmJet;
   var st=spawnState(); fm.reset(st);
   inp.throttle=fm.controls&&typeof fm.controls.throttle==="number"?fm.controls.throttle:0.6;
-  inp.pitch=0; inp.roll=0; inp.yaw=0; inp.ab=false; inp.brake=false; inp.gear=!!st.gear;
+  inp.pitch=0; inp.roll=0; inp.yaw=0; inp.ab=false; inp.brake=false; inp.gear=!!st.gear; inp.smoke=false;
 }
 
-// ================= Aircraft mesh (external view) - built in aircraft.js =================
-var jet=SkyrunnerJet.create(scene), acGroup=jet.root; scene.add(acGroup);
-var TOD_DARK=[0.55,0.15,1];   // how much the jet's lights stand out at each time of day
+// ================= Aircraft meshes (external view) - the jet in aircraft.js, the race plane in racer.js =================
+var jet=SkyrunnerJet.create(scene), racer=SkyrunnerRacer.create(scene);
+scene.add(jet.root); scene.add(racer.root);
+function plane(){ return mode==="race"?racer:jet; }
+// per airframe: keyboard stick travel (digital keys: a held key gives a firm turn, not a stall), chase camera, cockpit eye
+var KIT={jet:{kbPitch:0.55,kbRoll:1,back:15,up:3.5,look:40,eyeF:2.5,eyeU:0.9}, racer:{kbPitch:0.5,kbRoll:0.7,back:8.5,up:2.3,look:30,eyeF:-0.35,eyeU:0.75}};
+function kit(){ return mode==="race"?KIT.racer:KIT.jet; }
+var TOD_DARK=[0.55,0.15,1];   // how much the aircraft lights stand out at each time of day
+
+// ================= Cockpit view: the interiors (cockpit.js) in a scene of their own, drawn over the world =================
+// The panel is 0.3-1 m from the eye, inside the world camera's near plane (0.5 m), so the interior gets its own camera
+// (same pose, near 2 cm) and is rendered after the world with the depth buffer cleared. Its lights copy the world's.
+// The exterior airframe stays visible in this view: the nose, wings, tails and plume are what the pilot sees outside.
+var VIEWS=["hud","cockpit","ext"], VIEW_NAME={hud:"HUD視点",cockpit:"コックピット視点",ext:"外部視点"}, view="hud";
+try{ var savedView=localStorage.getItem("skyrunner.view"); if(VIEWS.indexOf(savedView)>=0) view=savedView; }catch(e){}
+var ckScene=new THREE.Scene(), ckCam=new THREE.PerspectiveCamera(70,1,0.02,30);
+var ckSun=new THREE.DirectionalLight(0xffffff,1), ckHemi=new THREE.HemisphereLight(0xffffff,0x000000,0.5); ckScene.add(ckSun,ckHemi);
+var cockpits={jet:SkyrunnerCockpit.create("jet",{rings:SkyrunnerJet.canopyRings(),canopy:SkyrunnerJet.canopyGeometry()}),
+  racer:SkyrunnerCockpit.create("racer",{rings:SkyrunnerRacer.canopyRings(),canopy:SkyrunnerRacer.canopyGeometry()})};
+ckScene.add(cockpits.jet.root,cockpits.racer.root);
+function cockpit(){ return mode==="race"?cockpits.racer:cockpits.jet; }
+// rear-view mirrors (jet): the view aft from the eye, every other frame, at the target's own low resolution. The
+// mirror's cockpit camera also sees layer 1 (the pilot's helmet, which the eye itself never sees).
+var mirCam=new THREE.PerspectiveCamera(28,3.2,0.5,24000), mirCkCam=new THREE.PerspectiveCamera(28,3.2,0.02,30), mirFrame=0;
+var MIRQ=new THREE.Quaternion().setFromEuler(new THREE.Euler(-3*Math.PI/180,Math.PI,0,"YXZ")); mirCkCam.layers.enable(1);
+function renderMirror(ck){
+  if(!ck.mirror||(mirFrame++&1)) return;
+  mirCkCam.position.copy(head.eye); mirCkCam.quaternion.copy(MIRQ);
+  mirCam.position.copy(head.eye).applyQuaternion(fm.q).add(fm.pos); mirCam.quaternion.copy(fm.q).multiply(MIRQ);
+  renderer.setRenderTarget(ck.mirror.target); renderer.clear(); renderer.render(scene,mirCam); renderer.clearDepth(); renderer.render(ckScene,mirCkCam);
+  renderer.setRenderTarget(null);
+}
+// head: look direction (yaw + = left, pitch + = up), zoom (vertical fov at 16:9), and the body's reaction to the seat's push
+var DEG=Math.PI/180, HEAD_REST=-10*DEG, NECK=new THREE.Vector3(0,0.12,-0.1); // neck pivot 12 cm below, 10 cm behind the eye
+var head={yaw:0,pitch:HEAD_REST,fov:72,drag:null,eye:new THREE.Vector3(),q:new THREE.Quaternion(),e:new THREE.Euler(0,0,0,"YXZ"),
+  off:new THREE.Vector3(),vel:new THREE.Vector3(),acc:new THREE.Vector3(0,9.80665,0),vPrev:new THREE.Vector3(),gs:1,gv:0,rv:0};
+// held glances [yaw, pitch] in degrees: U / O over the left / right shoulder, I up through the canopy, K down at the panel
+var GLANCE={KeyU:[120,10],KeyO:[-120,10],KeyI:[0,70],KeyK:[0,-38],Numpad4:[90,5],Numpad6:[-90,5],Numpad8:[0,70],Numpad2:[0,-38],Numpad7:[135,20],Numpad9:[-135,20],Numpad1:[155,5],Numpad3:[-155,5]};
+var GOAL=[0,0];
+function sstep(a,b,x){ var t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); }
+// the next thing to look at: ring, race gate or the runway's aiming point
+function objective(){
+  if(mode==="ring") return gates[0]?gates[0].pos:null;
+  if(mode==="race"){ if(race.done) return null; var g=TRACK.gates[TRACK.run[race.step].g]; return tmpV2.set(g.x,8,g.z); }
+  return tmpV2.set(RWY.thrX+RWY.fx*RWY.aim,RWY.elev,RWY.thrZ+RWY.fz*RWY.aim);
+}
+// look goal: padlock (L / touch) on the objective within the neck's reach, else held glances, else straight ahead
+function lookGoal(out){
+  var p=(keys.KeyL||touch.look)?objective():null, y=0, pt=0, n=0, k;
+  if(p){
+    tmpV.copy(p).sub(camera.position).applyQuaternion(tmpQ.copy(fm.q).invert());
+    out[0]=clamp(Math.atan2(-tmpV.x,-tmpV.z),-160*DEG,160*DEG); out[1]=clamp(Math.atan2(tmpV.y,Math.hypot(tmpV.x,tmpV.z)),-45*DEG,85*DEG); return 6;
+  }
+  for(k in GLANCE) if(keys[k]){ y+=GLANCE[k][0]; pt+=GLANCE[k][1]; n++; }
+  if(n){ out[0]=clamp(y,-160,160)*DEG; out[1]=clamp(pt,-45,85)*DEG; return 7; }
+  out[0]=0; out[1]=HEAD_REST; return 5;
+}
+function updateHead(dt){
+  var ck=cockpit(), live=running&&!paused&&dt>0, i, f;
+  if(!head.drag){ f=1-Math.exp(-dt*lookGoal(GOAL)); head.yaw+=(GOAL[0]-head.yaw)*f; head.pitch+=(GOAL[1]-head.pitch)*f; }
+  if(live){
+    // specific force (the seat's push, a - g) in body axes, smoothed; the head lags it on a damped spring
+    tmpV.copy(fm.vel).sub(head.vPrev).divideScalar(dt); tmpV.y+=9.80665; head.vPrev.copy(fm.vel);
+    tmpV.applyQuaternion(tmpQ.copy(fm.q).invert()); head.acc.lerp(tmpV,1-Math.exp(-dt/0.05));
+    var tx=clamp(-head.acc.x*0.0015,-0.05,0.05), ty=clamp(-(head.acc.y-9.80665)*0.0005,-0.045,0.03), tz=clamp(-head.acc.z*0.0012,-0.04,0.04);
+    var n=Math.ceil(dt/0.008), h=dt/n, w=16, z=0.55;
+    for(i=0;i<n;i++){
+      head.vel.x+=(w*w*(tx-head.off.x)-2*z*w*head.vel.x)*h; head.vel.y+=(w*w*(ty-head.off.y)-2*z*w*head.vel.y)*h; head.vel.z+=(w*w*(tz-head.off.z)-2*z*w*head.vel.z)*h;
+      head.off.addScaledVector(head.vel,h);
+    }
+    // g tolerance: the load smoothed with a slower onset than recovery drives grey-out (and red-out below -1.5 g)
+    var g=mode==="race"?race.gs:fm.nz; head.gs+=(g-head.gs)*(1-Math.exp(-dt/(g>head.gs?1.8:1.0)));
+  }
+  head.gv=mode==="race"?sstep(8,13,head.gs):sstep(6,10.5,head.gs); head.rv=sstep(-1.5,-3.5,head.gs);
+  // shake: buffet nearing the stall, the runway under the wheels, high-speed rumble, the race plane's engine
+  var amp=0, t=performance.now()/1000, as=fm.params.alphaStall;
+  if(running&&!paused) amp=clamp((fm.alpha-0.72*as)/(0.28*as),0,1)*clamp(fm.ias/60,0,1)*0.007+(fm.wow?clamp(fm.groundSpeed/70,0,1)*0.003:0)+clamp(fm.qbar/40000,0,1)*0.0006+(mode==="race"?0.0003:0);
+  head.e.set(head.pitch+amp*snoise(t*14,1.7),head.yaw+amp*0.7*snoise(t*11,5.3),amp*0.5*snoise(t*9,9.1),"YXZ"); head.q.setFromEuler(head.e);
+  // eye: turns about the neck, leans toward a look over the shoulder, then the body's reaction
+  var lean=sstep(60*DEG,150*DEG,Math.abs(head.yaw));
+  head.eye.copy(NECK).applyQuaternion(head.q).sub(NECK).add(ck.eye).add(head.off);
+  head.eye.x-=Math.sign(head.yaw)*0.06*lean; head.eye.y+=0.015*lean;
+}
+function resetHead(){ head.off.set(0,0,0); head.vel.set(0,0,0); head.acc.set(0,9.80665,0); head.vPrev.copy(fm.vel); head.gs=1; head.gv=head.rv=0; head.drag=null; }
+// cockpit fov: the zoom, widened on narrow screens so the panel's width stays in view
+function cockpitFov(){ var tz=Math.tan(head.fov*Math.PI/360), need=Math.atan(tz*1.425/camera.aspect)*2/DEG; return clamp(Math.max(head.fov,need),30,100); }
+// everything the instruments show besides the flight model, shared by both cockpits
+var CKO={visible:false,time:0,dark:0,mode:"ring",inp:null,warn:null,trimT:9,sun:new THREE.Vector3(),up:new THREE.Vector3(),sunCol:new THREE.Color(),skyCol:new THREE.Color(),eye:new THREE.Vector3(),
+  game:{rings:[],ils:null}};
+var ILS={gs:0,loc:0};
+// glide slope / localiser deviation (deg) on final for runway 09, or null when not established inbound
+function ilsDev(){
+  var dg=RWY.aim-rwyA;
+  if(!(dg>30&&rwyA>-15000&&Math.abs(angDiff(fm.heading,RWY.heading))<1.6)) return null;
+  ILS.gs=Math.atan2(fm.pos.y-RWY.elev,dg)*R2D-RWY.glide*R2D; ILS.loc=Math.atan2(rwyC,RWY.length-rwyA+300)*R2D; return ILS;
+}
+function cockpitInfo(t){
+  var o=CKO, g=o.game, i;
+  o.visible=view==="cockpit"; o.time=t/1000; o.dark=TOD_DARK[todIndex]; o.mode=mode; o.inp=inp; o.warn=warn; o.trimT=trimT;
+  tmpQ.copy(fm.q).invert(); o.sun.copy(skyUni.sunDir.value).applyQuaternion(tmpQ); o.up.set(0,1,0).applyQuaternion(tmpQ);
+  o.sunCol.copy(sun.color).multiplyScalar(sun.intensity); o.skyCol.copy(hemi.color).multiplyScalar(hemi.intensity); o.eye.copy(head.eye); o.headQ=head.q;
+  g.rings.length=0; if(mode==="ring") for(i=0;i<gates.length;i++) g.rings.push(gates[i].pos);
+  g.raceStep=race.step; g.raceDone=race.done; g.raceHit=race.hit; g.raceT=race.t; g.racePen=race.pen; g.raceStarted=race.started;
+  g.raceGs=race.gs; g.raceMaxG=race.maxG; g.raceHead=fm.pos.y+TRACK.headUp;
+  g.rwyA=rwyA; g.rwyC=rwyC; g.ils=mode==="land"?ilsDev():null; g.score=score; g.best=score.best;
+  return o;
+}
 
 // ================= Gates =================
 var torusGeo=new THREE.TorusGeometry(60,3.5,10,40);
@@ -146,10 +254,10 @@ function updateGates(){
   var d=tmpV.copy(fm.pos).sub(g.pos), s=d.dot(g.normal), lat=tmpV2.copy(d).addScaledVector(g.normal,-s).length();
   if(g.sideLast>0 && s<=0){
     if(lat<GATE_R){
-      score.gates++; if(lat<18){ score.perfect++; showMsg("PERFECT  +1",1200); beep(1320,0.08); setTimeout(function(){beep(1760,0.12);},90); }
-      else { showMsg("GATE  +1",900); beep(1100,0.1); }
+      score.gates++; if(lat<18){ score.perfect++; showMsg("PERFECT  +1",1200); sfx("perfect"); }
+      else { showMsg("GATE  +1",900); sfx("gate"); }
       if(score.gates>score.best){ score.best=score.gates; try{ localStorage.setItem("skyrunner.best",String(score.best)); }catch(e){} }
-    } else { score.miss++; showMsg("MISS",900); beep(300,0.2,"square"); }
+    } else { score.miss++; showMsg("MISS",900); sfx("penalty"); }
     advanceGate(); return;
   }
   if(d.length()>3200){ score.miss++; showMsg("MISS",900); advanceGate(); return; }
@@ -223,67 +331,126 @@ function updatePapi(){
   col.needsUpdate=true;
 }
 
-// ================= Air race: pylon gates over the channel (visible in race mode only) =================
+// ================= Air race: 2019 Master Class rules over the channel (visible in race mode only) =================
+// Pylons from World.TRACK: 25 m cones (white, red above the 15 m flight window), gate pylons with a vertical inner
+// face, each on a small pontoon. Judging (World.judgeCrossing, RULES) is shared with test/world.test.js.
 var raceGroup=new THREE.Group(); raceGroup.visible=false; scene.add(raceGroup);
-var PYL_H=COURSE.pylonHeight, NG=COURSE.gates.length;
-var race={step:0,t:0,pen:0,started:false,done:false,prevS:-1,miss:0,hits:0,splits:[],hit:[],pylons:[],tops:null};
-var raceBest=null; try{ raceBest=JSON.parse(localStorage.getItem("skyrunner.raceBest")||"null"); if(!raceBest||!(raceBest.t>0)) raceBest=null; }catch(e){ raceBest=null; }
-function pylonMat(c){ return new THREE.MeshLambertMaterial({color:c,emissive:c,emissiveIntensity:0.35}); }
-var RACE_LOOK={next:[pylonMat(0xffb347),[1,0.7,0.28]], next2:[pylonMat(0x8fd8ff),[0.56,0.85,1]], idle:[pylonMat(0x2f7fd0),[0.18,0.5,0.82]], done:[pylonMat(0x5d6573),[0.36,0.4,0.45]], hit:[pylonMat(0xff5d45),[1,0.36,0.27]]};
+var PYL_H=TRACK.pylonHeight, NRUN=TRACK.run.length, RACER_PTS=World.RACER_PTS;
+var race={step:0,t:0,pen:0,started:false,done:false,prevS:-1,hits:0,log:[],splits:[],hit:[],meshes:[],tops:null,gs:1,maxG:0,overG:false,smokePen:false,vtm:null,startKt:0,warnT:0};
+var raceBest=null; try{ raceBest=JSON.parse(localStorage.getItem("skyrunner.raceBest.2019")||"null"); if(!raceBest||!(raceBest.t>0)) raceBest=null; }catch(e){ raceBest=null; }
+var PEN_TXT={level:["INCORRECT LEVEL","水平飛行違反"],high:["TOO HIGH","高度超過"],speed:["ENTRY SPEED","進入速度超過"],pylon:["PYLON HIT","パイロン接触"],overg:["OVER G","オーバーG"],smoke:["NO SMOKE","スモークなし"],vtm:["INCORRECT VTM","VTM 不正"]};
+var DNF_TXT={missed:"ゲートの外を通過した（コース逸脱）",side:"シケインのパイロンを逆側から回った（コース逸脱）",speed:"スタートゲートの進入速度が 200 kt を 2 kt 以上超えた"};
+var RACE_TOP={next:[1,0.7,0.28],next2:[0.56,0.85,1],idle:[0.75,0.78,0.85],hit:[1,0.3,0.25]};
 (function(){
-  var geo=new THREE.CylinderGeometry(1.5,2.6,PYL_H,10), cap=new THREE.CylinderGeometry(1.56,1.56,6,10), capMat=new THREE.MeshLambertMaterial({color:0xf2f4f8}), tops=[];
-  COURSE.gates.forEach(function(g){
-    var pair=[];
-    [[g.ax,g.az],[g.bx,g.bz]].forEach(function(b){
-      var m=new THREE.Mesh(geo,RACE_LOOK.idle[0]); m.position.set(b[0],PYL_H/2,b[1]);
-      var c=new THREE.Mesh(cap,capMat); c.position.y=PYL_H/2-6; m.add(c);
-      raceGroup.add(m); pair.push(m); tops.push([b[0],PYL_H+3,b[1],1,1,1]);
-    });
-    race.pylons.push(pair);
+  var white=new THREE.MeshLambertMaterial({color:0xd6d6d2}), red=new THREE.MeshLambertMaterial({color:0xb01208}), dark=new THREE.MeshLambertMaterial({color:0x1b1e24});
+  var cv=document.createElement("canvas"), c2=cv.getContext("2d"), i, j; cv.width=64; cv.height=16;           // start/finish band
+  for(i=0;i<16;i++) for(j=0;j<4;j++){ c2.fillStyle=(i+j)%2?"#111":"#eee"; c2.fillRect(i*4,j*4,4,4); }
+  var chk=new THREE.CanvasTexture(cv); chk.wrapS=THREE.RepeatWrapping; chk.repeat.set(2,1);
+  var chkMat=new THREE.MeshLambertMaterial({map:chk});
+  function cone(y0,y1,offset){ // frustum between heights y0..y1; offset: shift every ring by its radius so the inner (-x) face is vertical
+    var g=new THREE.CylinderGeometry(World.pylonR(y1),World.pylonR(y0),y1-y0,28,3,true), p, k;
+    g.translate(0,(y0+y1)/2,0);
+    if(offset){ p=g.attributes.position; for(k=0;k<p.count;k++) p.setX(k,p.getX(k)+World.pylonR(p.getY(k))); g.computeVertexNormals(); }
+    return g;
+  }
+  var W=TRACK.windowTop, geo={gate:[cone(0,W,true),cone(W,PYL_H,true),cone(6,8.5,true)], pylon:[cone(0,W,false),cone(W,PYL_H,false),cone(6,8.5,false)]};
+  var pontoon=new THREE.BoxGeometry(7,0.9,7), tops=[];
+  TRACK.pylons.forEach(function(p){
+    var g=TRACK.gates[p.gate], kind=g.kind, m=new THREE.Group(), body=new THREE.Group();
+    m.position.set(p.x,0,p.z); m.rotation.y=Math.atan2(-p.oz,p.ox||1e-9); if(kind==="pylon") m.rotation.y=0;
+    body.add(new THREE.Mesh(geo[kind][0],white),new THREE.Mesh(geo[kind][1],red));
+    if(p.gate===0){ var band=new THREE.Mesh(geo[kind][2],chkMat); band.scale.set(1.01,1,1.01); body.add(band); }
+    var pt=new THREE.Mesh(pontoon,dark); pt.position.set(kind==="gate"?3:0,0.1,0); m.add(pt,body);
+    raceGroup.add(m); race.meshes.push(body);
+    var tx=p.x+p.ox*World.pylonR(PYL_H), tz=p.z+p.oz*World.pylonR(PYL_H); tops.push([tx,PYL_H+1.2,tz,1,1,1]);
   });
   race.tops=pointsObj(tops,6); raceGroup.add(race.tops);
 })();
-function gateS(gi){ return World.gateFrame(gi,fm.pos.x,fm.pos.z).s; }
-// colour every pylon by its gate's place in the lap: next (orange), the one after (light blue), later (blue), passed (grey), struck (red)
+// next gate (orange) and the one after (light blue) light up on top of their pylons; struck pylons go red
 function raceLook(){
-  var col=race.tops.geometry.attributes.color, gi, j, st, look;
-  for(gi=0;gi<NG;gi++){
-    st=race.step>gi?"done":"idle";
-    if(!race.done&&gi===race.step%NG) st="next"; else if(race.step+1<=NG&&gi===(race.step+1)%NG) st="next2";
-    for(j=0;j<2;j++){ look=RACE_LOOK[race.hit[gi][j]?"hit":st]; race.pylons[gi][j].material=look[0]; col.setXYZ(gi*2+j,look[1][0],look[1][1],look[1][2]); }
-  }
+  var col=race.tops.geometry.attributes.color, n1=race.done?-1:TRACK.run[race.step].g, n2=!race.done&&race.step+1<NRUN?TRACK.run[race.step+1].g:-1, i, c;
+  for(i=0;i<TRACK.pylons.length;i++){ var g=TRACK.pylons[i].gate; c=RACE_TOP[race.hit[i]?"hit":g===n1?"next":g===n2?"next2":"idle"]; col.setXYZ(i,c[0],c[1],c[2]); }
   col.needsUpdate=true;
 }
+var rPrev=RACER_PTS.map(function(){ return new THREE.Vector3(); }), rCur=RACER_PTS.map(function(){ return new THREE.Vector3(); });
+function racerPts(out){ for(var i=0;i<RACER_PTS.length;i++) out[i].fromArray(RACER_PTS[i]).applyQuaternion(fm.q).add(fm.pos); }
 function resetRace(){
-  race.step=0; race.t=0; race.pen=0; race.started=false; race.done=false; race.miss=0; race.hits=0; race.splits=[]; race.hit=[];
-  for(var gi=0;gi<NG;gi++){ race.hit.push([false,false]); for(var j=0;j<2;j++){ race.pylons[gi][j].scale.y=1; race.pylons[gi][j].position.y=PYL_H/2; } }
-  race.prevS=gateS(0); raceLook();
+  race.step=0; race.t=0; race.pen=0; race.started=false; race.done=false; race.hits=0; race.log=[]; race.splits=[]; race.hit=[];
+  race.gs=1; race.maxG=0; race.overG=false; race.smokePen=false; race.vtm=null; race.startKt=0; race.warnT=0;
+  for(var i=0;i<TRACK.pylons.length;i++){ race.hit.push(false); race.meshes[i].scale.set(1,1,1); race.meshes[i].rotation.set(0,0,0); }
+  race.prevS=World.gateFrame(0,fm.pos.x,fm.pos.z).s; racerPts(rPrev); raceLook();
 }
-function knockPylon(gi,j){ var m=race.pylons[gi][j]; m.scale.y=0.25; m.position.y=PYL_H*0.125; } // deflates like an air-race pylon
+function knockPylon(i){ var m=race.meshes[i]; m.scale.set(1.25,0.22,1.25); m.rotation.z=0.25; } // the fabric tears and the cone slumps
+function addPen(sec,code,extra){
+  race.pen+=sec; race.log.push([code,sec]); sfx(code==="pylon"?"pylon":"penalty");
+  showMsg(PEN_TXT[code][0]+"  +"+sec+"s"+(extra?"  "+extra:""),1500);
+}
+function raceDNF(why){
+  race.done=true; stopRun(); raceLook(); sfx("penalty");
+  showResult("DNF","失格（DNF）",[[race.step===0?"START":race.step+"/"+(NRUN-1),"GATE"],[race.started?fmtTime2(race.t):"--","TIME"],[raceBest?fmtTime2(raceBest.t):"--","BEST"]],
+    why+"。R でスタートゲートの手前からやり直せます。");
+}
 function updateRace(dt){
-  var gi=race.step%NG, gf=World.gateFrame(gi,fm.pos.x,fm.pos.z), s=gf.s, i, j, msg, pen=COURSE.penalty;
+  var R=RULES, i, s, k;
   if(race.started) race.t+=dt;
-  if(fm.pos.y<PYL_H+0.5) for(i=0;i<NG;i++) for(j=0;j<2;j++){
-    if(race.hit[i][j]) continue;
-    var gp=COURSE.gates[i], px=j?gp.bx:gp.ax, pz=j?gp.bz:gp.az, ex=fm.pos.x-px, ez=fm.pos.z-pz;
-    if(ex*ex+ez*ez<6.7*6.7){ race.hit[i][j]=true; race.hits++; race.pen+=pen; knockPylon(i,j); raceLook(); showMsg("PYLON HIT  +"+pen+"s",1300); beep(300,0.25,"square"); }
+  // accelerometer, smoothed over 50 ms: reaching 11 g costs 1 s once, 12 g is a DNF
+  race.gs+=(fm.nz-race.gs)*(1-Math.exp(-dt/0.05));
+  if(race.started){
+    race.maxG=Math.max(race.maxG,race.gs);
+    if(race.gs>=R.maxG){ raceDNF("最大荷重 12G に達した（"+race.gs.toFixed(1)+"G）"); return; }
+    if(race.gs>=R.overG&&!race.overG){ race.overG=true; addPen(R.overGPen,"overg",race.gs.toFixed(1)+"G"); }
+    if(!inp.smoke&&!race.smokePen){ race.smokePen=true; addPen(R.smokePen,"smoke"); }
+    if(!World.inBounds(fm.pos.x,fm.pos.z)){ raceDNF("コースの外に出た（コース逸脱）"); return; }
   }
-  // gate judgement on crossing its plane. Wide of the judging window it does not count at all: the gate stays next
-  // and has to be flown again (so cutting inside a turn apex never pays).
-  var v=race.prevS<0&&s>=0?World.gateVerdict(gf.lat,fm.pos.y):undefined;
-  if(v===null&&Math.abs(gf.lat)<3000) showMsg("ゲート未通過 — 戻ってくぐり直し",1800);
-  if(v){
-    if(v==="pass"){ msg=race.step===0?"START":race.step===NG?"FINISH":"GATE "+race.step+"/"+(NG-1); beep(1100,0.1); }
-    else { race.pen+=pen; race.miss++; msg=(v==="high"?"TOO HIGH":"MISSED GATE")+"  +"+pen+"s"; beep(300,0.2,"square"); }
-    if(race.step===0){ race.started=true; race.t=0; }
-    else {
-      var tt=race.t+race.pen; race.splits[race.step]=tt;
-      if(raceBest&&raceBest.splits&&raceBest.splits[race.step]!=null){ var dd=tt-raceBest.splits[race.step]; msg+="   "+(dd<0?"-":"+")+Math.abs(dd).toFixed(2); }
+  // any part of the airframe touching a pylon, swept between frames in 0.25 m steps (a wingtip covers 1.7 m a frame)
+  racerPts(rCur);
+  var mv=0; for(i=0;i<rCur.length;i++) mv=Math.max(mv,rCur[i].distanceToSquared(rPrev[i]));
+  var ns=Math.min(60,Math.max(1,Math.ceil(Math.sqrt(mv)/0.25)));
+  for(s=1;s<=ns;s++) for(i=0;i<rCur.length;i++){
+    k=s/ns; tmpV.copy(rPrev[i]).lerp(rCur[i],k);
+    var pi=World.pylonContact(tmpV.x,tmpV.y,tmpV.z);
+    if(pi>=0&&!race.hit[pi]){
+      race.hit[pi]=true; race.hits++; knockPylon(pi); raceLook();
+      if(race.hits>=R.pylonDnf){ sfx("pylon"); raceDNF("パイロンに 3 回接触した"); return; }
+      addPen(R.pylonPen,"pylon");
     }
-    if(race.step===NG){ finishRace(); return; }
-    race.step++; race.prevS=gateS(race.step%NG); raceLook(); showMsg(msg,1300); return;
   }
-  race.prevS=s;
+  for(i=0;i<rCur.length;i++) rPrev[i].copy(rCur[i]);
+  if(race.vtm) race.vtm.max=Math.max(race.vtm.max,fm.pitch);
+  // gate crossing: judged when the aircraft passes the current element's plane in the direction of travel
+  var gf=World.gateFrame(race.step,fm.pos.x,fm.pos.z), v=null;
+  if(race.prevS<0&&gf.s>=0) v=World.judgeCrossing(race.step,gf.lat,fm.pos.y,fm.bank,Math.asin(clamp(fm.vs/Math.max(fm.tas,1),-1,1)),fm.tas*KT);
+  race.prevS=gf.s;
+  if(!v) return;
+  var el=TRACK.run[race.step], msg;
+  if(v.dnf){ raceDNF(DNF_TXT[v.dnf]+(v.dnf==="speed"?"（"+(fm.tas*KT).toFixed(1)+" kt）":"")); return; }
+  if(race.vtm){   // the VTM before this crossing: our reading of the briefed manoeuvre is a vertical turn, nose 45 deg up
+    var mx=race.vtm.max*R2D; race.vtm=null;
+    if(mx<R.vtmDnfPitch){ raceDNF("VTM を水平旋回で回った（機首上げ最大 "+Math.round(mx)+"°）"); return; }
+    if(mx<R.vtmPitch) addPen(R.vtmPen,"vtm",Math.round(mx)+"°");
+  }
+  for(i=0;i<v.pens.length;i++) addPen(v.pens[i][0],v.pens[i][1],v.pens[i][1]==="speed"?(fm.tas*KT).toFixed(1)+" kt":"");
+  if(race.step===0){ race.started=true; race.t=0; race.startKt=fm.tas*KT; }
+  if(el.vtm) race.vtm={max:-9};
+  if(el.role==="finish"){ finishRace(); return; }
+  msg=race.step===0?"START  "+race.startKt.toFixed(0)+" kt":el.role==="pylon"?"CHICANE":"GATE "+race.step+"/"+(NRUN-1);
+  if(race.step>0){
+    var tt=race.t+race.pen; race.splits[race.step]=tt;
+    if(raceBest&&raceBest.splits&&raceBest.splits[race.step]!=null){ var dd=tt-raceBest.splits[race.step]; msg+="   "+(dd<0?"-":"+")+Math.abs(dd).toFixed(2); }
+  }
+  if(!v.pens.length) { showMsg(msg,1100); sfx(race.step===0?"start":"gate"); }
+  race.step++; race.prevS=World.gateFrame(race.step,fm.pos.x,fm.pos.z).s; raceLook();
+}
+// in a VTM until the nose has been 45 deg up and the aircraft heads back toward the next gate
+function inVtm(){ var el=TRACK.run[race.step]; return !!race.vtm&&(race.vtm.max*R2D<RULES.vtmPitch||fm.vel.x*el.hx+fm.vel.z*el.hz<=0); }
+// one-line brief for the next element, shown low on the HUD
+function raceHint(){
+  if(race.done) return "";
+  var el=TRACK.run[race.step];
+  if(!race.started) return (inp.smoke?"":"F でスモーク ON  ·  ")+"スタートゲートは 200 kt 以下で";
+  if(inVtm()) return "VTM: 機首を 45° 以上上げて左へ反転";
+  if(el.role==="pylon") return el.pass<0?"シケイン: パイロンを右に見て通過":"シケイン: パイロンを左に見て通過";
+  return (el.role==="finish"?"フィニッシュ":"ゲート")+": 水平に（±10°）、頭が赤い部分より下"+(el.vtm?"  →  通過後 VTM":"");
 }
 
 // ================= Landing: touchdown capture, scoring =================
@@ -299,8 +466,8 @@ function landTouch(vsB,wowB){
   if(fm.wow&&!wowB){
     if(!land.td){
       land.td={sink:-vsB,along:rwyA,across:rwyC,bank:fm.bank,ias:fm.ias};
-      var fpm=Math.round(-vsB*FPM); showMsg((fpm<=120?"BUTTER!  ":"TOUCHDOWN  ")+fpm+" fpm",1600); beep(fpm<=240?1320:700,0.12);
-    } else if(land.air>0.25){ land.bounces++; showMsg("BOUNCE",900); beep(500,0.12,"square"); }
+      var fpm=Math.round(-vsB*FPM); showMsg((fpm<=120?"BUTTER!  ":"TOUCHDOWN  ")+fpm+" fpm",1600); sfx("touch");
+    } else if(land.air>0.25){ land.bounces++; showMsg("BOUNCE",900); sfx("bounce"); }
   }
 }
 function updateLanding(dt){
@@ -317,73 +484,70 @@ function landingScore(td,bounces){
 }
 
 // ================= Input =================
-var keys={}, inp={pitch:0,roll:0,yaw:0,throttle:0.6,ab:false,brake:false,gear:false}, touch={stick:null,thr:null,pitch:0,roll:0,brake:false};
+var keys={}, inp={pitch:0,roll:0,yaw:0,throttle:0.6,ab:false,brake:false,gear:false,smoke:false}, touch={stick:null,thr:null,pitch:0,roll:0,brake:false,trim:0,look:false};
 var PREVENT={ArrowUp:1,ArrowDown:1,ArrowLeft:1,ArrowRight:1,Space:1,PageUp:1,PageDown:1,Escape:1};
 window.addEventListener("keydown",function(e){ if(e.target&&e.target.tagName==="BUTTON"&&e.code==="Space") return; keys[e.code]=true; if(PREVENT[e.code]) e.preventDefault(); if(!e.repeat) onKey(e.code); });
 window.addEventListener("keyup",function(e){ keys[e.code]=false; });
 window.addEventListener("blur",function(){ keys={}; });
 function approach(v,t,r){ return v<t?Math.min(v+r,t):Math.max(v-r,t); }
+var trimT=0;  // s since the trim last moved (the HUD highlights the trim readout meanwhile)
 function readInputs(dt){
-  var tp=0,tr=0,ty=0;
-  // Keyboard is digital: cap the pull so a held key gives a firm turn (~5 g at corner speed) instead of an instant stall. Touch/mouse stick stays analog to ±1.
-  if(keys.ArrowDown||keys.KeyS) tp+=0.55; if(keys.ArrowUp||keys.KeyW) tp-=0.55;
-  if(keys.ArrowRight||keys.KeyD) tr+=1; if(keys.ArrowLeft||keys.KeyA) tr-=1;
+  var tp=0,tr=0,ty=0,k=kit();
+  // Keyboard is digital: cap the stick so a held key gives a firm turn instead of an instant stall (jet ~5 g at
+  // corner speed, race plane ~9 g at 200 kt). Touch/mouse stick stays analog to ±1.
+  if(keys.ArrowDown||keys.KeyS) tp+=k.kbPitch; if(keys.ArrowUp||keys.KeyW) tp-=k.kbPitch;
+  if(keys.ArrowRight||keys.KeyD) tr+=k.kbRoll; if(keys.ArrowLeft||keys.KeyA) tr-=k.kbRoll;
   if(keys.KeyE) ty+=1; if(keys.KeyQ) ty-=1;
   if(keys.ShiftLeft||keys.ShiftRight||keys.PageUp) inp.throttle=Math.min(1,inp.throttle+dt*0.45);
   if(keys.KeyZ||keys.KeyX||keys.PageDown) inp.throttle=Math.max(0,inp.throttle-dt*0.45);
-  inp.ab=!!keys.Space; inp.brake=!!keys.KeyB||touch.brake;
+  inp.ab=!!keys.Space&&mode!=="race"; inp.brake=!!keys.KeyB||touch.brake;
   if(touch.stick){ tp=touch.pitch; tr=touch.roll; }
   inp.pitch=approach(inp.pitch,tp,dt*5); inp.roll=approach(inp.roll,tr,dt*7); inp.yaw=approach(inp.yaw,ty,dt*5);
+  // pitch trim: Y nose down / H nose up while held (the trim elevator is the stick-neutral surface angle)
+  var td=(keys.KeyH?1:0)-(keys.KeyY?1:0)+touch.trim;
+  if(td){ fm.trimBy(Math.sign(td)*fm.params.trimRate*dt); trimT=0; } else trimT+=dt;
   // B: wheel brakes and speed brake together
   fm.setControls({pitch:inp.pitch,roll:inp.roll,yaw:inp.yaw,throttle:inp.throttle,afterburner:inp.ab,brake:inp.brake?1:0,speedBrake:inp.brake,gear:inp.gear});
 }
 function clamp(v,a,b){ return v<a?a:v>b?b:v; }
 glc.addEventListener("pointerdown",function(e){
+  if(e.pointerType==="mouse"&&e.button!==0){   // right / middle button: look around in the cockpit (never the stick)
+    if(view==="cockpit"&&started){ e.preventDefault(); try{ glc.setPointerCapture(e.pointerId); }catch(err){} head.drag={id:e.pointerId,x:e.clientX,y:e.clientY,yaw:head.yaw,pitch:head.pitch}; }
+    return;
+  }
   if(!running) return; e.preventDefault(); try{ glc.setPointerCapture(e.pointerId); }catch(err){}
   if(e.clientX<window.innerWidth/2){ if(!touch.stick) touch.stick={id:e.pointerId,x0:e.clientX,y0:e.clientY}; }
   else if(!touch.thr) touch.thr={id:e.pointerId,y0:e.clientY,t0:inp.throttle};
 });
 glc.addEventListener("pointermove",function(e){
+  if(head.drag&&head.drag.id===e.pointerId){ head.yaw=clamp(head.drag.yaw-(e.clientX-head.drag.x)*0.005,-2.8,2.8); head.pitch=clamp(head.drag.pitch-(e.clientY-head.drag.y)*0.005,-0.8,1.5); }
   if(touch.stick&&touch.stick.id===e.pointerId){ touch.roll=clamp((e.clientX-touch.stick.x0)/70,-1,1); touch.pitch=clamp((e.clientY-touch.stick.y0)/80,-1,1); }
   if(touch.thr&&touch.thr.id===e.pointerId){ inp.throttle=clamp(touch.thr.t0+(touch.thr.y0-e.clientY)/220,0,1); }
 });
-function endPointer(e){ if(touch.stick&&touch.stick.id===e.pointerId){ touch.stick=null; touch.pitch=0; touch.roll=0; } if(touch.thr&&touch.thr.id===e.pointerId) touch.thr=null; }
+glc.addEventListener("contextmenu",function(e){ e.preventDefault(); });
+// mouse wheel: zoom in the cockpit (the HUD stays conformal: it is drawn from the camera's own projection)
+glc.addEventListener("wheel",function(e){ if(view!=="cockpit") return; e.preventDefault(); head.fov=clamp(head.fov*(e.deltaY>0?1.08:1/1.08),35,90); },{passive:false});
+function endPointer(e){ if(head.drag&&head.drag.id===e.pointerId) head.drag=null; if(touch.stick&&touch.stick.id===e.pointerId){ touch.stick=null; touch.pitch=0; touch.roll=0; } if(touch.thr&&touch.thr.id===e.pointerId) touch.thr=null; }
 glc.addEventListener("pointerup",endPointer); glc.addEventListener("pointercancel",endPointer);
 
-// ================= Audio (starts on the launch button) =================
-var audio={ctx:null,muted:false};
+// ================= Audio (sound.js; starts on the launch button) =================
+var snd=null, sndMuted=false;
 function audioInit(){
-  if(audio.ctx) return;
-  try{
-    var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; var c=new AC(); audio.ctx=c;
-    var master=c.createGain(); master.gain.value=audio.muted?0:1; master.connect(c.destination); audio.master=master;
-    var osc=c.createOscillator(); osc.type="sawtooth"; osc.frequency.value=80;
-    var lp=c.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=300; lp.Q.value=2;
-    var eg=c.createGain(); eg.gain.value=0; osc.connect(lp); lp.connect(eg); eg.connect(master); osc.start();
-    var whine=c.createOscillator(); whine.type="sine"; whine.frequency.value=640; var wg=c.createGain(); wg.gain.value=0; whine.connect(wg); wg.connect(master); whine.start();
-    var buf=c.createBuffer(1,c.sampleRate*2,c.sampleRate), d=buf.getChannelData(0); for(var i=0;i<d.length;i++) d[i]=Math.random()*2-1;
-    var ns=c.createBufferSource(); ns.buffer=buf; ns.loop=true; var bp=c.createBiquadFilter(); bp.type="bandpass"; bp.frequency.value=700; bp.Q.value=0.6;
-    var ng=c.createGain(); ng.gain.value=0; ns.connect(bp); bp.connect(ng); ng.connect(master); ns.start();
-    audio.osc=osc; audio.lp=lp; audio.eng=eg; audio.whine=whine; audio.wg=wg; audio.wind=ng;
-  }catch(e){ audio.ctx=null; }
+  if(snd) return;
+  try{ var AC=window.AudioContext||window.webkitAudioContext; if(!AC) return; snd=SkyrunnerSound.create(new AC()); snd.setMuted(sndMuted); }catch(e){ snd=null; }
 }
-function audioUpdate(){
-  if(!audio.ctx) return; var t=audio.ctx.currentTime, thr=fm.throttleActual||0, ab=inp.ab?1:0;
-  audio.osc.frequency.setTargetAtTime(55+thr*115+ab*45,t,0.2); audio.lp.frequency.setTargetAtTime(220+thr*900+ab*600,t,0.2);
-  audio.eng.gain.setTargetAtTime(0.025+thr*0.085+ab*0.06,t,0.15);
-  audio.whine.frequency.setTargetAtTime(500+thr*900,t,0.3); audio.wg.gain.setTargetAtTime(0.006+thr*0.018,t,0.2);
-  audio.wind.gain.setTargetAtTime(Math.min((fm.ias||0)/330,1.2)*0.1,t,0.15);
+function audioUpdate(dt){
+  if(!snd) return;
+  snd.setVoice(mode==="race"?"piston":"jet"); snd.setPaused(false);
+  snd.update({thr:fm.throttleActual,ab:fm.afterburnerLevel,ias:fm.ias,alpha:fm.alpha,g:fm.nz,ext:view==="ext",on:running,dt:dt});
 }
-function beep(freq,dur,type){
-  if(!audio.ctx||audio.muted) return;
-  try{ var c=audio.ctx, o=c.createOscillator(), g=c.createGain(), t=c.currentTime; o.type=type||"sine"; o.frequency.value=freq; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.18,t+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g); g.connect(audio.master); o.start(t); o.stop(t+dur+0.02); }catch(e){}
-}
-function setMuted(m){ audio.muted=m; if(audio.master) audio.master.gain.setTargetAtTime(m?0:1,audio.ctx.currentTime,0.05); var b=document.getElementById("bMute"); if(b.firstChild) b.firstChild.nodeValue=m?"音 OFF":"音"; }
+function sfx(name){ if(snd) snd.play(name); }
+function setMuted(m){ sndMuted=m; if(snd) snd.setMuted(m); var b=document.getElementById("bMute"); if(b.firstChild) b.firstChild.nodeValue=m?"音 OFF":"音"; }
 
 // ================= HUD (2D canvas overlay) =================
 var HUD_COL="#8dff9c", WARN_COL="#ff5d45", ACC_COL="#ffb347", MONO='"Share Tech Mono","Consolas",monospace';
 var dpr=1, W=1, H=1, fs=12, tmpV3=new THREE.Vector3(), P={x:0,y:0,z:0};
-var warn={pull:false,stall:false,sink:false,gear:false,high:false};
+var warn={pull:false,stall:false,sink:false,gear:false,high:false,overg:false};
 function resize(){ W=window.innerWidth; H=window.innerHeight; dpr=Math.min(window.devicePixelRatio||1,2); renderer.setSize(W,H,false); camera.aspect=W/H; camera.updateProjectionMatrix(); hud.width=Math.round(W*dpr); hud.height=Math.round(H*dpr); }
 window.addEventListener("resize",resize); resize();
 function line(x1,y1,x2,y2){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
@@ -404,7 +568,7 @@ function fmtDist(d){ return d>=1000?(d/1000).toFixed(1)+" km":Math.round(d)+" m"
 function drawMarker(p,label,col,primary,S,cx,cy){
   tmpV3.copy(p).applyMatrix4(camera.matrixWorldInverse);
   var ang, onScreen=false, gx, gy2;
-  if(tmpV3.z<0){ tmpV.copy(p).project(camera); if(Math.abs(tmpV.x)<=1&&Math.abs(tmpV.y)<=1){ onScreen=true; gx=(tmpV.x+1)/2*W; gy2=(1-tmpV.y)/2*H; } else ang=Math.atan2(-tmpV.y,tmpV.x); }
+  if(tmpV3.z<0){ tmpV.copy(p).project(camera); gx=(tmpV.x+1)/2*W; gy2=(1-tmpV.y)/2*H; if(gx>=HF.x0&&gx<=HF.x1&&gy2>=HF.y0&&gy2<=HF.y1) onScreen=true; else ang=Math.atan2(gy2-cy,gx-cx); }
   else ang=Math.atan2(-tmpV3.y,tmpV3.x);
   ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=2;
   if(onScreen){
@@ -433,9 +597,9 @@ function drawLandingAids(S,cx,cy){
     if(rwyScreen(-3000,0,RS[4])&&rwyScreen(0,0,RS[0])){ ctx.setLineDash([6,6]); line(RS[4][0],RS[4][1],RS[0][0],RS[0][1]); }
     ctx.restore();
   }
-  var dg=RWY.aim-rwyA;
-  if(dg>30&&rwyA>-15000&&Math.abs(angDiff(fm.heading,RWY.heading))<1.6){
-    var gsDev=Math.atan2(fm.pos.y-RWY.elev,dg)*R2D-RWY.glide*R2D, locDev=Math.atan2(rwyC,RWY.length-rwyA+300)*R2D, sp=S*0.032, k, gx=cx+S*0.175, ly=cy+S*0.205;
+  var ils=ilsDev();
+  if(ils){
+    var gsDev=ils.gs, locDev=ils.loc, sp=S*0.032, k, gx=cx+S*0.175, ly=cy+S*0.205;
     for(k=-2;k<=2;k++){ if(k){ ctx.beginPath(); ctx.arc(gx,cy+k*sp,S*0.005,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(cx+k*sp,ly,S*0.005,0,Math.PI*2); ctx.stroke(); } }
     line(gx-S*0.012,cy,gx+S*0.012,cy); line(cx,ly-S*0.012,cx,ly+S*0.012);
     ctx.fillStyle=ACC_COL; ctx.strokeStyle=ACC_COL; var dd=S*0.011, y=cy+clamp(gsDev/0.35,-2.4,2.4)*sp, x=cx-clamp(locDev/0.75,-2.4,2.4)*sp;
@@ -446,14 +610,49 @@ function drawLandingAids(S,cx,cy){
   var ra=(Math.min(fm.gearPts[1],fm.gearPts[4],fm.gearPts[7])-groundHeight(fm.pos.x,fm.pos.z))*3.28084;
   if(fm.gearPos>=1&&!fm.wow&&ra<200){ ctx.font=Math.round(fs*1.5)+"px "+MONO; ctx.textAlign="right"; ctx.fillText("RA "+Math.max(0,Math.round(ra)),cx-S*0.07,cy+S*0.075); ctx.font=fs+"px "+MONO; }
 }
+// HUD frame: where the symbology goes. HUD view: the whole screen round its centre. Jet cockpit: collimated on the
+// combiner - centred on the boresight (the HUD is focused at infinity, so it stays on the aircraft's axis as the head
+// moves), conformal (the camera's own pixels per degree) and clipped to the glass. Race plane (no HUD): only the
+// game's cues (targets, hint, warnings) round the boresight.
+var HF={cx:0,cy:0,S:1,ppd:1,clip:null,x0:0,y0:0,x1:1,y1:1,compact:false,hud:true,cues:false}, CLIP=[[0,0],[0,0],[0,0],[0,0]];
+function hudFrame(){
+  HF.clip=null; HF.compact=false; HF.hud=true; HF.cues=false; HF.x0=0; HF.y0=0; HF.x1=W; HF.y1=H;
+  if(view!=="cockpit"){ HF.cx=W/2; HF.cy=H/2; HF.S=Math.min(W,H); HF.ppd=HF.S*0.011; return HF; }
+  var ck=cockpit(), i, x0=1e9, y0=1e9, x1=-1e9, y1=-1e9, ahead;
+  HF.ppd=(H/2)/Math.tan(camera.fov*Math.PI/360)*DEG;
+  tmpV.set(0,0,-1).applyQuaternion(fm.q).multiplyScalar(5000).add(camera.position).project(camera);
+  ahead=tmpV.z<1; HF.cx=ahead?(tmpV.x+1)/2*W:W/2; HF.cy=ahead?(1-tmpV.y)/2*H:H/2;
+  if(!ck.combiner){ HF.S=Math.min(W,H); HF.hud=false; HF.cues=true; return HF; }
+  HF.S=27*HF.ppd; HF.compact=true;
+  for(i=0;i<4;i++){
+    if(tmpV3.copy(ck.combiner[i]).applyMatrix4(ckCam.matrixWorldInverse).z>-0.02) ahead=false;
+    tmpV.copy(ck.combiner[i]).project(ckCam); CLIP[i][0]=(tmpV.x+1)/2*W; CLIP[i][1]=(1-tmpV.y)/2*H;
+    x0=Math.min(x0,CLIP[i][0]); y0=Math.min(y0,CLIP[i][1]); x1=Math.max(x1,CLIP[i][0]); y1=Math.max(y1,CLIP[i][1]);
+  }
+  HF.clip=CLIP; HF.x0=x0; HF.y0=y0; HF.x1=x1; HF.y1=y1; HF.hud=ahead;
+  return HF;
+}
+function hudStyle(){ ctx.lineWidth=1.5; ctx.strokeStyle=HUD_COL; ctx.fillStyle=HUD_COL; ctx.font=fs+"px "+MONO; ctx.textBaseline="middle"; ctx.lineJoin="round"; ctx.lineCap="round"; ctx.shadowColor="rgba(0,0,0,0.6)"; ctx.shadowBlur=3; }
 function drawHUD(now){
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
   if(!started) return;
-  var cx=W/2, cy=H/2, S=Math.min(W,H), blink=Math.floor(now/250)%2===0;
-  fs=Math.max(11,Math.round(S*0.024));
-  ctx.lineWidth=1.5; ctx.strokeStyle=HUD_COL; ctx.fillStyle=HUD_COL; ctx.font=fs+"px "+MONO; ctx.textBaseline="middle"; ctx.lineJoin="round"; ctx.lineCap="round";
-  ctx.shadowColor="rgba(0,0,0,0.6)"; ctx.shadowBlur=3;
-  var pitchDeg=fm.pitch*57.29578, bank=fm.bank, hdg=fm.heading*57.29578, ppd=S*0.011;
+  var hf=hudFrame(), blink=Math.floor(now/250)%2===0, i;
+  if(hf.hud){
+    ctx.save();
+    if(hf.clip){ ctx.beginPath(); ctx.moveTo(hf.clip[0][0],hf.clip[0][1]); for(i=1;i<4;i++) ctx.lineTo(hf.clip[i][0],hf.clip[i][1]); ctx.closePath(); ctx.clip(); }
+    drawSymbology(hf,blink); ctx.restore();
+  } else if(hf.cues) drawCues(hf,blink);
+  if(view==="cockpit") drawGEffects();
+  fs=Math.max(11,Math.round(Math.min(W,H)*0.024)); hudStyle();
+  if(paused){ ctx.textAlign="center"; ctx.font="bold "+Math.round(fs*1.9)+"px "+MONO; ctx.fillStyle=ACC_COL; ctx.fillText("PAUSED",W/2,H/2-Math.min(W,H)*0.13); }
+  if(touch.stick){ ctx.strokeStyle="rgba(141,255,156,0.5)"; ctx.beginPath(); ctx.arc(touch.stick.x0,touch.stick.y0,70,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(touch.stick.x0+touch.roll*70,touch.stick.y0+touch.pitch*80,14,0,Math.PI*2); ctx.stroke(); }
+  ctx.fillStyle=HUD_COL; ctx.font=fs+"px "+MONO; ctx.shadowBlur=0;
+}
+// the HUD proper round hf's boresight: pitch ladder, bank scale, tapes, flight path marker, data, targets, warnings
+function drawSymbology(hf,blink){
+  var cx=hf.cx, cy=hf.cy, S=hf.S, cmp=hf.compact;
+  fs=cmp?Math.max(10,Math.round(S*0.03)):Math.max(11,Math.round(S*0.024)); hudStyle();
+  var pitchDeg=fm.pitch*57.29578, bank=fm.bank, hdg=fm.heading*57.29578, ppd=hf.ppd;
   var iasKt=fm.ias*1.94384, altFt=fm.pos.y*3.28084, vsFpm=fm.vs*196.85, aglFt=(fm.pos.y-groundHeight(fm.pos.x,fm.pos.z))*3.28084;
 
   // --- pitch ladder (rotates with bank, slides with pitch) ---
@@ -482,7 +681,7 @@ function drawHUD(now){
 
   // --- flight path vector (where the velocity actually points) ---
   if(fm.vel.lengthSq()>4){
-    tmpV3.copy(fm.vel).normalize(); tmpV.copy(fm.pos).addScaledVector(tmpV3,300).project(camera);
+    tmpV3.copy(fm.vel).normalize(); tmpV.copy(camera.position).addScaledVector(tmpV3,3000).project(camera);
     if(tmpV.z<1){
       var fx=clamp((tmpV.x+1)/2*W,cx-S*0.22,cx+S*0.22), fy=clamp((1-tmpV.y)/2*H,cy-S*0.28,cy+S*0.28), fr=S*0.012;
       ctx.beginPath(); ctx.arc(fx,fy,fr,0,Math.PI*2); ctx.stroke(); line(fx-fr,fy,fx-fr*2.4,fy); line(fx+fr,fy,fx+fr*2.4,fy); line(fx,fy-fr,fx,fy-fr*1.9);
@@ -497,9 +696,10 @@ function drawHUD(now){
     var by=cy-(RWY.vApp*KT-iasKt)*S*0.0022, bx2=cx-S*0.31;
     if(Math.abs(by-cy)<S*0.2){ ctx.fillStyle=ACC_COL; ctx.beginPath(); ctx.moveTo(bx2+2,by); ctx.lineTo(bx2+S*0.016,by-S*0.009); ctx.lineTo(bx2+S*0.016,by+S*0.009); ctx.closePath(); ctx.fill(); ctx.fillStyle=HUD_COL; }
   }
+  if(mode==="race") drawRaceGauges(S,cx,cy,iasKt);
 
   // --- heading tape ---
-  var hy=cy-S*0.39, hw2=S*0.22, ppdH=S*0.0045, h0=Math.floor((hdg-hw2/ppdH)/5)*5, h1=hdg+hw2/ppdH, hh, x, is10, hn, lbl;
+  var hy=cy-S*0.39, hw2=S*0.22, ppdH=S*(cmp?0.009:0.0045), h0=Math.floor((hdg-hw2/ppdH)/5)*5, h1=hdg+hw2/ppdH, hh, x, is10, hn, lbl;
   ctx.save(); ctx.beginPath(); ctx.rect(cx-hw2,hy-S*0.05,hw2*2,S*0.06); ctx.clip();
   line(cx-hw2,hy,cx+hw2,hy);
   for(hh=h0;hh<=h1;hh+=5){ x=cx+(hh-hdg)*ppdH; is10=((hh%10)+10)%10===0; hn=((hh%360)+360)%360; line(x,hy,x,hy-(is10?S*0.016:S*0.009)); if(is10){ ctx.textAlign="center"; lbl=hn===0?"N":hn===90?"E":hn===180?"S":hn===270?"W":String(hn/10); ctx.fillText(lbl,x,hy-S*0.03); } }
@@ -509,47 +709,87 @@ function drawHUD(now){
   ctx.font=Math.round(fs*1.3)+"px "+MONO; ctx.textAlign="center"; ctx.fillText(pad3(hdg),cx,hy+9+hbh/2+1); ctx.font=fs+"px "+MONO;
 
   // --- data blocks ---
-  var lx=cx-S*0.44, rx=cx+S*0.44, ly=cy+S*0.25, lh=fs*1.5;
+  var lx=cx-S*0.44, rx=cx+S*0.44, ly=cy+S*(cmp?0.2:0.25), lh=fs*(cmp?1.2:1.5);
   ctx.textAlign="left";
+  var gNow=mode==="race"?race.gs:(fm.nz||0), tr=fm.elevatorTrim*R2D;
   ctx.fillText("THR "+Math.round((fm.throttleActual||0)*100)+"%"+(inp.ab?"  AB":""),lx,ly);
-  ctx.fillText("G   "+(fm.nz||0).toFixed(1),lx,ly+lh);
-  ctx.fillText("M   "+(fm.mach||0).toFixed(2),lx,ly+lh*2);
+  if(mode==="race"&&gNow>=9) ctx.fillStyle=gNow>=10?WARN_COL:ACC_COL;
+  ctx.fillText("G   "+gNow.toFixed(1)+(mode==="race"&&race.started?"  MAX "+race.maxG.toFixed(1):""),lx,ly+lh); ctx.fillStyle=HUD_COL;
+  if(mode==="race"){ ctx.fillStyle=inp.smoke?HUD_COL:WARN_COL; ctx.fillText("SMK "+(inp.smoke?"ON":"OFF"),lx,ly+lh*2); ctx.fillStyle=HUD_COL; }
+  else ctx.fillText("M   "+(fm.mach||0).toFixed(2),lx,ly+lh*2);
   ctx.fillText("AOA "+(fm.tas>20?(fm.alpha*57.29578).toFixed(1)+"°":"--"),lx,ly+lh*3);
+  if(trimT<1.5) ctx.fillStyle=ACC_COL;
+  ctx.fillText("TRM "+(tr>0.05?"▲":tr<-0.05?"▼":" ")+Math.abs(tr).toFixed(1)+"°",lx,ly+lh*4); ctx.fillStyle=HUD_COL;
   if(fm.gearPos>0||mode==="land"){
     ctx.fillStyle=fm.gearPos>=1?HUD_COL:WARN_COL;
-    ctx.fillText("GEAR "+(fm.gearPos>=1?"DN":fm.gearPos>0?"··":"UP")+(inp.brake?"  BRK":""),lx,ly+lh*4); ctx.fillStyle=HUD_COL;
+    ctx.fillText("GEAR "+(fm.gearPos>=1?"DN":fm.gearPos>0?"··":"UP")+(inp.brake?"  BRK":""),lx,ly+lh*5); ctx.fillStyle=HUD_COL;
   }
   ctx.textAlign="right";
   ctx.fillText("VS "+(vsFpm>=0?"+":"")+Math.round(vsFpm/10)*10,rx,ly);
   ctx.fillText("AGL "+Math.max(0,Math.round(aglFt/10)*10),rx,ly+lh);
   ctx.fillText((fm.wow?"GND ":"TAS ")+Math.round((fm.wow?fm.groundSpeed:fm.tas)*1.94384)+" kt",rx,ly+lh*2);
-  ctx.fillText(TOD[todIndex].name,rx,ly+lh*3);
-  if(mode==="land") ctx.fillText(rwyA<0?"RWY 09 "+fmtDist(-rwyA):"RWY 09",rx,ly+lh*4);
+  if(!cmp) ctx.fillText(TOD[todIndex].name,rx,ly+lh*3);
+  if(mode==="land") ctx.fillText(rwyA<0?"RWY 09 "+fmtDist(-rwyA):"RWY 09",rx,ly+lh*(cmp?3:4));
 
-  // --- targets: next ring / next two race gates / aiming point; landing aids ---
+  drawTargets(S,cx,cy,cy+S*0.36);
+  drawWarning(cx,cy+S*0.13,blink);
+}
+// targets: next ring / next two race gates (with the brief for the next element at hintY) / aiming point, landing aids
+function drawTargets(S,cx,cy,hintY){
   var g=gates[0];
   if(mode==="ring"&&g) drawMarker(g.pos,fmtDist(fm.pos.distanceTo(g.pos)),ACC_COL,true,S,cx,cy);
   else if(mode==="race"&&!race.done){
-    var g1=COURSE.gates[race.step%NG], g2=race.step<NG?COURSE.gates[(race.step+1)%NG]:null;
-    if(g2) drawMarker(tmpV2.set(g2.x,PYL_H*0.45,g2.z),"","#8fd8ff",false,S,cx,cy);
-    drawMarker(tmpV2.set(g1.x,PYL_H*0.45,g1.z),fmtDist(Math.hypot(fm.pos.x-g1.x,fm.pos.z-g1.z)),ACC_COL,true,S,cx,cy);
+    var e1=TRACK.run[race.step], g1=TRACK.gates[e1.g], e2=race.step+1<NRUN?TRACK.run[race.step+1]:null;
+    if(e2){ var g2=TRACK.gates[e2.g]; drawMarker(tmpV2.set(g2.x,8,g2.z),"","#8fd8ff",false,S,cx,cy); }
+    var dl=fmtDist(Math.hypot(fm.pos.x-g1.x,fm.pos.z-g1.z));
+    drawMarker(tmpV2.set(g1.x,8,g1.z),e1.role==="pylon"?(e1.pass<0?"◀ "+dl:dl+" ▶"):dl,ACC_COL,true,S,cx,cy);
+    ctx.textAlign="center"; ctx.fillStyle=ACC_COL; ctx.fillText(raceHint(),cx,hintY); ctx.fillStyle=HUD_COL;
   } else if(mode==="land"){
     drawLandingAids(S,cx,cy);
     // aiming point marker far out only: closer in it would sit on top of the runway itself
     if(rwyA<-3000) drawMarker(tmpV2.set(RWY.thrX+RWY.fx*RWY.aim,RWY.elev,RWY.thrZ+RWY.fz*RWY.aim),"",ACC_COL,true,S,cx,cy);
   }
-
-  // --- warnings ---
+}
+function drawWarning(x,y,blink){
   ctx.textAlign="center"; ctx.font="bold "+Math.round(fs*1.9)+"px "+MONO;
-  var wtxt=warn.pull?"PULL UP":warn.sink?"SINK RATE":warn.gear?"GEAR":warn.stall?"STALL":warn.high?"TOO HIGH":"";
-  if(wtxt&&blink){ ctx.fillStyle=WARN_COL; ctx.fillText(wtxt,cx,cy+S*0.13); }
-  if(paused){ ctx.fillStyle=ACC_COL; ctx.fillText("PAUSED",cx,cy-S*0.13); }
-  if(touch.stick){ ctx.strokeStyle="rgba(141,255,156,0.5)"; ctx.beginPath(); ctx.arc(touch.stick.x0,touch.stick.y0,70,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(touch.stick.x0+touch.roll*70,touch.stick.y0+touch.pitch*80,14,0,Math.PI*2); ctx.stroke(); }
-  ctx.fillStyle=HUD_COL; ctx.font=fs+"px "+MONO; ctx.shadowBlur=0;
+  var wtxt=warn.pull?"PULL UP":warn.overg?"OVER G":warn.sink?"SINK RATE":warn.gear?"GEAR":warn.stall?"STALL":warn.high?"TOO HIGH":"";
+  if(wtxt&&blink){ ctx.fillStyle=WARN_COL; ctx.fillText(wtxt,x,y); }
+  ctx.fillStyle=HUD_COL; ctx.font=fs+"px "+MONO;
+}
+// race plane cockpit (no HUD): the gate markers, the brief for the next element and the warnings only
+function drawCues(hf,blink){
+  var S=hf.S; fs=Math.max(11,Math.round(S*0.024)); hudStyle();
+  drawTargets(S,hf.cx,hf.cy,hf.cy+S*0.13);
+  drawWarning(hf.cx,hf.cy+S*0.07,blink);
+}
+// cockpit view: tunnel vision under sustained g (grey-out), a red cast under negative g
+function drawGEffects(){
+  var gv=head.gv, rv=head.rv; if(gv<0.01&&rv<0.01) return;
+  var R=Math.hypot(W,H)/2, gr=ctx.createRadialGradient(W/2,H/2,R*(0.8-0.62*gv),W/2,H/2,R);
+  gr.addColorStop(0,"rgba(0,0,0,0)"); gr.addColorStop(1,"rgba(5,5,7,"+(0.85*gv).toFixed(3)+")");
+  ctx.save(); ctx.shadowBlur=0; ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
+  if(gv>0.35){ ctx.fillStyle="rgba(72,72,76,"+(0.32*(gv-0.35)).toFixed(3)+")"; ctx.fillRect(0,0,W,H); }
+  if(rv>0.01){ ctx.fillStyle="rgba(150,8,8,"+(0.32*rv).toFixed(3)+")"; ctx.fillRect(0,0,W,H); }
+  ctx.restore();
+}
+
+// race extras: the 200 kt start limit on the speed tape (until the start gate), and a pylon gauge beside the
+// altitude tape: the pilot's head against the white flight window (0-15 m) and the red top section
+function drawRaceGauges(S,cx,cy,iasKt){
+  if(!race.started){
+    var by=cy-(RULES.startKt-iasKt)*S*0.0022, bx=cx-S*0.31;
+    if(Math.abs(by-cy)<S*0.21){ ctx.strokeStyle=WARN_COL; ctx.lineWidth=3; line(bx-S*0.035,by,bx,by); ctx.lineWidth=1.5; ctx.fillStyle=WARN_COL; ctx.textAlign="right"; ctx.fillText(String(RULES.startKt),bx-S*0.04,by); ctx.strokeStyle=HUD_COL; ctx.fillStyle=HUD_COL; }
+  }
+  var gx=cx+S*0.4, y0=cy+S*0.11, k=S*0.2/30, head=fm.pos.y+TRACK.headUp, hy=y0-clamp(head,0,30)*k;
+  ctx.save(); ctx.lineWidth=4; ctx.globalAlpha=0.75;
+  ctx.strokeStyle=HUD_COL; line(gx,y0,gx,y0-TRACK.windowTop*k);
+  ctx.strokeStyle=WARN_COL; line(gx,y0-TRACK.windowTop*k,gx,y0-PYL_H*k); ctx.restore();
+  ctx.fillStyle=head>TRACK.windowTop?WARN_COL:ACC_COL; ctx.beginPath(); ctx.moveTo(gx-4,hy); ctx.lineTo(gx-S*0.016,hy-S*0.008); ctx.lineTo(gx-S*0.016,hy+S*0.008); ctx.closePath(); ctx.fill();
+  ctx.textAlign="left"; ctx.fillText(head>30?"▲"+Math.round(head)+"m":Math.round(head)+"m",gx+S*0.012,hy); ctx.fillStyle=HUD_COL; ctx.strokeStyle=HUD_COL;
 }
 
 // ================= Game loop / UI wiring =================
-var running=false, started=false, paused=false, lastT=0, viewExt=false, warnT=0, msgT=null;
+var running=false, started=false, paused=false, lastT=0, warnT=0, msgT=null;
 var camUp=new THREE.Vector3(0,1,0), camTarget=new THREE.Vector3();
 var $=function(id){ return document.getElementById(id); };
 var overlay=$("overlay"), startCard=$("start"), result=$("result"), chip=$("chip"), btns=$("btns"), zones=$("zones");
@@ -559,7 +799,7 @@ function fmtTime(s){ s=Math.floor(s); return pad2(Math.floor(s/60))+":"+pad2(s%6
 function fmtTime2(s){ var c=Math.round(s*100); return pad2(Math.floor(c/6000))+":"+pad2(Math.floor(c/100)%60)+"."+pad2(c%100); } // mm:ss.cc
 var MODES={
   ring:{chip:["GATES","TIME","BEST"],msg:"オレンジのリングをくぐれ"},
-  race:{chip:["NEXT","TIME","PEN","BEST"],msg:"スタートゲートを通過すると計時開始"},
+  race:{chip:["GATE","TIME","PEN","BEST"],msg:"F でスモーク ON、200 kt 以下でスタートゲートへ"},
   land:{chip:["RWY 09","VAPP","BEST"],msg:"滑走路 09 へ。PAPI 白 2・赤 2 が正しいパス"}
 };
 var chipEls=[];
@@ -567,20 +807,23 @@ function chipSetup(){
   chip.textContent=""; chipEls=MODES[mode].chip.map(function(l){ var s=document.createElement("span"), b=document.createElement("b"); s.textContent=l+" "; s.appendChild(b); chip.appendChild(s); return b; });
 }
 function chipValues(){
-  if(mode==="race") return [race.step===0?"START":race.step===NG?"FINISH":race.step+"/"+(NG-1), race.started?fmtTime2(race.t):"--:--.--", "+"+race.pen+"s", raceBest?fmtTime2(raceBest.t):"--"];
+  if(mode==="race") return [race.step===0?"START":race.step===NRUN-1?"FINISH":race.step+"/"+(NRUN-1), race.started?fmtTime2(race.t):"--:--.--", "+"+race.pen+"s", raceBest?fmtTime2(raceBest.t):"--"];
   if(mode==="land") return [rwyA<0?fmtDist(-rwyA):"ON RWY", Math.round(RWY.vApp*KT)+" kt", landBest?String(landBest):"--"];
   return [String(score.gates), fmtTime(score.time), String(score.best)];
 }
 function updateChip(){ var v=chipValues(), i; for(i=0;i<chipEls.length;i++) if(chipEls[i].textContent!==v[i]) chipEls[i].textContent=v[i]; }
 function startRun(){
-  spawnAircraft(); if(mode==="ring") resetGates(); else clearGates(); jet.reset();
+  spawnAircraft(); if(mode==="ring") resetGates(); else clearGates(); jet.reset(); racer.reset();
   raceGroup.visible=mode==="race"; if(mode==="race") resetRace();
   land.td=null; land.bounces=0; land.air=0;
   score.gates=0; score.miss=0; score.perfect=0; score.time=0;
-  paused=false; running=true; started=true;
-  overlay.hidden=true; chip.hidden=false; btns.hidden=false; zones.hidden=!(("ontouchstart" in window)||navigator.maxTouchPoints>0);
-  $("bGear").hidden=$("bBrake").hidden=mode!=="land";
+  paused=false; running=true; started=true; trimT=9;
+  var isTouch=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+  overlay.hidden=true; chip.hidden=false; btns.hidden=false; zones.hidden=!isTouch;
+  $("bGear").hidden=$("bBrake").hidden=mode!=="land"; $("bSmoke").hidden=mode!=="race";
+  $("bTrimDn").hidden=$("bTrimUp").hidden=$("bTrimAuto").hidden=!isTouch;
   lastCx=null; updateChunks(fm.pos.x,fm.pos.z); camUp.set(0,1,0); camera.position.copy(fm.pos); updateRwyFrame(); chipSetup(); updateChip();
+  resetHead(); cockpits.jet.reset(); cockpits.racer.reset(); updateLookBtn();
   showMsg(MODES[mode].msg,2200);
 }
 function showResult(kicker,title,stats,note){
@@ -588,10 +831,10 @@ function showResult(kicker,title,stats,note){
   for(var i=0;i<3;i++){ $("rV"+i).textContent=stats[i][0]; $("rL"+i).textContent=stats[i][1]; }
   startCard.hidden=true; result.classList.add("show"); overlay.hidden=false;
 }
-function stopRun(){ running=false; warn.pull=warn.stall=warn.sink=warn.gear=warn.high=false; touch.brake=false; }
+function stopRun(){ running=false; warn.pull=warn.stall=warn.sink=warn.gear=warn.high=warn.overg=false; touch.brake=false; touch.trim=0; touch.look=false; }
 function crash(reason){
-  stopRun(); beep(110,0.7,"sawtooth");
-  if(mode==="race") showResult("CRASHED — DNF","墜落",[[race.step===0?"START":race.step+"/"+(NG-1),"GATE"],[race.started?fmtTime2(race.t):"--","TIME"],[raceBest?fmtTime2(raceBest.t):"--","BEST"]],
+  stopRun(); sfx("crash");
+  if(mode==="race") showResult("CRASHED — DNF","墜落",[[race.step===0?"START":race.step+"/"+(NRUN-1),"GATE"],[race.started?fmtTime2(race.t):"--","TIME"],[raceBest?fmtTime2(raceBest.t):"--","BEST"]],
     reason+"。R でスタートゲートの手前からやり直せます。");
   else if(mode==="land"){
     var td=land.td;
@@ -602,12 +845,15 @@ function crash(reason){
 }
 function finishRace(){
   race.done=true; stopRun(); raceLook();
-  var total=race.t+race.pen, prev=raceBest, rec=!prev||total<prev.t;
-  race.splits[NG]=total;
-  if(rec){ raceBest={t:total,splits:race.splits.slice()}; try{ localStorage.setItem("skyrunner.raceBest",JSON.stringify(raceBest)); }catch(e){} }
-  beep(1320,0.1); setTimeout(function(){ beep(1760,0.18); },110);
+  var total=race.t+race.pen, prev=raceBest, rec=!prev||total<prev.t, by={}, i, parts=[];
+  race.splits[NRUN-1]=total;
+  if(rec){ raceBest={t:total,splits:race.splits.slice()}; try{ localStorage.setItem("skyrunner.raceBest.2019",JSON.stringify(raceBest)); }catch(e){} }
+  sfx("finish");
+  for(i=0;i<race.log.length;i++){ var c=race.log[i][0]; by[c]=by[c]||[0,0]; by[c][0]++; by[c][1]+=race.log[i][1]; }
+  for(var c2 in by) parts.push(PEN_TXT[c2][1]+" "+by[c2][0]+" 回 +"+by[c2][1]+" 秒");
   showResult("FINISH",rec?"新記録":"ゴール",[[fmtTime2(total),"TIME"],["+"+race.pen+"s","PENALTY"],[fmtTime2(raceBest.t),"BEST"]],
-    "飛行タイム "+fmtTime2(race.t)+" ＋ ペナルティ "+race.pen+" 秒（ゲート外・高すぎ "+race.miss+" 回、パイロン接触 "+race.hits+" 回）。"+
+    "飛行タイム "+fmtTime2(race.t)+" ＋ ペナルティ "+race.pen+" 秒"+(parts.length?"（"+parts.join("、")+"）":"（ノーペナルティ）")+
+    "。進入 "+race.startKt.toFixed(1)+" kt、最大 "+race.maxG.toFixed(1)+"G。"+
     (rec&&prev?"これまでのベストを "+(prev.t-total).toFixed(2)+" 秒更新。":rec?"初めての記録です。次からはゲートごとにベストとの差が出ます。":
       total-prev.t<0.005?"ベストと同タイム。":"ベストまであと "+(total-prev.t).toFixed(2)+" 秒。"));
 }
@@ -615,7 +861,7 @@ function finishLanding(){
   stopRun();
   var td=land.td, sc=landingScore(td,land.bounces), rec=sc.total>landBest;
   if(rec){ landBest=sc.total; try{ localStorage.setItem("skyrunner.landBest",String(landBest)); }catch(e){} }
-  beep(1320,0.1); setTimeout(function(){ beep(1760,0.18); },110);
+  sfx("finish");
   showResult("LANDED","着陸成功  グレード "+sc.grade,[[String(sc.total),"SCORE"],[String(Math.round(td.sink*FPM)),"SINK fpm"],[String(landBest),"BEST"]],
     "接地点はスレッショルドから "+Math.round(td.along)+" m（目標 "+RWY.aim+" m）、センターラインから "+Math.abs(td.across).toFixed(1)+" m、バンク "+Math.abs(td.bank*R2D).toFixed(1)+"°、接地速度 "+Math.round(td.ias*KT)+" kt、バウンド "+land.bounces+" 回。"+
     (rec?"自己ベスト更新。":""));
@@ -623,13 +869,18 @@ function finishLanding(){
 function openMenu(){
   stopRun(); started=false; paused=false;
   $("bestRing").textContent="BEST "+score.best; $("bestRace").textContent="BEST "+(raceBest?fmtTime2(raceBest.t):"--"); $("bestLand").textContent="BEST "+(landBest||"--");
-  result.classList.remove("show"); startCard.hidden=false; overlay.hidden=false; chip.hidden=true; btns.hidden=true; zones.hidden=true;
+  result.classList.remove("show"); startCard.hidden=false; overlay.hidden=false; chip.hidden=true; btns.hidden=true; zones.hidden=true; updateLookBtn();
 }
-// Crash rules. Gear up: the old 2.5 m CG clearance. Gear down and locked: the tyres may touch only the runway, no
+// Crash rules. Race plane: any of its contact points (wheels, wingtips, propeller disc, tail) in the water or the
+// ground. Jet, gear up: the old 2.5 m CG clearance. Gear down and locked: the tyres may touch only the runway, no
 // other part of the airframe may touch at all, and the touchdown sink rate / strut travel must stay within limits.
 var BODY_PTS=[[0,-0.85,0,"胴体が地面に接触"],[0,-0.7,6.8,"尾部を擦った（テールストライク）"],[0,-0.3,-7.6,"機首が地面に接触"],[-4.75,-0.15,1.2,"翼端が地面に接触"],[4.75,-0.15,1.2,"翼端が地面に接触"]];
 function groundCheck(vsB,wowB){
   var i, p, x, z;
+  if(mode==="race"){
+    for(i=0;i<RACER_PTS.length;i++){ tmpV.fromArray(RACER_PTS[i]).applyQuaternion(fm.q).add(fm.pos); if(tmpV.y<groundHeight(tmpV.x,tmpV.z)) return terrainHeight(tmpV.x,tmpV.z)<0?"海面に接触して墜落":"地面に激突"; }
+    return null;
+  }
   if(fm.gearPos<1){
     var th=terrainHeight(fm.pos.x,fm.pos.z);
     if(fm.pos.y-Math.max(th,0)<2.5) return th<0?"海に墜落":fm.gearPos>0?"脚が下りきる前に接地":"地面に激突";
@@ -650,42 +901,71 @@ function updateWarnings(dt){
   warn.sink=false; warn.high=false;
   if(fm.wow) warn.pull=false;
   else if(inApproach()){ warn.pull=agl<120&&sink>9; warn.sink=!warn.pull&&agl<350&&sink>7; } // on final: callouts, not terrain alarms
-  else if(mode==="race"){ warn.pull=(sink>2&&agl<sink*5)||(agl<12&&sink>0.5); }       // low-level racing: time to impact
+  else if(mode==="race"){ warn.pull=sink>1.5&&agl<sink*2.5; }                          // gate height is ~10 m: time to impact only
   else warn.pull=(agl<170&&sink>7)||(agl<60&&sink>1);
   warn.stall=!!fm.stalled&&!fm.wow&&fm.tas>25;
   warn.gear=mode==="land"&&fm.gearPos<1&&!fm.wow&&agl<300;
-  if(mode==="race"&&!race.done){ var g=COURSE.gates[race.step%NG]; warn.high=fm.pos.y>PYL_H&&Math.hypot(fm.pos.x-g.x,fm.pos.z-g.z)<1500; }
-  if(warn.pull){ warnT+=dt; if(warnT>=0.5){ warnT=0; beep(720,0.12,"square"); } } else warnT=0.5;
+  warn.overg=false;
+  if(mode==="race"&&!race.done){
+    var el=TRACK.run[race.step], g=TRACK.gates[el.g];  // above the window on the way into a gate; the g meter near the limit
+    warn.high=el.role!=="pylon"&&!inVtm()&&fm.pos.y+TRACK.headUp>TRACK.windowTop&&Math.hypot(fm.pos.x-g.x,fm.pos.z-g.z)<500;
+    warn.overg=race.gs>=10;
+  }
+  if(warn.pull){ warnT+=dt; if(warnT>=0.5){ warnT=0; sfx("warn"); } }
+  else if(warn.overg){ warnT+=dt; if(warnT>=0.45){ warnT=0; sfx("overg"); } } else warnT=0.5;
 }
 function onKey(code){
   if(code==="KeyV") toggleView();
   else if(code==="KeyT") cycleTOD();
-  else if(code==="KeyM") setMuted(!audio.muted);
+  else if(code==="KeyM") setMuted(!sndMuted);
   else if(code==="KeyR"&&started) startRun();
   else if(code==="KeyP"&&running){ paused=!paused; }
   else if(code==="KeyG"&&running) toggleGear();
+  else if(code==="KeyJ"&&running) autoTrim();
+  else if(code==="KeyF"&&running) toggleSmoke();
   else if(code==="Escape"&&started) openMenu();
 }
 function toggleGear(){
+  if(mode==="race"){ showMsg("レース機は固定脚です",1000); return; }
   if(inp.gear&&fm.wow){ showMsg("接地中は脚を上げられません",1200); return; }
-  inp.gear=!inp.gear; showMsg(inp.gear?"GEAR DOWN":"GEAR UP",900);
+  inp.gear=!inp.gear; showMsg(inp.gear?"GEAR DOWN":"GEAR UP",900); sfx("click");
 }
-function toggleView(){ viewExt=!viewExt; showMsg(viewExt?"外部視点":"HUD視点",800); }
+// J: trim for hands-off flight along the present path at the present speed
+function autoTrim(){ var ok=fm.autoTrim(); trimT=0; sfx("click"); showMsg(ok?"AUTO TRIM":"AUTO TRIM — 範囲外（速度が遅すぎ / 速すぎ）",ok?900:1500); }
+function toggleSmoke(){
+  if(mode!=="race") return;
+  inp.smoke=!inp.smoke; sfx("click"); showMsg(inp.smoke?"SMOKE ON":"SMOKE OFF",800);
+}
+// V: HUD -> cockpit -> external; the choice is kept for the next visit
+function toggleView(){
+  view=VIEWS[(VIEWS.indexOf(view)+1)%VIEWS.length]; head.drag=null; updateLookBtn();
+  try{ localStorage.setItem("skyrunner.view",view); }catch(e){}
+  showMsg(VIEW_NAME[view]+(view==="cockpit"?(isTouchDev()?"  ·  「目標を見る」で目標を目で追う":"  ·  右ドラッグで見回す"):""),view==="cockpit"?1600:800);
+}
+function isTouchDev(){ return ("ontouchstart" in window)||navigator.maxTouchPoints>0; }
+function updateLookBtn(){ $("bLook").hidden=!(started&&view==="cockpit"&&isTouchDev()); }
 function cycleTOD(){ applyTOD((todIndex+1)%TOD.length); showMsg(TOD[todIndex].name,900); }
 function wire(id,fn){ $(id).addEventListener("click",function(){ fn(); this.blur(); }); }
-function startMode(m){ mode=m; audioInit(); if(audio.ctx&&audio.ctx.state==="suspended") audio.ctx.resume(); startRun(); }
+function startMode(m){ mode=m; audioInit(); if(snd&&snd.ctx.state==="suspended") snd.ctx.resume(); startRun(); }
 (function(){ var b=document.querySelectorAll("[data-mode]"), i; for(i=0;i<b.length;i++) b[i].addEventListener("click",function(){ startMode(this.getAttribute("data-mode")); this.blur(); }); })();
 wire("bAgain",function(){ startRun(); }); wire("bMenu",openMenu); wire("bMenuTop",openMenu);
-wire("bView",toggleView); wire("bTime",cycleTOD); wire("bMute",function(){ setMuted(!audio.muted); }); wire("bReset",function(){ startRun(); });
-wire("bGear",function(){ if(running) toggleGear(); });
-(function(){ var b=$("bBrake"); function on(e){ e.preventDefault(); touch.brake=true; } function off(){ touch.brake=false; }
-  b.addEventListener("pointerdown",on); b.addEventListener("pointerup",off); b.addEventListener("pointercancel",off); b.addEventListener("pointerleave",off); })();
+wire("bView",toggleView); wire("bTime",cycleTOD); wire("bMute",function(){ setMuted(!sndMuted); }); wire("bReset",function(){ startRun(); });
+wire("bGear",function(){ if(running) toggleGear(); }); wire("bSmoke",function(){ if(running) toggleSmoke(); }); wire("bTrimAuto",function(){ if(running) autoTrim(); });
+// hold-to-act buttons: brakes, and the trim switch (nose down / nose up)
+function holdBtn(id,on,off){ var b=$(id); function dn(e){ e.preventDefault(); on(); } b.addEventListener("pointerdown",dn); b.addEventListener("pointerup",off); b.addEventListener("pointercancel",off); b.addEventListener("pointerleave",off); }
+holdBtn("bBrake",function(){ touch.brake=true; },function(){ touch.brake=false; });
+holdBtn("bTrimDn",function(){ touch.trim=-1; },function(){ touch.trim=0; });
+holdBtn("bTrimUp",function(){ touch.trim=1; },function(){ touch.trim=0; });
+holdBtn("bLook",function(){ touch.look=true; },function(){ touch.look=false; });
 document.addEventListener("visibilitychange",function(){ if(document.hidden&&running) paused=true; });
 
 function frame(t){
   requestAnimationFrame(frame);
   var dt=Math.min((t-lastT)/1000,0.1)||0; lastT=t;
   if(document.hidden) return;
+  simulate(dt); render(t,dt);
+}
+function simulate(dt){
   if(running&&!paused){
     readInputs(dt);
     var vsB=fm.vel.y, wowB=fm.wow; // vel is the state of record (also right after a snapshot restore)
@@ -697,21 +977,41 @@ function frame(t){
     else if(mode==="race") updateRace(dt);
     else updateLanding(dt);
     if(running) updateWarnings(dt);
-    audioUpdate(); updateChip();
-  } else if(audio.ctx&&audio.eng){ audio.eng.gain.setTargetAtTime(0,audio.ctx.currentTime,0.3); audio.wind.gain.setTargetAtTime(0,audio.ctx.currentTime,0.3); audio.wg.gain.setTargetAtTime(0,audio.ctx.currentTime,0.3); }
-  acGroup.position.copy(fm.pos); acGroup.quaternion.copy(fm.q); acGroup.visible=viewExt;
+    audioUpdate(dt); updateChip();
+  } else if(snd) snd.setPaused(true);
+}
+function render(t,dt){
+  var pl=plane(), other=pl===jet?racer:jet, k=kit(), ck=cockpit(), inCk=view==="cockpit";
+  pl.root.position.copy(fm.pos); pl.root.quaternion.copy(fm.q); pl.root.visible=view!=="hud"; other.root.visible=false;
   var fwd=tmpV.set(0,0,-1).applyQuaternion(fm.q), up=tmpV2.set(0,1,0).applyQuaternion(fm.q);
-  if(viewExt){
-    camTarget.copy(fm.pos).addScaledVector(fwd,-15).addScaledVector(up,3.5);
+  if(inCk){
+    updateHead(dt);   // the head's pose in body axes; the world camera takes the same pose in world axes
+    camera.position.copy(head.eye).applyQuaternion(fm.q).add(fm.pos); camera.quaternion.copy(fm.q).multiply(head.q); camera.up.set(0,1,0);
+    ckCam.position.copy(head.eye); ckCam.quaternion.copy(head.q);
+  } else if(view==="ext"){
+    camTarget.copy(fm.pos).addScaledVector(fwd,-k.back).addScaledVector(up,k.up);
     if(running&&!paused) camera.position.addScaledVector(fm.vel,dt);   // ride along, so the lag below does not grow with airspeed
     camera.position.lerp(camTarget,1-Math.exp(-dt*6)); camUp.lerp(up,1-Math.exp(-dt*3)).normalize(); camera.up.copy(camUp);
-    camera.lookAt(tmpV3.copy(fm.pos).addScaledVector(fwd,40));
+    camera.lookAt(tmpV3.copy(fm.pos).addScaledVector(fwd,k.look));
   } else {
-    camera.position.copy(fm.pos).addScaledVector(fwd,2.5).addScaledVector(up,0.9); camera.quaternion.copy(fm.q); camera.up.set(0,1,0);
+    camera.position.copy(fm.pos).addScaledVector(fwd,k.eyeF).addScaledVector(up,k.eyeU); camera.quaternion.copy(fm.q); camera.up.set(0,1,0);
   }
+  var fov=inCk?cockpitFov():70; if(camera.fov!==fov){ camera.fov=fov; camera.updateProjectionMatrix(); }
   sky.position.copy(camera.position); water.position.set(fm.pos.x,0,fm.pos.z); updateChunks(fm.pos.x,fm.pos.z); updatePapi();
-  jet.update(fm,running&&!paused?dt:0,{visible:viewExt,engine:running,camera:camera,dark:TOD_DARK[todIndex],time:t/1000});
-  renderer.render(scene,camera); drawHUD(t);
+  var live=running&&!paused, o={visible:view!=="hud",engine:running,camera:camera,dark:TOD_DARK[todIndex],time:t/1000,cockpit:inCk,
+    smoke:live&&mode==="race"&&inp.smoke,pxScale:H*renderer.getPixelRatio()/(2*Math.tan(camera.fov*Math.PI/360))};
+  pl.update(fm,live?dt:0,o);
+  o.visible=false; o.smoke=false; o.cockpit=false; other.update(other===jet?fmJet:fmRacer,0,o);   // keeps its trails / smoke hidden and ageing
+  cockpits.jet.root.visible=ck===cockpits.jet; cockpits.racer.root.visible=ck===cockpits.racer;
+  ck.update(fm,live?dt:0,cockpitInfo(t));    // the map trail and tell-tales run in every view; drawing only in the cockpit
+  if(inCk){
+    if(ckCam.fov!==camera.fov||ckCam.aspect!==camera.aspect){ ckCam.fov=camera.fov; ckCam.aspect=camera.aspect; ckCam.updateProjectionMatrix(); }
+    ckSun.color.copy(sun.color); ckSun.intensity=sun.intensity; ckSun.position.copy(CKO.sun);
+    ckHemi.color.copy(hemi.color); ckHemi.groundColor.copy(hemi.groundColor); ckHemi.intensity=hemi.intensity*0.8; ckHemi.position.copy(CKO.up);
+    renderer.autoClear=false; renderMirror(ck);
+    renderer.clear(); renderer.render(scene,camera); renderer.clearDepth(); renderer.render(ckScene,ckCam);
+  } else { renderer.autoClear=true; renderer.render(scene,camera); }
+  drawHUD(t);
 }
 
 function boot(data){
@@ -721,13 +1021,22 @@ function boot(data){
   if(data&&data.started){
     startRun();
     if(data.pos){ fm.pos.fromArray(data.pos); fm.q.fromArray(data.q); fm.vel.fromArray(data.vel); }
-    if(data.gear!=null){ inp.gear=!!data.gear; fm.setControls({gear:inp.gear}); fm.gearPos=inp.gear?1:0; }
+    if(data.gear!=null&&mode!=="race"){ inp.gear=!!data.gear; fm.setControls({gear:inp.gear}); fm.gearPos=inp.gear?1:0; }
+    if(typeof data.trim==="number") fm.elevatorTrim=data.trim;
+    if(data.throttle!=null) inp.throttle=data.throttle;
     if(data.score){ score.gates=data.score.gates||0; score.time=data.score.time||0; score.miss=data.score.miss||0; score.perfect=data.score.perfect||0; }
-    if(data.race&&mode==="race"){ var r=data.race; race.step=r.step||0; race.t=r.t||0; race.pen=r.pen||0; race.started=!!r.started; race.miss=r.miss||0; race.hits=r.hits||0; race.prevS=gateS(race.step%NG); raceLook(); }
-    viewExt=!!data.viewExt; lastCx=null; updateRwyFrame();
+    if(data.race&&mode==="race"){
+      var r=data.race; race.step=Math.min(r.step||0,NRUN-1); race.t=r.t||0; race.pen=r.pen||0; race.started=!!r.started; race.hits=r.hits||0;
+      race.log=r.log||[]; race.maxG=r.maxG||0; race.overG=!!r.overG; race.smokePen=!!r.smokePen; race.startKt=r.startKt||0; race.vtm=r.vtm||null; inp.smoke=!!r.smoke;
+      if(r.hit) for(var i=0;i<r.hit.length&&i<race.hit.length;i++) if(r.hit[i]){ race.hit[i]=true; knockPylon(i); }
+      race.prevS=World.gateFrame(race.step,fm.pos.x,fm.pos.z).s; racerPts(rPrev); raceLook();
+    }
+    if(VIEWS.indexOf(data.view)>=0) view=data.view; else if(data.viewExt!=null) view=data.viewExt?"ext":"hud";   // older snapshots
+    lastCx=null; updateRwyFrame(); resetHead(); updateLookBtn();
   }
   requestAnimationFrame(frame);
 }
-if(window.claude&&window.claude.hot&&window.claude.hot.snapshot){ window.claude.hot.snapshot(function(){ return {started:started&&running,mode:mode,gear:inp.gear,pos:fm.pos.toArray(),q:fm.q.toArray(),vel:fm.vel.toArray(),score:{gates:score.gates,time:score.time,miss:score.miss,perfect:score.perfect},race:{step:race.step,t:race.t,pen:race.pen,started:race.started,miss:race.miss,hits:race.hits},tod:todIndex,viewExt:viewExt}; }); }
+if(window.claude&&window.claude.hot&&window.claude.hot.snapshot){ window.claude.hot.snapshot(function(){ return {started:started&&running,mode:mode,gear:inp.gear,trim:fm.elevatorTrim,throttle:inp.throttle,pos:fm.pos.toArray(),q:fm.q.toArray(),vel:fm.vel.toArray(),score:{gates:score.gates,time:score.time,miss:score.miss,perfect:score.perfect},
+  race:{step:race.step,t:race.t,pen:race.pen,started:race.started,hits:race.hits,hit:race.hit.slice(),log:race.log.slice(),maxG:race.maxG,overG:race.overG,smokePen:race.smokePen,startKt:race.startKt,vtm:race.vtm,smoke:inp.smoke},tod:todIndex,view:view}; }); }
 if(window.claude&&window.claude.hot&&window.claude.hot.ready) window.claude.hot.ready(boot); else boot((window.claude&&window.claude.hot&&window.claude.hot.data)||{});
 })();

@@ -368,5 +368,65 @@ for (const sink of [0.6, 3]) {
     `(glide path ${f1(expect)} m), max |dTAS| ${f2(dv)} m/s`);
 }
 
+// ---------------------------------------------------------------- pitch trim
+// 20. after a sudden speed loss (throttle set for the new speed) the old trim sinks the aircraft; autoTrim()
+//     re-trims for the new speed and it holds its path hands-off. trimBy() moves the equilibrium and is clamped.
+function slowDown(params, v0, v1, alt, auto) {
+  const fm = new FlightModel(params), ref = new FlightModel(params);
+  fm.reset({ pos: new Vector3(0, alt, 0), speed: v0 }); ref.reset({ pos: new Vector3(0, alt, 0), speed: v1 });
+  const k = v1 / v0; fm.vel.set(fm.vel.x * k, fm.vel.y * k, fm.vel.z * k); fm.step(DT);
+  fm.setControls({ throttle: ref.controls.throttle });
+  const inRange = auto ? fm.autoTrim() : true, y0 = fm.pos.y;
+  let gam = 0, ok = true;
+  run(fm, 10, (f) => { if (!finiteState(f)) { ok = false; return false; } gam = Math.max(gam, Math.abs(Math.asin(f.vs / f.tas))); });
+  return { ok, inRange, gam, dh: fm.pos.y - y0, trim: fm.elevatorTrim, ref: ref.elevatorTrim };
+}
+for (const [label, params, v0, v1, alt] of [['jet', undefined, 150, 110, 1000], ['race plane', FlightModel.raceplaneParams, 103, 80, 300]]) {
+  const off = slowDown(params, v0, v1, alt, false), on = slowDown(params, v0, v1, alt, true);
+  report(`20 autoTrim after slowing ${v0} -> ${v1} m/s (${label})`, off.ok && on.ok && on.inRange && Math.abs(on.trim - on.ref) < 0.2 * DEG &&
+    on.gam < 2.5 * DEG && Math.abs(on.dh) < 15 && off.dh < -60,
+    `old trim: 10 s height change ${f1(off.dh)} m; autoTrim ${f2(off.trim * R2D)} -> ${f2(on.trim * R2D)} deg (trimmed reset ${f2(on.ref * R2D)}), ` +
+    `then max |gamma| ${f2(on.gam * R2D)} deg, height change ${f1(on.dh)} m`);
+}
+{
+  const fm = trimmed({ speed: 150 }); fm.trimBy(1 * DEG);
+  let ok = true; run(fm, 90, (f) => { if (!finiteState(f)) { ok = false; return false; } });
+  const c = trimmed(); c.trimBy(1);
+  report('20 trimBy: 1 deg nose-up trim settles slower, range clamped', ok && fm.tas < 140 && fm.tas > 90 && Math.abs(c.elevatorTrim - c.params.trimMax) < 1e-12,
+    `150 m/s + 1 deg nose-up trim, 90 s hands-off: ${f1(fm.tas)} m/s, climbed ${f1(fm.pos.y - 1000)} m; trimBy(+1 rad) -> ${f2(c.elevatorTrim * R2D)} deg`);
+}
+
+// ---------------------------------------------------------------- race plane (FlightModel.raceplaneParams)
+// 21. published envelope: top speed 406-426 km/h (113-118 m/s) in level flight, ~420 deg/s roll, about 10 g at
+//     200 kt with full aft stick, and with no g-limiter the 12 g race limit can actually be broken
+{
+  const RP = FlightModel.raceplaneParams, race = (speed, alt) => trimmed({ pos: new Vector3(0, alt || 30, 0), speed }, RP);
+  let vTop = 0; for (let v = 100; v <= 130; v += 0.25) if (!race(v).trimLimited) vTop = v;
+  const r = race(103, 500); r.setControls({ roll: 1 }); let pMax = 0; run(r, 1, (f) => { pMax = Math.max(pMax, Math.abs(f.rollRate)); });
+  const pull = (v) => { const f = race(v, 500); f.setControls({ pitch: 1 }); let g = 0; run(f, 1.5, (x) => { g = Math.max(g, x.nz); }); return g; };
+  const g103 = pull(103), g125 = pull(125);
+  const st = race(30); const vStall = Math.sqrt(2 * RP.mass * 9.80665 / (1.225 * RP.S * RP.CLmax));
+  report('21 race plane envelope', vTop >= 113 && vTop <= 118.3 && pMax > 380 * DEG && pMax < 460 * DEG && g103 > 9.5 && g103 < 12 && g125 > 12,
+    `top speed ${f1(vTop)} m/s (${(vTop * 3.6).toFixed(0)} km/h), roll ${f1(pMax * R2D)} deg/s, full aft stick peak ${f1(g103)} g @103 m/s / ${f1(g125)} g @125 m/s, ` +
+    `1 g stall ${f1(vStall)} m/s, trim @30 m/s limited=${st.trimLimited}`);
+}
+// 22. race plane robustness: 120 s random inputs (full throttle half the time), with the auto-rudder SAS and the
+//     bare airframe: the state stays finite and normalised, and no runaway speed (random stirring mostly bleeds
+//     energy, so this is a divergence check, not a performance one: test 21 covers the envelope)
+for (const sas of [true, false]) {
+  const rnd = mulberry32(777);
+  const fm = trimmed({ pos: new Vector3(0, 3000, 0), speed: 110 }, FlightModel.raceplaneParams); fm.sas = sas;
+  const pick = () => { const r = rnd(); return r < 0.25 ? -1 : r < 0.5 ? 1 : rnd() * 2 - 1; };
+  let next = 0, ok = true, vMax = 0, vMin = 1e9, gHi = -1e9, gLo = 1e9, qErr = 0, why = '';
+  run(fm, 120, (f, t) => {
+    if (t >= next) { f.setControls({ pitch: pick(), roll: pick(), yaw: pick(), throttle: rnd() < 0.5 ? 1 : rnd() }); next = t + 0.3 + 1.7 * rnd(); }
+    if (!finiteState(f)) { ok = false; why = `non-finite at t=${f2(t)} `; return false; }
+    qErr = Math.max(qErr, Math.abs(f.q.length() - 1)); vMax = Math.max(vMax, f.tas); vMin = Math.min(vMin, f.tas);
+    gHi = Math.max(gHi, f.nz); gLo = Math.min(gLo, f.nz);
+  });
+  report(`22 race plane 120 s random inputs (SAS ${sas ? 'auto-rudder' : 'off'})`, ok && qErr < 1e-6 && vMax < 160,
+    `${why}speed ${f1(vMin)}..${f1(vMax)} m/s, g ${f1(gLo)}..${f1(gHi)}, max ||q|-1| ${qErr.toExponential(1)}`);
+}
+
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nALL CHECKS PASSED');
 process.exit(failures ? 1 : 0);

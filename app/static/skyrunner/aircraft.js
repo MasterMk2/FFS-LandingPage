@@ -720,5 +720,14 @@
     return {root: group, update: update, reset: reset};
   }
 
-  root.SkyrunnerJet = {create: create};
+  // For the cockpit view (cockpit.js): the canopy glass in airframe metres, and its half sections (top centre ->
+  // sill, x >= 0) front to back, so the interior's sills and frames sit on the exterior glass edges.
+  function canopyGeometry() { var g = buildCanopy(); g.scale(SCALE, SCALE, SCALE); return g; }
+  function canopyRings() {
+    return refineGrid(CANOPY.map(domeRing), 3, 3, true).map(function (r) { return r.map(function (p) { return [p[0] * SCALE, p[1] * SCALE, p[2] * SCALE]; }); });
+  }
+  root.SkyrunnerJet = {create: create, canopyGeometry: canopyGeometry, canopyRings: canopyRings};
+  // shared with racer.js: the mesh builder, lofting, aerofoil rings, the sky-reflection skin and glow sprites
+  root.SkyrunnerKit = {Builder: Builder, loft: loft, refineGrid: refineGrid, foil: foil, foilY: foilY, foilGroup: foilGroup,
+    tailRing: tailRing, tailGroup: tailGroup, envify: envify, ENV: ENV, glowSprite: glowSprite, mid: mid, clamp: clamp, sstep: sstep};
 })(typeof globalThis !== 'undefined' ? globalThis : window);

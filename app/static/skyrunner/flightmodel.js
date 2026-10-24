@@ -46,6 +46,11 @@
     thrustDensityExp: 0.7, // thrust ~ (rho/rho0)^exp
     spoolTau: 1.2,         // s, dry spool lag (first order)
     abTau: 0.5,            // s, afterburner light-up lag
+    // propeller instead of the jet (used when propPower > 0): T = spool * min(propStatic, propEta * P / V),
+    // scaled by the same density law. thrustDry / thrustAB are then unused and the afterburner adds nothing.
+    propPower: 0,          // W, shaft power at throttle 1
+    propEta: 0.8,          // propulsive efficiency in cruise
+    propStatic: 0,         // N, static (low-speed) thrust ceiling
     // lift (keep CL0 + CLa*alphaStall > CLmax and CL0 + CLa*alphaStallNeg < CLmin for the round-off)
     CL0: 0.05,             // lift at alpha = 0 (camber)
     CLa: 5.5,              // lift slope, 1/rad
@@ -85,8 +90,12 @@
     sasBeta: 1.0,          // rad rudder per rad sideslip (turn coordination)
     sasRollToRudder: 0.04, // rad rudder per rad/s roll rate (cancels adverse yaw)
     sasWashoutTau: 1.0,    // s
+    gLimiter: true,        // false: the SAS keeps its dampers and turn coordination but never limits g
     gMax: 9, gMin: -3,     // g-limiter
     sasGFeedback: 0.02,    // rad elevator per g of overshoot beyond the limits
+    // pitch trim: the elevator angle at neutral stick (fm.elevatorTrim; reset() and autoTrim() set it too)
+    trimMax: 15 * DEG,     // trim range +-
+    trimRate: 1 * DEG,     // rad/s, trim switch held
     // configuration drag
     CDgear: 0.025,         // added CD with the gear fully down
     CDspeedBrake: 0.05,    // added CD with the speed brake fully out
@@ -355,13 +364,15 @@
       const kw = 1 - Math.exp(-h / p.sasWashoutTau);
       this._qLP += (Q - this._qLP) * kw; this._rLP += (R - this._rLP) * kw;
       if (this.sas) {
-        this._gLimits();                                            // g-limiter: clamp the pilot command
-        de = clamp(de, LIM[0], LIM[1]);
+        if (p.gLimiter) {
+          this._gLimits();                                          // g-limiter: clamp the pilot command
+          de = clamp(de, LIM[0], LIM[1]);
+        }
         de -= p.sasPitchDamp * (Q - this._qLP);                     // pitch damper (washed out)
         da -= p.sasRollDamp * P;                                    // roll damper
         dr += p.sasBeta * this.beta + p.sasRollToRudder * P         // turn coordination
           - p.sasYawDamp * (R - this._rLP);                         // yaw damper (washed out)
-        if (this.wow) { /* on the wheels: no g-overshoot feedback (touchdown loads are not a manoeuvre) */ }
+        if (this.wow || !p.gLimiter) { /* on the wheels: no g-overshoot feedback (touchdown loads are not a manoeuvre) */ }
         else if (this.gLoad > p.gMax) de -= p.sasGFeedback * (this.gLoad - p.gMax); // overshoot feedback
         else if (this.gLoad < p.gMin) de += p.sasGFeedback * (p.gMin - this.gLoad);
       }
@@ -375,7 +386,7 @@
       const ab = !!c.afterburner;
       this.throttleActual += ((ab ? 1 : thr) - this.throttleActual) * (1 - Math.exp(-h / p.spoolTau));
       this.afterburnerLevel += ((ab ? 1 : 0) - this.afterburnerLevel) * (1 - Math.exp(-h / p.abTau));
-      this.thrust = this._thrustAt(this.rho, this.throttleActual, this.afterburnerLevel);
+      this.thrust = this._thrustAt(this.rho, this.throttleActual, this.afterburnerLevel, this.tas);
       // gear runs at a constant rate (no retraction with weight on wheels), speed brake first order
       if (c.gear) this.gearPos = Math.min(1, this.gearPos + h / p.gearTime);
       else if (!this.wow) this.gearPos = Math.max(0, this.gearPos - h / p.gearTime);
@@ -385,9 +396,21 @@
       this._steer = yaw * Math.min(p.noseSteerMax, Math.atan(p.noseSteerLatG * G0 * wb / (v2 + 1e-9)));
     }
 
-    _thrustAt(rho, spool, abLevel) {
+    _thrustAt(rho, spool, abLevel, V) {
       const p = this.params;
+      if (p.propPower > 0) return Math.pow(rho / RHO0, p.thrustDensityExp) * spool * Math.min(p.propStatic, p.propEta * p.propPower / Math.max(V, 1));
       return Math.pow(rho / RHO0, p.thrustDensityExp) * (p.thrustDry * spool + (p.thrustAB - p.thrustDry) * abLevel);
+    }
+
+    // trim angle of attack: CL(alpha) + CLde * de(alpha) = CLreq with de(alpha) the Cm = 0 elevator, clamped to the
+    // stall bounds (bisection: CL is monotonic between them)
+    _alphaFor(CLreq, clOf) {
+      const p = this.params;
+      let lo = p.alphaStallNeg, hi = p.alphaStall;
+      if (CLreq >= clOf(hi)) return hi;
+      if (CLreq <= clOf(lo)) return lo;
+      for (let j = 0; j < 60; j++) { const m = 0.5 * (lo + hi); if (clOf(m) < CLreq) lo = m; else hi = m; }
+      return 0.5 * (lo + hi);
     }
 
     // ---------------------------------------------------------------- public API
@@ -420,23 +443,15 @@
       this._wx = this.wind.x; this._wy = this.wind.y; this._wz = this.wind.z;
       this._atmo(py);
       const rho = this._rho, mach = V / this._a, qS = 0.5 * rho * V * V * p.S, W = p.mass * G0;
-      const deOf = (a) => -(p.Cm0 + p.Cma * Math.sin(a)) / p.Cmde;  // Cm = 0 (linear in elevator)
-      const clOf = (a) => this.clAlpha(a) + p.CLde * deOf(a);
+      const deOf = (a) => this._deOf(a), clOf = (a) => this._clTrim(a);
       let T = 0, alpha = 0;
       for (let it = 0; it < 12; it++) {
-        const CLreq = (W * Math.cos(gam) - T * Math.sin(alpha)) / qS; // L + T sin(a) = W cos(gamma)
-        let lo = p.alphaStallNeg, hi = p.alphaStall;
-        if (CLreq >= clOf(hi)) alpha = hi;
-        else if (CLreq <= clOf(lo)) alpha = lo;
-        else {
-          for (let j = 0; j < 60; j++) { const m = 0.5 * (lo + hi); if (clOf(m) < CLreq) lo = m; else hi = m; }
-          alpha = 0.5 * (lo + hi);
-        }
+        alpha = this._alphaFor((W * Math.cos(gam) - T * Math.sin(alpha)) / qS, clOf); // L + T sin(a) = W cos(gamma)
         // T cos(a) = D + W sin(gamma)
         T = (qS * (this.cdTotal(alpha, clOf(alpha), 0, mach) + this._configDrag()) + W * Math.sin(gam)) / Math.cos(alpha);
       }
-      const de = clamp(deOf(alpha), -p.elevMax, p.elevMax);
-      const thr = clamp(T / this._thrustAt(rho, 1, 0), 0, 1);
+      const de = clamp(deOf(alpha), -p.elevMax, p.elevMax), Tmax = this._thrustAt(rho, 1, 0, V);
+      const thr = clamp(T / Tmax, 0, 1);
       // attitude: yaw (-heading about world Y) then pitch = gamma + alpha about body X
       const th = gam + alpha;
       const cy = Math.cos(-psi / 2), sy = Math.sin(-psi / 2), cp = Math.cos(th / 2), sp = Math.sin(th / 2);
@@ -447,16 +462,36 @@
       s[10] = 0; s[11] = 0; s[12] = 0;
       this.elevatorTrim = de; this.elevator = de; this.aileron = 0; this.rudder = 0;
       this.throttleActual = thr; this.afterburnerLevel = 0;
-      this.thrust = this._thrustAt(rho, thr, 0);
+      this.thrust = this._thrustAt(rho, thr, 0, V);
       this._qLP = 0; this._rLP = 0;
       this.controls.pitch = 0; this.controls.roll = 0; this.controls.yaw = 0;
       this.controls.throttle = thr; this.controls.afterburner = false;
       // trim report: limited = speed outside the trimmable range (alpha at a stall bound, surface or throttle clamped)
       this.trimAlpha = alpha;
       this.trimLimited = alpha >= p.alphaStall || alpha <= p.alphaStallNeg || de !== deOf(alpha)
-        || T > this._thrustAt(rho, 1, 0) * 1.0001 || T < 0;
+        || T > Tmax * 1.0001 || T < 0;
       this._deriv(s, this._k[0], true);
       this._publish();
+    }
+
+    _deOf(a) { const p = this.params; return -(p.Cm0 + p.Cma * Math.sin(a)) / p.Cmde; } // Cm = 0 (linear in elevator)
+    _clTrim(a) { return this.clAlpha(a) + this.params.CLde * this._deOf(a); }
+
+    /** Move the pitch trim by d rad (+ = nose up), within +-trimMax. */
+    trimBy(d) { const m = this.params.trimMax; this.elevatorTrim = clamp(this.elevatorTrim + num(d, 0), -m, m); }
+
+    /**
+     * Re-trim for hands-off flight along the current flight path at the current airspeed, wings level: the trim
+     * elevator becomes the one that holds the angle of attack with L + T sin(alpha) = W cos(gamma). Returns false
+     * when that lies outside the trim range or beyond the stall (the trim then stops at the nearest limit).
+     */
+    autoTrim() {
+      const p = this.params, V = Math.max(this.tas, 1), qS = Math.max(this.qbar, 1) * p.S, W = p.mass * G0;
+      const gam = Math.asin(clamp((this.vel.y - this.wind.y) / V, -1, 1));
+      const alpha = this._alphaFor((W * Math.cos(gam) - this.thrust * Math.sin(this.alpha)) / qS, (a) => this._clTrim(a));
+      const de = this._deOf(alpha);
+      this.trimBy(de - this.elevatorTrim);
+      return Math.abs(de) <= p.trimMax && alpha < p.alphaStall && alpha > p.alphaStallNeg;
     }
 
     step(dt) {
@@ -516,5 +551,27 @@
   }
 
   FlightModel.defaultParams = DEFAULT_PARAMS;
+  /**
+   * Overrides for an unlimited-class aerobatic race plane (air-race mode): 700 kg at the 696 kg race minimum,
+   * 7.4 m span, 9.1 m^2, ~250 kW piston engine with a constant-speed propeller; symmetric aerofoil (CL0 = Cm0 = 0).
+   * Tuned to the published performance: ~420 deg/s roll, ~10 g at 95 m/s, top speed ~230 kt. No g-limiter: the
+   * SAS stays on only as an auto-rudder (sideslip and yaw damping), the pitch and roll axes are the bare airframe.
+   * Fixed gear: the flight model keeps gearPos = 0 and the gear drag is in CD0.
+   */
+  FlightModel.raceplaneParams = {
+    mass: 700, S: 9.1, b: 7.4, cbar: 1.25,
+    Ixx: 600, Iyy: 1000, Izz: 1500, Ixz: 0,
+    propPower: 250000, propEta: 0.8, propStatic: 4500, thrustDensityExp: 1, spoolTau: 0.35,
+    CL0: 0, CLa: 4.6, CLmax: 1.4, alphaStall: 18.5 * DEG, CLmin: -1.4, alphaStallNeg: -18.5 * DEG,
+    CLde: -0.27, CLq: 3.5,
+    CD0: 0.022, oswald: 0.85,
+    CYb: -0.8, CYdr: -0.12,
+    Cm0: 0, Cma: -0.45, Cmq: -14, Cmde: 0.8,
+    Clb: -0.05, Clp: -0.45, Clr: 0.08, Clda: 0.28, Cldr: -0.01,
+    Cnb: 0.12, Cnr: -0.2, Cnp: -0.04, Cnda: -0.01, Cndr: 0.07,
+    actTau: 0.05,
+    gLimiter: false, sasPitchDamp: 0, sasRollDamp: 0, sasYawDamp: 0.3, sasBeta: 1.0, sasRollToRudder: 0.02,
+    trimRate: 0.5 * DEG
+  };
   root.FlightModel = FlightModel;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

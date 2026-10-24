@@ -17,7 +17,9 @@
 #   HERMES_GCAL_WEBHOOK_UPSTREAM        /google/calendar/watch の転送先 (同上)
 #   IYAKUSAI_LINE_WEBHOOK_UPSTREAM      line.iyakusai.com /webhook の転送先 (同上)
 # 任意: APP_UID / APP_GID (既定 10001)、TRACK_DOWNLOAD_CONCURRENCY (既定 4)、
-#       TRACK_DOWNLOAD_PER_CLIENT (既定 2)
+#       TRACK_DOWNLOAD_PER_CLIENT (既定 2)、
+#       FFS_UPDATES_DIR (既定 ./updates)、FFS_UPDATE_PASSES_DIR (既定 ./update-passes)、
+#       FFS_CADDY_LOCAL_DIR (既定 ./caddy/local)
 #
 # 起動順序:
 #   1. ../ffs-dcs-server/ で `docker compose up -d dcsserverbot` を先に
@@ -124,6 +126,14 @@ services:
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./gravitymap:/srv/gravitymap:ro
+      # アプリ内更新とフルインストーラの置き場所 (/updates/。Caddyfile の (update_distribution) 参照)。
+      # 中身は git に入れない (.gitignore 済み)。
+      - ${FFS_UPDATES_DIR:-./updates}:/srv/updates:ro
+      # /updates/ のパス (basic_auth の *.users)。git に入れない。無くても起動し、そのときは全部 401。
+      - ${FFS_UPDATE_PASSES_DIR:-./update-passes}:/etc/caddy/update-passes:ro
+      # このサーバーだけの経路とサイトブロック (freedomflight.jp/*.caddy と sites/*.caddy)。git に入れない。
+      # Caddyfile の末尾と freedomflight.jp ブロックの import 参照。無くても起動する。
+      - ${FFS_CADDY_LOCAL_DIR:-./caddy/local}:/etc/caddy/local:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

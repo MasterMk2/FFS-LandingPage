@@ -37,7 +37,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 
 ## 更新配信 (/updates/)
 
-EddiePDF / Transinglater / IshikawADE / GUNYUPDF / DcsMissionStudio のアプリ内更新の取得元。Caddy の file_server で
+EddiePDF / Transinglater / IshikawADE / GUNYUPDF / ALLOCR / DcsMissionStudio のアプリ内更新の取得元。Caddy の file_server で
 `FFS_UPDATES_DIR` (git 管理外) を配るだけで、アプリは置かれた `update.json` の Ed25519 署名を、
 製品に埋め込んだ公開鍵で検証してから使う。サーバーには秘密鍵を置かない。
 

@@ -33,6 +33,19 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://sneaker.freedomflight.jp/` | Sneaker (Live Map) — 実体は姉妹 repo コンテナ |
 | `https://lardoon.freedomflight.jp/` | Lardoon (Tacview Replay archive) |
 | `https://gravitymap.freedomflight.jp/` | MyGravityMap — DCS とは無関係の個人ツール (姉妹 repo)、完全静的、file_server 配信 |
+| `https://freedomflight.jp/updates/<製品>/` | 自作デスクトップ製品のアプリ内更新とフルインストーラ。下の「更新配信」参照 |
+
+## 更新配信 (/updates/)
+
+EddiePDF / Transinglater / IshikawADE / DcsMissionStudio のアプリ内更新の取得元。Caddy の file_server で
+`FFS_UPDATES_DIR` (git 管理外) を配るだけで、アプリは置かれた `update.json` の Ed25519 署名を、
+製品に埋め込んだ公開鍵で検証してから使う。サーバーには秘密鍵を置かない。
+
+- `/updates/<製品>/update.json` (署名付き manifest)、`files/` (アプリが取る成果物)、`full/` (ブラウザ用のフルインストーラ)
+- `dcs-mission-studio` は公開。それ以外は basic_auth の「パス」が要る (ID `<製品>-<名前>` はその製品だけ、
+  `dev-<名前>` は全製品)。パスの一覧は `FFS_UPDATE_PASSES_DIR` の `*.users` (git 管理外)。1 つも無ければ全部 401
+- 設定は `caddy/Caddyfile` の `(update_distribution)`。手元の試験: `scripts/test-update-distribution.sh` (docker が要る)
+- 署名・パスの発行・配置の手順は、署名の道具 (別管理、手元専用) の RUNBOOK にある
 
 ## トポロジ
 

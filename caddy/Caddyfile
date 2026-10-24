@@ -76,6 +76,64 @@
 	}
 }
 
+# 自作デスクトップ製品のアプリ内更新とフルインストーラの配信 (/updates/)。
+# freedomflight.jp のブロックで import する。scripts/test-update-distribution.sh がこの snippet だけを
+# 取り出してローカルの caddy で試験するので、snippet の中で外のものを参照しないこと。
+#
+# 置き場所: compose の caddy に FFS_UPDATES_DIR を /srv/updates として read-only で渡す (git 管理外)。
+#   /srv/updates/<product>/update.json   署名付き manifest (Ed25519。検証はアプリ側。サーバーは置き場所だけ)
+#   /srv/updates/<product>/files/...     アプリの更新処理が取得する成果物
+#   /srv/updates/<product>/full/...      ブラウザで落とすフルインストーラと index.html
+#
+# 認証: dcs-mission-studio は公開 (ZIP は配布ページでも公開している)。それ以外の製品は basic_auth の
+# 「パス」が要る。パスの ID は <scope>-<名前> で、scope が製品名ならその製品だけ、dev (開発協力者用) なら
+# 全製品に通る。アプリの更新処理も同じパスを Basic 認証で送る。
+#   - パスの一覧は FFS_UPDATE_PASSES_DIR の *.users (git 管理外。発行・取り消しは手元の ffs-access.mjs)。
+#     ファイルが 1 つも無くても起動できるよう、誰もパスワードを知らない ffs-placeholder を 1 件置いてある
+#     (basic_auth は 0 件だと設定エラーになり、caddy ごと起動しなくなる)。
+#   - Caddy はアクセスログの Authorization を既定で伏せるので、パスはログに残らない。
+#   - パスの無い・違う要求は 401、範囲外の製品は 404。知らない製品・パスも 404。
+# 成果物は版入りの名前で置き換えないので長くキャッシュしてよいが、update.json と index.html は no-cache。
+(update_distribution) {
+	@updates_write {
+		path /updates/*
+		not method GET HEAD
+	}
+	respond @updates_write 405
+
+	@updates_public path /updates/dcs-mission-studio/*
+	handle @updates_public {
+		import update_files
+	}
+
+	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade)/
+	handle @updates_protected {
+		basic_auth {
+			import /etc/caddy/update-passes/*.users
+			ffs-placeholder $2a$14$Gdziph3K5EMMwrDRWz9/muyytBJiNAt2R17uzRqms7it84SffJSp.
+		}
+		@out_of_scope expression `!({http.auth.user.id}.startsWith('dev-') || {http.auth.user.id}.startsWith({re.updates.1} + '-'))`
+		respond @out_of_scope 404
+		import update_files
+	}
+
+	handle /updates/* {
+		respond 404
+	}
+}
+
+(update_files) {
+	header X-Robots-Tag "noindex, nofollow, noarchive"
+	@mutable path */update.json */ */index.html
+	header @mutable Cache-Control "no-cache"
+	@immutable path */files/* */full/*
+	header @immutable ?Cache-Control "public, max-age=31536000, immutable"
+	root * /srv
+	file_server {
+		hide .*
+	}
+}
+
 # www.freedomflight.jp は DNS 未設定のため TLS 化対象外。
 # A レコード追加後に `freedomflight.jp, www.freedomflight.jp {` に戻す。
 freedomflight.jp {
@@ -262,6 +320,9 @@ freedomflight.jp {
 			header_up X-Real-IP {remote_host}
 		}
 	}
+
+	# アプリ内更新とフルインストーラの配信。中身は (update_distribution) の説明を参照。
+	import update_distribution
 
 	handle {
 		# CSP は Report-Only で様子を見る段階 (違反はブラウザのコンソールに出るだけで、

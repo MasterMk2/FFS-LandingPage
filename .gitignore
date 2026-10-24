@@ -15,3 +15,6 @@ gravitymap/
 # 更新配信の中身 (署名付き manifest と成果物) とパス (basic_auth のハッシュ)。docker-compose.yml の caddy 参照
 updates/
 update-passes/
+
+# このサーバーだけの Caddy の経路とサイトブロック (Caddyfile の import /etc/caddy/local/... 参照)
+caddy/local/

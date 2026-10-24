@@ -324,6 +324,12 @@ freedomflight.jp {
 	# アプリ内更新とフルインストーラの配信。中身は (update_distribution) の説明を参照。
 	import update_distribution
 
+	# このサーバーだけの経路 (git 管理外)。compose の caddy が FFS_CADDY_LOCAL_DIR を /etc/caddy/local に
+	# 読み取り専用で渡す。公開リポジトリに書けない個人・関係先のサービスや、別リポジトリの公開スクリプトが
+	# 足す経路はここに置き、この Caddyfile は直接編集しない (編集すると git pull が止まる)。
+	# ファイルが無くても起動する。handle は Caddy がパスの長さで並べ替えるので、置く位置で意味は変わらない。
+	import /etc/caddy/local/freedomflight.jp/*.caddy
+
 	handle {
 		# CSP は Report-Only で様子を見る段階 (違反はブラウザのコンソールに出るだけで、
 		# 読み込みは止めない)。ffs-website のテンプレートから洗い出した読み込み元:
@@ -428,3 +434,7 @@ line.iyakusai.com {
 	}
 	log
 }
+
+# このサーバーだけのサイトブロック (git 管理外、freedomflight.jp の中の経路と同じ FFS_CADDY_LOCAL_DIR)。
+# 公開リポジトリに書けない関係先のドメインなどはここに置く。ファイルが無くても起動する。
+import /etc/caddy/local/sites/*.caddy

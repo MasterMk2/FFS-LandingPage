@@ -58,8 +58,9 @@ chmod 777 "$WORK/logs"
 echo '{"format":"ffs-update/1"}' > "$WORK/updates/eddiepdf/update.json"
 echo '{"format":"ffs-update/1"}' > "$WORK/updates/transinglater/update.json"
 echo '{"format":"ffs-update/1"}' > "$WORK/updates/dcs-mission-studio/update.json"
-mkdir -p "$WORK/updates/gunyupdf"
+mkdir -p "$WORK/updates/gunyupdf" "$WORK/updates/allocr"
 echo '{"format":"ffs-update/1"}' > "$WORK/updates/gunyupdf/update.json"
+echo '{"format":"ffs-update/1"}' > "$WORK/updates/allocr/update.json"
 head -c 3000000 /dev/urandom > "$WORK/updates/eddiepdf/files/EddiePDF-setup-v9.9.9.exe"
 # 圧縮が掛かれば縮む中身 (圧縮されないことを確かめる)
 (set +o pipefail; yes 'compressible line' | head -c 2000000) > "$WORK/updates/eddiepdf/full/EddiePDF-setup-v9.9.9.exe"
@@ -72,11 +73,13 @@ echo 'zip' > "$WORK/updates/dcs-mission-studio/files/DcsMissionStudio-9.9.9-win6
   echo "dev-bob $(hash bobpass)"
   echo "transinglater-carol $(hash carolpass)"
   echo "gunyupdf-dave $(hash davepass)"
+  echo "allocr-erin $(hash erinpass)"
 } > "$WORK/passes/test.users"
 chmod -R a+rX "$WORK"
 
 docker run -d --name "$NAME" -p "127.0.0.1:$PORT:8080" \
   -v "$WORK/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$WORK/updates:/srv/updates:ro" \
+  -v "$REPO/caddy/updates-index:/srv/updates-index:ro" \
   -v "$WORK/passes:/etc/caddy/update-passes:ro" -v "$WORK/logs:/logs" "$IMAGE" >/dev/null
 for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$PORT/" && break; sleep 0.2; done
 
@@ -100,6 +103,14 @@ check "gunyupdf pass on own product" 200 "$(code -u gunyupdf-dave:davepass "$B/u
 check "gunyupdf pass on other product" 404 "$(code -u gunyupdf-dave:davepass "$B/updates/eddiepdf/update.json")"
 check "other product pass on gunyupdf" 404 "$(code -u eddiepdf-alice:alicepass "$B/updates/gunyupdf/update.json")"
 check "dev pass on gunyupdf" 200 "$(code -u dev-bob:bobpass "$B/updates/gunyupdf/update.json")"
+check "index page public" 200 "$(code "$B/updates/")"
+check "index page lists products" 1 "$(curl -s "$B/updates/" | grep -c 'href="/updates/allocr/full/"')"
+check "index redirect" 308 "$(code "$B/updates")"
+check "index no-cache" 1 "$(curl -s -D - -o /dev/null "$B/updates/" | grep -ci '^cache-control: no-cache')"
+check "allocr without pass" 401 "$(code "$B/updates/allocr/update.json")"
+check "allocr pass on own product" 200 "$(code -u allocr-erin:erinpass "$B/updates/allocr/update.json")"
+check "allocr pass on other product" 404 "$(code -u allocr-erin:erinpass "$B/updates/gunyupdf/update.json")"
+check "dev pass on allocr" 200 "$(code -u dev-bob:bobpass "$B/updates/allocr/update.json")"
 check "unknown product" 404 "$(code -u dev-bob:bobpass "$B/updates/nothing/update.json")"
 check "hidden file" 404 "$(code -u dev-bob:bobpass "$B/updates/eddiepdf/.hidden")"
 check "no directory listing" 404 "$(code -u dev-bob:bobpass "$B/updates/eddiepdf/files/")"
@@ -153,13 +164,15 @@ docker rm -f "$NAME" >/dev/null
 docker run -d --name "$NAME" -p "127.0.0.1:$PORT:8080" \
   -e HERMES_LINE_WEBHOOK_UPSTREAM=127.0.0.1:1 -e HERMES_GCAL_WEBHOOK_UPSTREAM=127.0.0.1:2 -e IYAKUSAI_LINE_WEBHOOK_UPSTREAM=127.0.0.1:3 \
   -v "$WORK/full.Caddyfile:/etc/caddy/Caddyfile:ro" -v "$WORK/updates:/srv/updates:ro" \
-  -v "$WORK/passes:/etc/caddy/update-passes:ro" -v "$WORK/local:/etc/caddy/local:ro" "$IMAGE" >/dev/null
+  -v "$WORK/passes:/etc/caddy/update-passes:ro" -v "$WORK/local:/etc/caddy/local:ro" \
+  -v "$REPO/caddy/updates-index:/srv/updates-index:ro" "$IMAGE" >/dev/null
 H=(-H 'Host: freedomflight.jp')
 for _ in $(seq 1 50); do curl -s -o /dev/null "${H[@]}" "$B/updates/" && break; sleep 0.2; done
 check "full: protected needs pass" 401 "$(code "${H[@]}" "$B/updates/eddiepdf/update.json")"
 check "full: dev pass" 200 "$(code "${H[@]}" -u dev-bob:bobpass "$B/updates/eddiepdf/update.json")"
 check "full: public product" 200 "$(code "${H[@]}" "$B/updates/dcs-mission-studio/update.json")"
 check "full: unknown under /updates" 404 "$(code "${H[@]}" "$B/updates/nothing")"
+check "full: index page" 200 "$(code "${H[@]}" "$B/updates/")"
 check "full: site still proxies (upstream down here)" 502 "$(code "${H[@]}" "$B/")"
 check "full: gca still proxies" 502 "$(code "${H[@]}" "$B/gca/")"
 check "full: local route imported" "local route" "$(curl -s "${H[@]}" "$B/localtest/x")"

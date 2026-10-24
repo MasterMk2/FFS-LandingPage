@@ -101,12 +101,24 @@
 	}
 	respond @updates_write 405
 
+	# 製品の一覧 (公開)。中身は repo の caddy/updates-index/index.html を compose がフォルダごと渡す
+	# (フォルダで渡すので、git pull だけで新しい版が見える)。各製品のページはパスが要る。
+	redir /updates /updates/ 308
+	@updates_index path /updates/ /updates/index.html
+	handle @updates_index {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		header Cache-Control "no-cache"
+		root * /srv/updates-index
+		rewrite * /index.html
+		file_server
+	}
+
 	@updates_public path /updates/dcs-mission-studio/*
 	handle @updates_public {
 		import update_files
 	}
 
-	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade|gunyupdf)/
+	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade|gunyupdf|allocr)/
 	handle @updates_protected {
 		basic_auth {
 			import /etc/caddy/update-passes/*.users

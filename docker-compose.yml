@@ -129,6 +129,8 @@ services:
       # アプリ内更新とフルインストーラの置き場所 (/updates/。Caddyfile の (update_distribution) 参照)。
       # 中身は git に入れない (.gitignore 済み)。
       - ${FFS_UPDATES_DIR:-./updates}:/srv/updates:ro
+      # /updates/ の製品一覧 (repo で管理する静的ページ。フォルダで渡すので git pull で更新される)
+      - ./caddy/updates-index:/srv/updates-index:ro
       # /updates/ のパス (basic_auth の *.users)。git に入れない。無くても起動し、そのときは全部 401。
       - ${FFS_UPDATE_PASSES_DIR:-./update-passes}:/etc/caddy/update-passes:ro
       # このサーバーだけの経路とサイトブロック (freedomflight.jp/*.caddy と sites/*.caddy)。git に入れない。

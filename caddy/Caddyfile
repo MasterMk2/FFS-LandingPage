@@ -106,7 +106,7 @@
 		import update_files
 	}
 
-	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade)/
+	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade|gunyupdf)/
 	handle @updates_protected {
 		basic_auth {
 			import /etc/caddy/update-passes/*.users

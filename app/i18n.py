@@ -42,17 +42,39 @@ MESSAGES: dict[str, dict[str, str]] = {
     # ── home.html ──
     "home_lead": {
         "ja": (
-            "FFS は DCS World の専用サーバを運営するコミュニティです。"
-            "常時稼働しているマルチプレイヤー環境で、飛行訓練・合同作戦・シナリオベースのミッションを行っています。"
-            "サーバの稼働状況・ミッション・気象・負荷はリアルタイムで公開、飛行時間や戦果のランキングもご覧いただけます。"
+            "FFS は DCS World の専用サーバを常時運営しているコミュニティです。"
+            "飛行訓練・合同作戦・シナリオミッションをマルチプレイで行っています。"
+            "サーバの起動や集まりの連絡は Discord で流れます。"
         ),
         "en": (
-            "FFS is a community operating dedicated DCS World servers. "
-            "It runs an always-online multiplayer environment for flight training, joint operations "
-            "and scenario-based missions. Server status, missions, weather and load are published in "
-            "real time, and flight-time / combat rankings are available to browse."
+            "FFS is a community running always-online dedicated DCS World servers "
+            "for flight training, joint operations and scenario missions. "
+            "Server starts and meet-ups are announced on Discord."
         ),
     },
+    "home_servers_title": {"ja": "サーバ", "en": "Servers"},
+    "home_servers_meta": {
+        "ja": "稼働 {running} / {total} ・ 接続中 {players} 人 ・ 取得 {age}",
+        "en": "{running} of {total} running · {players} online · fetched {age}",
+    },
+    "home_servers_pending": {
+        "ja": "サーバの情報をまだ取得していません。数秒後に再読み込みしてください。",
+        "en": "Server info has not been fetched yet. Reload in a few seconds.",
+    },
+    "home_servers_error": {
+        "ja": "サーバの情報を取得できません。稼働状況は Discord でも確認できます。",
+        "en": "Server info is unavailable right now. Check Discord for server status.",
+    },
+    "home_servers_empty": {"ja": "登録されているサーバがありません。", "en": "No servers are registered."},
+    "home_players": {"ja": "{n} 人", "en": "{n} online"},
+    "home_password": {"ja": "パスワードあり", "en": "password required"},
+    "home_link_status": {"ja": "負荷・気象を含む詳しい状況", "en": "Full status with load and weather"},
+    "home_link_lb": {"ja": "リーダーボード", "en": "Leaderboard"},
+    "home_link_tracks": {"ja": "リプレイ ({n} 件)", "en": "Replays ({n})"},
+    "home_tools_dcs": {"ja": "DCS で使うツール", "en": "Tools for DCS"},
+    "home_tools_apps": {"ja": "アプリとゲーム", "en": "Apps and games"},
+    "home_tools_other": {"ja": "DCS 以外の個人プロジェクト", "en": "Personal projects outside DCS"},
+    "home_new_tab": {"ja": "新しいタブで開く", "en": "opens in a new tab"},
     "home_card_gca_title": {
         "ja": "Web GCA — 管制コンソール",
         "en": "Web GCA — ATC Console",
@@ -89,30 +111,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "Sunset Skyrunner — ブラウザ・フライトゲーム",
         "en": "Sunset Skyrunner — Browser Flight Game",
     },
-    "cta_status": {"ja": "ステータスを見る →", "en": "View status →"},
-    "cta_lb": {"ja": "ランキングを見る →", "en": "View leaderboard →"},
-    "cta_open_sneaker": {
-        "ja": "sneaker.freedomflight.jp を開く ↗",
-        "en": "Open sneaker.freedomflight.jp ↗",
-    },
-    "cta_open_gca": {"ja": "管制卓を開く ↗", "en": "Open the console ↗"},
-    "cta_olympus_how": {"ja": "使い方を見る →", "en": "How to use →"},
-    "cta_open_lt": {"ja": "Landing Teacher を開く ↗", "en": "Open Landing Teacher ↗"},
-    "cta_open_lardoon": {
-        "ja": "lardoon.freedomflight.jp を開く ↗",
-        "en": "Open lardoon.freedomflight.jp ↗",
-    },
-    "cta_view_replays": {"ja": "リプレイを見る →", "en": "View replays →"},
-    "cta_open_gm": {
-        "ja": "gravitymap.freedomflight.jp を開く ↗",
-        "en": "Open gravitymap.freedomflight.jp ↗",
-    },
-    "cta_open_drivecal": {"ja": "DriveCal を開く ↗", "en": "Open DriveCal ↗"},
-    "cta_open_gatchan": {"ja": "GATCHAN を開く ↗", "en": "Open GATCHAN ↗"},
-    "cta_open_komagire": {"ja": "こま切れ印刷をダウンロード", "en": "Download KOMAGIRE"},
-    "cta_open_dsv": {"ja": "DCS Skin Viewer をダウンロード", "en": "Download DCS Skin Viewer"},
-    "cta_open_dms": {"ja": "DCS Mission Studio をダウンロード", "en": "Download DCS Mission Studio"},
-    "cta_open_skyrunner": {"ja": "離陸する →", "en": "Take off →"},
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

@@ -17,7 +17,7 @@
 {% endif %}
 <title>{% block title %}FFS DCS Status{% endblock %}</title>
 {% block head %}{% endblock %}
-<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=10">
+<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=11">
 {# Discord バーを閉じた人には最初から出さない。<head> で html にクラスを
    立てておくことで、body 描画後に消す方式で起きる一瞬のちらつきを避ける。
    localStorage が使えない環境 (プライベートウィンドウ等) では単に毎回

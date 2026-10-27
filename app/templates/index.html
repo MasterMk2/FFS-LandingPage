@@ -1,18 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 class="section-title">Host Load (Physical Machine)</h2>
+{# 参加者が最初に知りたいのはサーバの状況なので先に置き、物理ホストの負荷は後ろへ #}
+<h2 class="section-title">Servers</h2>
 <section
-  id="sysmon"
-  hx-get="/panel/sysmon"
+  id="servers"
+  hx-get="/panel/servers"
   hx-trigger="load, every {{ poll_seconds }}s"
   hx-swap="innerHTML">
   <p class="loading">loading...</p>
 </section>
 
-<h2 class="section-title">Servers</h2>
+<h2 class="section-title">Host Load (Physical Machine)</h2>
 <section
-  id="servers"
-  hx-get="/panel/servers"
+  id="sysmon"
+  hx-get="/panel/sysmon"
   hx-trigger="load, every {{ poll_seconds }}s"
   hx-swap="innerHTML">
   <p class="loading">loading...</p>

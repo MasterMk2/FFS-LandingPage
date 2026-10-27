@@ -93,13 +93,13 @@ tracked ファイルには書かない**。
 | [app/db.py](../../../app/db.py) | postgres `serverstats` を RO で SELECT、時系列と SVG スパークライン生成 |
 | [app/sysmon.py](../../../app/sysmon.py) | psutil でホスト CPU/mem/swap/loadavg/uptime を /host/proc 経由で取得。ネットワーク I/O は `/host/proc/1/net/dev` (PID1 = init = host netns) を直読み、物理 NIC のみ合算して rx/tx rate 化 |
 | [app/templates/base.html](../../../app/templates/base.html) | 共通レイアウト。ヒーロー + Nav + footer |
-| [app/templates/home.html](../../../app/templates/home.html) | Home ページ (Welcome / quick stats / カード) |
-| [app/templates/index.html](../../../app/templates/index.html) | Status ページ (HTMX panel mount: Host Load + Servers) |
+| [app/templates/home.html](../../../app/templates/home.html) | Home ページ (導入文 / サーバ一覧 1 サーバ 1 行 / ツール一覧 3 区分) |
+| [app/templates/index.html](../../../app/templates/index.html) | Status ページ (HTMX panel mount: Servers → Host Load の順) |
 | [app/templates/leaderboard.html](../../../app/templates/leaderboard.html) | Leaderboard (カテゴリ別 top 10) |
 | [app/templates/tracks.html](../../../app/templates/tracks.html) | Replays (各サーバの .trk 一覧 + DL リンク) |
 | [app/templates/servers_panel.html](../../../app/templates/servers_panel.html) | HTMX: 統合サーバカード (mission/weather/extensions + FPS/CPU/Mem/Players スパークライン) |
 | [app/templates/sysmon_panel.html](../../../app/templates/sysmon_panel.html) | HTMX: ホスト CPU/Mem/Swap/Load/Network カード (RX/TX 同一スケール 2 系列スパークライン) + Uptime/history メタフッター |
-| [app/static/style.css](../../../app/static/style.css) | ダークテーマ、全スタイル統合 |
+| [app/static/style.css](../../../app/static/style.css) | ダークテーマ、全スタイル統合。操作の印 (リンク・選択中) は無彩色、色は状態・陣営・ネットワークのグラフだけ |
 
 ## 6. バックグラウンドキャッシュ ([app/cache.py](../../../app/cache.py))
 
@@ -109,10 +109,10 @@ F5 連打で upstream (DCSSB / postgres) に負荷を掛けないよう、HTTP h
 
 | cache 名 | データ元 | interval | 用途 |
 |---|---|---|---|
-| `servers_cache` | `dcssb.get_servers()` | **15s** | 統合サーバカード (mission/weather/extensions) + Home quick stats |
+| `servers_cache` | `dcssb.get_servers()` | **15s** | 統合サーバカード (mission/weather/extensions) + Home サーバ一覧 |
 | `load_cache` | `db.get_server_load_series()` | **60s** | 統合サーバカード内の FPS/CPU/Mem/Players 時系列 (DCSSB Monitoring が 1 分毎 serverstats に書き込んだ履歴) |
 | `highscore_cache` | `dcssb.get_highscore(period='month', limit=10)` | **300s** | Leaderboard |
-| `tracks_cache` | summary + 各サーバ list をバッチで取得 | **60s** | Replays ページ + Home quick stats |
+| `tracks_cache` | summary + 各サーバ list をバッチで取得 | **60s** | Replays ページ + Home のリプレイ件数 |
 
 **設計上の注意**:
 - `CachedValue` は最新 1 件のみ保持 (履歴は持たない)。時系列グラフは `serverstats`

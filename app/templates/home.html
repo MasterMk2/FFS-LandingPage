@@ -1,293 +1,114 @@
 {% extends "base.html" %}
 {% block title %}FFS — Freedom Flight Server{% endblock %}
 {% block content %}
+{# 外部サイトや別アプリを新しいタブで開くリンク。名前の後ろの ↗ と読み上げ用の注記を付ける #}
+{% macro tool(href, name, new_tab=false) -%}
+<li><a class="tool" href="{{ href }}"{% if new_tab %} target="_blank" rel="noopener"{% endif %}>
+  <span class="tool-name">{{ name }}</span>{% if new_tab %}<span class="tool-ext" aria-hidden="true">↗</span><span class="sr-only"> ({{ t('home_new_tab') }})</span>{% endif %}
+  <span class="tool-desc">{{ caller() }}</span>
+</a></li>
+{%- endmacro %}
+
 <section class="home-intro">
-  <h2>Welcome</h2>
   <p class="lead">{{ t('home_lead') }}</p>
 </section>
 
-<section class="home-quick-stats" aria-label="live snapshot">
-  <div class="qstat">
-    <dt>Running Servers</dt>
-    <dd>{{ stats.running_count }} / {{ stats.total_servers }}</dd>
-  </div>
-  <div class="qstat">
-    <dt>Players Online</dt>
-    <dd>{{ stats.total_players }}</dd>
-  </div>
-  <div class="qstat">
-    <dt>Replay Tracks</dt>
-    <dd><a href="/tracks" class="qstat-link">{{ stats.tracks_total }}</a></dd>
-  </div>
-  <div class="qstat">
-    <dt>Last Sample</dt>
-    <dd class="qstat-age">{{ stats.age }}</dd>
-  </div>
+<section class="home-servers" aria-labelledby="home-servers-title">
+  <h2 class="section-title" id="home-servers-title">{{ t('home_servers_title') }}</h2>
+  {% if servers_state == 'pending' %}
+  <p class="notice">{{ t('home_servers_pending') }}</p>
+  {% elif servers_state == 'error' %}
+  <p class="error">{{ t('home_servers_error') }}</p>
+  {% elif not servers %}
+  <p class="notice">{{ t('home_servers_empty') }}</p>
+  {% else %}
+  <p class="section-meta">{{ t('home_servers_meta').format(running=running_count, total=servers|length, players=total_players, age=servers_age) }}</p>
+  <ul class="server-rows">
+    {% for s in servers %}
+    <li class="server-row status-{{ s.status_class }}">
+      <span class="badge">{{ s.status }}</span>
+      <span class="sr-name truncate" title="{{ s.name }}">{{ s.name }}</span>
+      <span class="sr-mission truncate" title="{{ s.mission or '-' }}">{{ s.mission or '-' }}{% if s.theatre %} <span class="sr-theatre">({{ s.theatre }})</span>{% endif %}</span>
+      <span class="sr-players">{{ t('home_players').format(n=s.players) }}</span>
+      <span class="sr-addr mono">{% if s.address %}{{ s.address }}{% endif %}{% if s.password %} · {{ t('home_password') }}{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  <ul class="home-links">
+    <li><a href="/status">{{ t('home_link_status') }}</a></li>
+    <li><a href="/leaderboard">{{ t('home_link_lb') }}</a></li>
+    <li><a href="/tracks">{{ t('home_link_tracks').format(n=tracks_total) }}</a></li>
+  </ul>
 </section>
 
-<section class="home-cards">
-  <a class="home-card" href="/status">
-    <h3>Server Status</h3>
-    {% if lang == 'ja' %}
-    <p>現在稼働中のサーバとミッション、気象、接続情報 (LotAtc / Tacview)、サーバ負荷 (FPS / Memory の時系列) を 15 秒毎に更新。</p>
-    {% else %}
-    <p>Running servers with missions, weather, connection info (LotAtc / Tacview) and server load (FPS / memory history), refreshed every 15 seconds.</p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_status') }}</span>
-  </a>
-  <a class="home-card" href="/leaderboard">
-    <h3>Leaderboard</h3>
-    {% if lang == 'ja' %}
-    <p>過去 30 日間の飛行時間 / 撃墜記録 / KD 比 など、パイロット別トップ 10 を表示します。</p>
-    {% else %}
-    <p>Top 10 pilots over the last 30 days by flight time, kills and K/D ratio.</p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_lb') }}</span>
-  </a>
+<section aria-labelledby="home-tools-dcs">
+  <h2 class="section-title" id="home-tools-dcs">{{ t('home_tools_dcs') }}</h2>
+  <ul class="tool-list">
+    {% call tool("https://sneaker.freedomflight.jp/", "Sneaker — Live Map", true) %}
+      {%- if lang == 'ja' %}飛行中の機体を 2D マップにリアルタイムで表示する戦況モニタ。地上指揮や AWACS 役に。
+      {%- else %}A real-time 2D map of airborne aircraft from Tacview telemetry. Handy for ground command or playing AWACS.{% endif %}
+    {% endcall %}
+    {% call tool("/gca/", t('home_card_gca_title'), true) %}
+      {%- if lang == 'ja' %}進入中の機体を拾い、GCA (PAR) のスコープとトークダウンを自動で作る管制卓。GCI・TWR も同じ画面で。
+      {%- else %}An ATC console that tracks inbound traffic and generates GCA (PAR) scopes and talkdown. GCI and TWR on the same screen.{% endif %}
+    {% endcall %}
+    {% call tool("/guide#olympus", t('home_card_olympus_title')) %}
+      {%- if lang == 'ja' %}ブラウザからユニットを配置・操作する RTS 風の画面。DCS を起動せずに参加できます。URL はサーバーごとに別で、パスワードは Discord の <code>#status-server1</code> に掲示。
+      {%- else %}An RTS-style browser interface to spawn and command units, no DCS launch needed. Each server has its own URL; passwords are posted on Discord <code>#status-server1</code>.{% endif %}
+    {% endcall %}
+    {% call tool("/landing-teacher/", t('home_card_lt_title'), true) %}
+      {%- if lang == 'ja' %}着陸・着艦を自動で採点 (空母は LSO 式、陸上は A〜E)。進入の軌跡も見返せます。現在は server1 のみ。
+      {%- else %}Auto-grades landings and carrier traps (LSO scale at sea, A–E ashore) with an approach-path view. Server 1 only for now.{% endif %}
+    {% endcall %}
+    {% call tool("https://lardoon.freedomflight.jp/", "Lardoon — Tacview Archive", true) %}
+      {%- if lang == 'ja' %}自動録画された Tacview (.acmi) の一覧・検索・ダウンロード。1 フライト分だけ切り出せます。
+      {%- else %}Browse, search and download auto-recorded Tacview (.acmi) files, trimmed to a single flight if you like.{% endif %}
+    {% endcall %}
+    {% call tool("/tracks", t('home_card_replays_title')) %}
+      {%- if lang == 'ja' %}自動保存された DCS のリプレイ (.trk) をダウンロード。DCS の <code>File → Open</code> で再生できます。
+      {%- else %}Download auto-saved DCS replays (.trk) and play them via <code>File → Open</code> in DCS.{% endif %}
+    {% endcall %}
+  </ul>
 </section>
 
-<h2 class="section-title">Tools &amp; Services</h2>
-<section class="home-cards">
-  <a class="home-card" href="https://sneaker.freedomflight.jp/" target="_blank" rel="noopener">
-    <h3>Sneaker — Live Map</h3>
-    {% if lang == 'ja' %}
-    <p>
-      飛行中の機体位置を 2D マップ上でリアルタイム表示する<strong>戦況モニタ</strong>。
-      Tacview テレメトリをブラウザで受信し、味方・敵・中立の動きを追跡できます。
-      Discord で地上指揮や AWACS 役をしたいときに便利。
-    </p>
-    {% else %}
-    <p>
-      A real-time <strong>situation monitor</strong> plotting airborne aircraft on a 2D map.
-      It receives Tacview telemetry in the browser and tracks friendly, enemy and neutral movement.
-      Handy for ground command or playing AWACS over Discord.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_sneaker') }}</span>
-  </a>
-  <a class="home-card" href="/gca/" target="_blank" rel="noopener">
-    <h3>{{ t('home_card_gca_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      ブラウザで動く<strong>地上管制卓</strong>。Tacview のリアルタイムテレメトリから
-      進入中の機体を拾い、<strong>GCA (PAR)</strong> の方位・降下スコープと
-      トークダウン (&quot;5 miles from touchdown, on course, on glidepath&quot;) を自動生成します。
-      迎撃管制の <strong>GCI</strong>、飛行場管制の <strong>TWR</strong> も同じ画面から。
-      滑走路データは DCS 本体から取得しているので、マップが変わっても手直し不要です。
-    </p>
-    {% else %}
-    <p>
-      A <strong>ground ATC console</strong> that runs in the browser. It picks up inbound traffic from
-      Tacview's real-time telemetry and auto-generates the azimuth / elevation scopes and talkdown of
-      <strong>GCA (PAR)</strong> (&quot;5 miles from touchdown, on course, on glidepath&quot;).
-      Interception control (<strong>GCI</strong>) and aerodrome control (<strong>TWR</strong>) work from the same screen.
-      Runway data is taken from the DCS installation itself, so no rework is needed when the map changes.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_gca') }}</span>
-  </a>
-  <a class="home-card" href="/guide#olympus">
-    <h3>{{ t('home_card_olympus_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      ブラウザからユニットを<strong>配置・操作</strong>できる RTS 風インターフェース。
-      航空機・地上部隊・艦艇をその場でスポーンし、移動や攻撃を指示できます。
-      DCS を起動していなくても参加でき、飛んでいる仲間に合わせてシナリオを作る、
-      味方支援を足す、といった遊び方ができます。
-      サーバーごとに URL が分かれています。ログインに必要なパスワードは Discord の
-      <code>#status-server1</code> (稼働状況の投稿、DCS Olympus 欄) に掲示中。
-    </p>
-    {% else %}
-    <p>
-      An RTS-style interface for <strong>placing and commanding units</strong> from the browser.
-      Spawn aircraft, ground forces and ships on the spot, then task them to move or attack.
-      You can join in without launching DCS — build scenarios around whoever is flying,
-      or add friendly support on the fly.
-      Each server has its own URL. Login passwords are posted on Discord's
-      <code>#status-server1</code> (the auto-updated status post, DCS Olympus section).
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_olympus_how') }}</span>
-  </a>
-  <a class="home-card" href="/landing-teacher/" target="_blank" rel="noopener">
-    <h3>{{ t('home_card_lt_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      Tacview のリアルタイムテレメトリから着陸・着艦を自動検出し、
-      空母着艦は米海軍式 <strong>LSO グレーディング</strong> (OK / OK- / (OK) / CUT ほか)、
-      陸上着陸は簡易採点 (A〜E) で振り返えます。
-      履歴ダッシュボードと GCA スコープ風の進入軌跡ビューをブラウザで確認可能。
-      現時点は server1 のみ対応。
-    </p>
-    {% else %}
-    <p>
-      Auto-detects landings and carrier traps from Tacview's real-time telemetry:
-      carrier traps are graded with the US Navy <strong>LSO scale</strong> (OK / OK- / (OK) / CUT and more),
-      field landings with a simple A–E score.
-      Reviewable in the browser via a history dashboard and a GCA-style approach-path view.
-      Server 1 only for now.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_lt') }}</span>
-  </a>
-  <a class="home-card" href="https://lardoon.freedomflight.jp/" target="_blank" rel="noopener">
-    <h3>Lardoon — Tacview Archive</h3>
-    {% if lang == 'ja' %}
-    <p>
-      各サーバで自動録画された <strong>Tacview (.acmi)</strong> を一覧・検索・ダウンロードできる Web アーカイブ。
-      単一フライトへの trim 機能で必要な部分だけ小さく落とせます。再生は手元の Tacview デスクトップアプリで。
-    </p>
-    {% else %}
-    <p>
-      A web archive that lists, searches and serves the <strong>Tacview (.acmi)</strong> recordings
-      captured automatically on each server. Trim to a single flight to download just the part you need.
-      Playback happens in your local Tacview desktop app.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_lardoon') }}</span>
-  </a>
-  <a class="home-card" href="/tracks">
-    <h3>{{ t('home_card_replays_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      各サーバで自動保存された DCS の<strong>リプレイファイル (.trk)</strong> を一覧・ダウンロード。
-      DCS World の <code>File → Open</code> で再生でき、デブリーフィング / AAR / 機動検証に使えます。
-    </p>
-    {% else %}
-    <p>
-      Lists and serves the DCS <strong>replay files (.trk)</strong> auto-saved on each server.
-      Replay them via <code>File → Open</code> in DCS World — useful for debriefs, AAR and manoeuvre checks.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_view_replays') }}</span>
-  </a>
-  <a class="home-card" href="/dcs-skin-viewer/{% if lang == 'en' %}en/{% endif %}">
-    <h3>{{ t('home_card_dsv_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      リバリー（塗装）制作を手伝う Windows アプリ。画像編集ソフトでリバリーの画像を保存すると自動で読み直し、
-      変わった場所を<strong>3D の機体と UV 画像の両方</strong>に色付きで示します。
-      手元の DCS World のモデルとリバリーを読み取り専用で使います。試用版。
-    </p>
-    {% else %}
-    <p>
-      A Windows desktop app for livery painters. Save a livery image in your image editor and it reloads automatically,
-      highlighting what changed on <strong>both the 3D aircraft and the UV image</strong>.
-      It reads models and liveries from your own DCS World install without changing them. Trial version; the interface is in Japanese.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_dsv') }}</span>
-  </a>
-  <a class="home-card" href="/dcs-mission-studio/{% if lang == 'en' %}en/{% endif %}">
-    <h3>{{ t('home_card_dms_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      既存のミッション（.miz）を開いて、グループ・ゾーン・天候・トリガーの文言・無線・AI タスクなどを編集し、
-      <strong>原本を残したまま別名で保存</strong>する Windows アプリ。Lua は実行しません。
-      開発中のアルファ版です。編集したミッションは DCS の Mission Editor で確認してから使ってください。
-    </p>
-    {% else %}
-    <p>
-      A Windows app that opens an existing mission (.miz), edits groups, zones, weather, trigger texts, radios, AI tasks and more,
-      and <strong>saves under a new name, keeping the original</strong>. It never runs Lua.
-      Alpha under development; check edited missions in the DCS Mission Editor before use. The interface is in Japanese.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_dms') }}</span>
-  </a>
-  <a class="home-card" href="/skyrunner">
-    <h3>{{ t('home_card_skyrunner_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      夕焼けの低ポリ世界をジェットで飛び、浮かぶリングを順にくぐるブラウザ・フライトゲーム。
-      見た目は軽めですが、中身は<strong>6 自由度の飛行力学</strong>
-      (揚力・抗力・舵のモーメント・慣性テンソル・ISA 大気) で、失速も G 制限も本物の挙動です。
-      HUD 付き。キーボードでもスマホのタッチでも操縦できます。
-    </p>
-    {% else %}
-    <p>
-      A browser flight game: fly a jet over an endless low-poly sunset world and thread the floating rings in order.
-      Light on the outside, but underneath runs a <strong>6-DOF flight model</strong>
-      (lift, drag, control moments, inertia tensor, ISA atmosphere), so stalls and g-limits behave like the real thing.
-      HUD included; keyboard or touch controls.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_skyrunner') }}</span>
-  </a>
+<section aria-labelledby="home-tools-apps">
+  <h2 class="section-title" id="home-tools-apps">{{ t('home_tools_apps') }}</h2>
+  <ul class="tool-list">
+    {% call tool("/dcs-skin-viewer/" ~ ("en/" if lang == 'en' else ""), t('home_card_dsv_title')) %}
+      {%- if lang == 'ja' %}リバリーの画像を保存すると、変わった所を 3D の機体と UV 画像の両方に示す Windows アプリ。DCS のモデルとリバリーは読み取り専用で使います。試用版。
+      {%- else %}A Windows app for livery painters that highlights changes on both the 3D aircraft and the UV image as you save. Reads your DCS models and liveries without changing them. Trial; Japanese UI.{% endif %}
+    {% endcall %}
+    {% call tool("/dcs-mission-studio/" ~ ("en/" if lang == 'en' else ""), t('home_card_dms_title')) %}
+      {%- if lang == 'ja' %}.miz のグループ・天候・トリガーなどを編集し、原本を残して別名で保存する Windows アプリ。アルファ版なので、編集したミッションは DCS の Mission Editor で確認してから使ってください。
+      {%- else %}A Windows app that edits groups, weather, triggers and more in a .miz and saves under a new name. Alpha: check edited missions in the DCS Mission Editor before use. Japanese UI.{% endif %}
+    {% endcall %}
+    {% call tool("/skyrunner", t('home_card_skyrunner_title')) %}
+      {%- if lang == 'ja' %}6 自由度の飛行力学で飛ぶ、リングくぐりのブラウザ・フライトゲーム。キーボードでもタッチでも。
+      {%- else %}A ring-threading browser flight game on a 6-DOF flight model. Keyboard or touch controls.{% endif %}
+    {% endcall %}
+  </ul>
 </section>
 
-<h2 class="section-title">Other</h2>
-<section class="home-cards">
-  <a class="home-card" href="https://gravitymap.freedomflight.jp/" target="_blank" rel="noopener">
-    <h3>MyGravityMap</h3>
-    {% if lang == 'ja' %}
-    <p>
-      DCS とは無関係の個人プロジェクト。Google マップのタイムライン履歴から、
-      自分がどこに引き寄せられて生きてきたかを可視化するブラウザアプリ。
-      位置データは端末内 (IndexedDB) だけで処理され、サーバには送信されません。
-    </p>
-    {% else %}
-    <p>
-      A personal project unrelated to DCS. A browser app that visualises, from your Google Maps
-      timeline history, which places have kept pulling you back through life.
-      Location data is processed entirely on-device (IndexedDB) and never sent to a server.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_gm') }}</span>
-  </a>
-  <a class="home-card" href="/drivecal/" target="_blank" rel="noopener">
-    <h3>DriveCal</h3>
-    {% if lang == 'ja' %}
-    <p>
-      DCS とは無関係の個人プロジェクト。スマホで記録した GNSS と加速度・ジャイロから、
-      運転を地図・グラフ・G・高度付きの 3D で振り返るブラウザアプリ (記録用の Android アプリは開発中)。
-      実走行のサンプル (夜間の一般道) とサーキットの合成デモで試せます。
-      ファイルは端末内だけで処理され、サーバには送信されません。
-    </p>
-    {% else %}
-    <p>
-      A personal project unrelated to DCS. A browser app for reviewing drives recorded on a phone
-      (GNSS plus accelerometer and gyro): map, charts, g-forces and a 3D view with altitude
-      (the Android recorder is still in development).
-      Try it with a real night drive on local roads or a synthetic circuit demo.
-      Files are processed entirely on-device and never sent to a server.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_drivecal') }}</span>
-  </a>
-  <a class="home-card" href="/gatchan/" target="_blank" rel="noopener">
-    <h3>{{ t('home_card_gatchan_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      A0・A1 などの大きなデザインを、A4・A3 などの用紙に分割して印刷するブラウザアプリ。
-      印刷余白とのりしろを設定し、貼り合わせ用の PDF を作れます。
-      原稿はブラウザ内で処理し、サーバには送信されません。
-    </p>
-    {% else %}
-    <p>
-      Split large designs, including A0 and A1 posters, across A4, A3 or custom sheets.
-      Set printer margins and overlap for joining, then download a tiled PDF.
-      Designs are processed in your browser and never uploaded to the server.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_gatchan') }}</span>
-  </a>
-  <a class="home-card" href="/komagire/{% if lang == 'en' %}en/{% endif %}">
-    <h3>{{ t('home_card_komagire_title') }}</h3>
-    {% if lang == 'ja' %}
-    <p>
-      長い PDF を10ページ程度の小さなジョブに分け、1部ずつ順番に印刷する Windows アプリ。
-      自動両面の長辺・短辺とじ、ジョブ間の休止、停止と再開位置の指定に対応しています。
-      原稿は PC 内で処理します。まず少ないページで試し刷りしてください。
-    </p>
-    {% else %}
-    <p>
-      A Windows desktop app that prints long PDFs in small, sequential jobs, one complete copy at a time.
-      Supports automatic duplex, delays between jobs, pausing and an explicit starting job for resuming.
-      PDFs are processed on your PC. Start with a short test print. The app interface is in Japanese.
-    </p>
-    {% endif %}
-    <span class="home-card-cta">{{ t('cta_open_komagire') }}</span>
-  </a>
+<section aria-labelledby="home-tools-other">
+  <h2 class="section-title" id="home-tools-other">{{ t('home_tools_other') }}</h2>
+  <ul class="tool-list">
+    {% call tool("https://gravitymap.freedomflight.jp/", "MyGravityMap", true) %}
+      {%- if lang == 'ja' %}Google マップのタイムライン履歴から、よく引き寄せられた場所を可視化。データは端末内だけで処理します。
+      {%- else %}Visualises the places that kept pulling you back, from your Google Maps timeline. Processed on-device only.{% endif %}
+    {% endcall %}
+    {% call tool("/drivecal/", "DriveCal", true) %}
+      {%- if lang == 'ja' %}スマホで記録した GNSS と加速度から、運転を地図・グラフ・3D で振り返る (記録用の Android アプリは開発中)。データは端末内だけで処理します。
+      {%- else %}Review drives recorded on a phone (GNSS plus IMU) as a map, charts and 3D (the Android recorder is in development). Processed on-device only.{% endif %}
+    {% endcall %}
+    {% call tool("/gatchan/", t('home_card_gatchan_title'), true) %}
+      {%- if lang == 'ja' %}A0・A1 などの大判デザインを A4・A3 に分割し、貼り合わせ用の PDF を作る。ブラウザ内で処理します。
+      {%- else %}Split A0/A1 designs across A4/A3 sheets into a tiled PDF for joining. Processed in the browser.{% endif %}
+    {% endcall %}
+    {% call tool("/komagire/" ~ ("en/" if lang == 'en' else ""), t('home_card_komagire_title')) %}
+      {%- if lang == 'ja' %}長い PDF を小さなジョブに分け、1 部ずつ順に印刷する Windows アプリ。まず少ないページで試し刷りしてください。
+      {%- else %}A Windows app that prints long PDFs in small sequential jobs, one copy at a time. Start with a short test print. Japanese UI.{% endif %}
+    {% endcall %}
+  </ul>
 </section>
 {% endblock %}

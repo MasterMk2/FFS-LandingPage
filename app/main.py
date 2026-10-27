@@ -355,17 +355,18 @@ def _sort_players(servers: list) -> list:
     return out
 
 
-def _fmt_age(dt: datetime | None) -> str:
+def _fmt_age(dt: datetime | None, lang: str = "en") -> str:
+    ja = lang == "ja"
     if dt is None:
-        return "no data yet"
+        return "未取得" if ja else "no data yet"
     delta = (datetime.now().astimezone() - dt.astimezone()).total_seconds()
     if delta < 0:
-        return "just now"
+        return "たった今" if ja else "just now"
     if delta < 60:
-        return f"{int(delta)}s ago"
+        return f"{int(delta)} 秒前" if ja else f"{int(delta)}s ago"
     if delta < 3600:
-        return f"{int(delta // 60)}m ago"
-    return f"{int(delta // 3600)}h ago"
+        return f"{int(delta // 60)} 分前" if ja else f"{int(delta // 60)}m ago"
+    return f"{int(delta // 3600)} 時間前" if ja else f"{int(delta // 3600)}h ago"
 
 
 @app.get("/healthz")
@@ -373,33 +374,69 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-def _home_stats() -> dict:
-    cached = servers_cache.get()
-    servers: list = []
-    if cached.value and cached.value.ok and isinstance(cached.value.data, list):
-        servers = cached.value.data
-    running = sum(
-        1 for s in servers if (s.get("status") or "").lower() == "running"
-    )
-    total_players = sum(len(s.get("players") or []) for s in servers)
-    # tracks cache から総数を合算。unavailable サーバは 0 として扱う。
+def _home_tracks_total() -> int:
+    """tracks cache から総数を合算。unavailable サーバは 0 として扱う。"""
     tracks_c = tracks_cache.get()
     tracks_total = 0
     if tracks_c.value and isinstance(tracks_c.value, dict):
         for info in (tracks_c.value.get("summary") or {}).values():
             tracks_total += int(info.get("count") or 0)
-    return {
-        "running_count": running,
-        "total_servers": len(servers),
-        "total_players": total_players,
-        "tracks_total": tracks_total,
-        "age": _fmt_age(cached.fetched_at),
-    }
+    return tracks_total
+
+
+def _status_class(status: str) -> str:
+    """servers_panel.html と同じ区分 (up / down / warn) を返す。"""
+    s = status.lower()
+    if s in ("running", "paused", "up"):
+        return "up"
+    if s in ("shutdown", "stopped", "down", "unregistered"):
+        return "down"
+    return "warn"
+
+
+def _home_servers() -> tuple[str, list[dict]]:
+    """Home のサーバ一覧 (1 サーバ 1 行) と、その取得状態 ("ok" / "pending" / "error")。
+
+    失敗時に生のエラー文は渡さない (内部の URL 等が載るため。利用者には
+    取得できないことだけを伝える)。
+    """
+    cached = servers_cache.get()
+    result = cached.value
+    if result is None:
+        return ("error" if cached.error else "pending"), []
+    if not result.ok or not isinstance(result.data, list):
+        return "error", []
+    rows = []
+    for s in sorted(result.data, key=_server_order_key):
+        m = s.get("mission") or {}
+        status = s.get("status") or s.get("state") or "unknown"
+        players = s.get("players")
+        rows.append({
+            "name": s.get("server_name") or s.get("name") or "(unnamed)",
+            "status": status,
+            "status_class": _status_class(status),
+            "mission": s.get("mission_name") or s.get("current_mission") or m.get("name"),
+            "theatre": s.get("theatre") or s.get("mission_theatre") or m.get("theatre"),
+            "players": s.get("num_players") if s.get("num_players") is not None
+                       else (len(players) if isinstance(players, list) else 0),
+            "address": s.get("address"),
+            "password": bool(s.get("password")),
+        })
+    return "ok", rows
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return render(request, "home.html", {"stats": _home_stats()})
+    servers_state, servers = _home_servers()
+    return render(request, "home.html", {
+        "tracks_total": _home_tracks_total(),
+        "servers": servers,
+        # 見出しの件数は行と同じデータから数える (行のバッジ・人数と食い違わないように)
+        "running_count": sum(1 for s in servers if s["status_class"] == "up"),
+        "total_players": sum(s["players"] for s in servers),
+        "servers_state": servers_state,
+        "servers_age": _fmt_age(servers_cache.get().fetched_at, i18n.resolve_lang(request)),
+    })
 
 
 @app.get("/guide", response_class=HTMLResponse)

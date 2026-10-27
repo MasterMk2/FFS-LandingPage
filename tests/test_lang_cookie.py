@@ -1,4 +1,4 @@
-"""`?lang=` を cookie に保存する middleware (純 ASGI 化した _LangCookieMiddleware)。"""
+"""`?lang=` を cookie に保存する middleware (純 ASGI 化した _PrefCookieMiddleware)。"""
 from fastapi.testclient import TestClient
 
 from app.main import app

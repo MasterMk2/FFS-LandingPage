@@ -99,7 +99,8 @@ tracked ファイルには書かない**。
 | [app/templates/tracks.html](../../../app/templates/tracks.html) | Replays (各サーバの .trk 一覧 + DL リンク) |
 | [app/templates/servers_panel.html](../../../app/templates/servers_panel.html) | HTMX: 統合サーバカード (mission/weather/extensions + FPS/CPU/Mem/Players スパークライン) |
 | [app/templates/sysmon_panel.html](../../../app/templates/sysmon_panel.html) | HTMX: ホスト CPU/Mem/Swap/Load/Network カード (RX/TX 同一スケール 2 系列スパークライン) + Uptime/history メタフッター |
-| [app/static/style.css](../../../app/static/style.css) | ダークテーマ、全スタイル統合。操作の印 (リンク・選択中) は無彩色、色は状態・陣営・ネットワークのグラフだけ |
+| [app/static/style.css](../../../app/static/style.css) | 全スタイル統合。テーマは若葉 (既定、属性なし) と墨 (`data-theme="dark"`) の 2 つで、色は `:root` のトークンだけに書く。操作の印 (リンク・選択中) は無彩色、色は状態・陣営・ネットワークのグラフだけ |
+| [app/theme.py](../../../app/theme.py) | テーマの解決 (`?theme=` → cookie `ffs_theme` → 既定 `wakaba`)。cookie への保存は `_PrefCookieMiddleware` が lang と一緒に行う |
 
 ## 6. バックグラウンドキャッシュ ([app/cache.py](../../../app/cache.py))
 
@@ -253,7 +254,7 @@ landing 側に proxy endpoint を立て、api_key ヘッダを注入してバイ
   閉じるまで送信バッファを抱えて残るので、同じ接続元からの積み上げを抑えるため
 - 途中で打ち切ったときは終端を送らずに戻り、uvicorn に接続を閉じにいかせる
   (uvicorn は `ASGI callable returned without completing response.` を ERROR で 1 行出すが
-  想定内)。`_LangCookieMiddleware` を BaseHTTPMiddleware (`@app.middleware("http")`) に
+  想定内)。`_PrefCookieMiddleware` を BaseHTTPMiddleware (`@app.middleware("http")`) に
   戻すと例外が握りつぶされ、Content-Length の無い上流では途中までのファイルが正常完了
   扱いになるので戻さない
 - 既知の限界: 多数の IP から読まない接続を張られると、接続とカーネルのバッファは

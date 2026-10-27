@@ -35,6 +35,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "このお知らせを閉じる",
         "en": "Dismiss this notice",
     },
+    "theme_switch_aria": {"ja": "表示テーマ", "en": "Color theme"},
+    "theme_wakaba": {"ja": "若葉", "en": "Wakaba"},
+    "theme_dark": {"ja": "墨", "en": "Dark"},
     "footer_privacy": {
         "ja": "プライバシーポリシー",
         "en": "Privacy Policy",

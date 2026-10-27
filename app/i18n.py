@@ -111,6 +111,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "Sunset Skyrunner — ブラウザ・フライトゲーム",
         "en": "Sunset Skyrunner — Browser Flight Game",
     },
+    "home_card_updates_title": {
+        "ja": "ダウンロード — Windows アプリの配布",
+        "en": "Downloads — Windows App Distribution",
+    },
     # ── leaderboard.html ──
     "lb_period": {"ja": "過去 30 日", "en": "Last 30 days"},
     "lb_error": {

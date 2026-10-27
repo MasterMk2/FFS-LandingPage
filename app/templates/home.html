@@ -93,6 +93,10 @@
 <section aria-labelledby="home-tools-other">
   <h2 class="section-title" id="home-tools-other">{{ t('home_tools_other') }}</h2>
   <ul class="tool-list">
+    {% call tool("/updates/", t('home_card_updates_title')) %}
+      {%- if lang == 'ja' %}EddiePDF・GUNYUPDF・ALLOCR など、自作の Windows アプリのインストーラーと更新の配布ページ。DCS Mission Studio 以外は、配布元から受け取ったパスが要ります。
+      {%- else %}Installers and updates for my own Windows apps, including EddiePDF, GUNYUPDF and ALLOCR. Every product except DCS Mission Studio needs a pass from the distributor. The page is in Japanese.{% endif %}
+    {% endcall %}
     {% call tool("https://gravitymap.freedomflight.jp/", "MyGravityMap", true) %}
       {%- if lang == 'ja' %}Google マップのタイムライン履歴から、よく引き寄せられた場所を可視化。データは端末内だけで処理します。
       {%- else %}Visualises the places that kept pulling you back, from your Google Maps timeline. Processed on-device only.{% endif %}

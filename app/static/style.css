@@ -205,7 +205,8 @@ footer small{font-size:.75rem}
 .player-list-head{color:var(--muted);font-size:.75rem;width:100%;margin-bottom:.1rem}
 .player-chip{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--border);border-radius:999px;padding:.15rem .55rem;font-size:.75rem;background:rgba(255,255,255,.03);max-width:100%;min-width:0}
 .player-chip .player-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.player-chip .player-slot{color:var(--muted);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 機体名は陣営色を敷いた地に載るので、--muted (BLUE の地で 4.2:1) より明るくして 4.5:1 以上を保つ */
+.player-chip .player-slot{color:#a3a19c;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* RestAPI の PlayerEntry.side は Side enum の名前 (RED/BLUE/NEUTRAL/UNKNOWN)。
    数値 class は旧レスポンス互換で残してある。 */
 .player-chip.side-1,.player-chip.side-RED{border-color:rgba(205,106,97,.5);background:rgba(205,106,97,.09)}
@@ -214,8 +215,9 @@ footer small{font-size:.75rem}
 .player-chip.side-2 .player-name,.player-chip.side-BLUE .player-name{color:#9db8dc}
 .player-chip.side-0,.player-chip.side-u,.player-chip.side-NEUTRAL,.player-chip.side-UNKNOWN{border-color:var(--border);background:rgba(255,255,255,.03)}
 .player-chip.side-0 .player-name,.player-chip.side-u .player-name,.player-chip.side-NEUTRAL .player-name,.player-chip.side-UNKNOWN .player-name{color:var(--muted)}
-/* 接続中だが slot 未選択 (ブリーフィング / 観戦) */
-.player-chip.spectating{border-style:dashed;opacity:.75}
+/* 接続中だが slot 未選択 (ブリーフィング / 観戦)。opacity で薄くすると文字が 4.5:1 を割るので、
+   点線の枠と斜体の "spectating" で示す */
+.player-chip.spectating{border-style:dashed}
 .player-chip.spectating .player-slot{font-style:italic}
 .player-empty{color:var(--muted);font-size:.78rem;font-style:italic;padding:.15rem 0}
 .weather-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.3rem .75rem;margin-top:.75rem;padding-top:.6rem;border-top:1px dashed var(--border)}

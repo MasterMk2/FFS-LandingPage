@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from . import cache, db, dcssb, fitbit as _fitbit, i18n, sysmon
+from . import cache, db, dcssb, fitbit as _fitbit, i18n, sysmon, theme
 
 logging.basicConfig(
     level=logging.INFO,
@@ -134,14 +134,27 @@ templates.env.globals["ga_measurement_id"] = _ga_measurement_id(
 
 
 def render(request: Request, name: str, ctx: dict | None = None):
-    """TemplateResponse の薄いラッパ。lang と翻訳関数 t を全テンプレに注入する。"""
+    """TemplateResponse の薄いラッパ。lang・theme と翻訳関数 t を全テンプレに注入する。"""
     lang = i18n.resolve_lang(request)
-    ctx = {"request": request, **(ctx or {}), "lang": lang, "t": lambda k: i18n.t(lang, k)}
+    ctx = {
+        "request": request, **(ctx or {}),
+        "lang": lang, "theme": theme.resolve(request), "t": lambda k: i18n.t(lang, k),
+    }
     return templates.TemplateResponse(request, name, ctx)
 
 
-class _LangCookieMiddleware:
-    """`?lang=` が有効値なら cookie (ffs_lang) に永続化する。
+def _pref_cookie(request: Request, raw: str | None, normalize, name: str, max_age: int) -> list:
+    """query の値が有効で、保存済みの cookie と違うときだけ Set-Cookie ヘッダを作る。"""
+    value = normalize(raw)
+    if not value or request.cookies.get(name) == value:
+        return []
+    carrier = Response()
+    carrier.set_cookie(name, value, max_age=max_age, samesite="lax", path="/")
+    return [h for h in carrier.raw_headers if h[0] == b"set-cookie"]
+
+
+class _PrefCookieMiddleware:
+    """`?lang=` と `?theme=` が有効値なら cookie (ffs_lang / ffs_theme) に永続化する。
 
     HTMX の polling も cookie で lang を引き継ぐための下地。
 
@@ -159,19 +172,14 @@ class _LangCookieMiddleware:
             await self.app(scope, receive, send)
             return
         request = Request(scope)
-        lang = i18n.normalize(request.query_params.get("lang"))
-        if not lang or request.cookies.get(i18n.COOKIE_NAME) == lang:
+        q = request.query_params
+        cookies = [
+            *_pref_cookie(request, q.get("lang"), i18n.normalize, i18n.COOKIE_NAME, i18n.COOKIE_MAX_AGE),
+            *_pref_cookie(request, q.get("theme"), theme.normalize, theme.COOKIE_NAME, theme.COOKIE_MAX_AGE),
+        ]
+        if not cookies:
             await self.app(scope, receive, send)
             return
-        carrier = Response()
-        carrier.set_cookie(
-            i18n.COOKIE_NAME,
-            lang,
-            max_age=i18n.COOKIE_MAX_AGE,
-            samesite="lax",
-            path="/",
-        )
-        cookies = [h for h in carrier.raw_headers if h[0] == b"set-cookie"]
 
         async def send_with_cookie(message: Message) -> None:
             if message["type"] == "http.response.start":
@@ -181,7 +189,7 @@ class _LangCookieMiddleware:
         await self.app(scope, receive, send_with_cookie)
 
 
-app.add_middleware(_LangCookieMiddleware)
+app.add_middleware(_PrefCookieMiddleware)
 
 
 def _fmt_dt(dt: datetime | None) -> str:

@@ -17,7 +17,7 @@
 {% endif %}
 <title>{% block title %}FFS DCS Status{% endblock %}</title>
 {% block head %}{% endblock %}
-<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=13">
+<link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=14">
 {# Discord バーを閉じた人には最初から出さない。<head> で html にクラスを
    立てておくことで、body 描画後に消す方式で起きる一瞬のちらつきを避ける。
    localStorage が使えない環境 (プライベートウィンドウ等) では単に毎回
@@ -63,6 +63,7 @@
       <a href="/"{% if path == '/' %} aria-current="page"{% endif %}>Home</a>
       <a href="/status"{% if path.startswith('/status') %} aria-current="page"{% endif %}>Status</a>
       <a href="/leaderboard"{% if path.startswith('/leaderboard') %} aria-current="page"{% endif %}>Leaderboard</a>
+      <a href="/points"{% if path.startswith('/points') %} aria-current="page"{% endif %}>Points</a>
       <a href="/tracks"{% if path.startswith('/tracks') %} aria-current="page"{% endif %}>Replays</a>
       <a href="/gca/">GCA</a>
       <a href="/landing-teacher/">Landing Teacher</a>

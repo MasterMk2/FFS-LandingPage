@@ -163,6 +163,98 @@ MESSAGES: dict[str, dict[str, str]] = {
     "health_failed": {"ja": "取得できません", "en": "Unavailable"},
     # "{min}" is replaced by the minute count in JS.
     "health_ago_min": {"ja": "{min} 分前", "en": "{min} min ago"},
+    # ── points.html (フライトボード) ──
+    # 文中の {n} {rank} などは テンプレート側で str.format() に渡して埋める。
+    "pt_title": {"ja": "フライトボード", "en": "Flight Board"},
+    "pt_lead": {
+        "ja": (
+            "部門ごとのポイントで決まる称号と順位です。点数は公開せず、"
+            "順位と称号だけを表示します。"
+        ),
+        "en": (
+            "Titles and ranks are decided by points in each department. "
+            "Points are not published; only ranks and titles are shown."
+        ),
+    },
+    "pt_period_label": {"ja": "期間", "en": "Period"},
+    "pt_period_month": {"ja": "今月", "en": "This month"},
+    "pt_period_all": {"ja": "累計", "en": "All time"},
+    "pt_dept_label": {"ja": "部門", "en": "Department"},
+    "pt_dept_total": {"ja": "総合", "en": "Total"},
+    "pt_dept_host": {"ja": "主催", "en": "Host"},
+    "pt_dept_lead": {"ja": "フライトリード", "en": "Flight Lead"},
+    "pt_dept_coop": {"ja": "COOP参加", "en": "COOP"},
+    "pt_dept_free": {"ja": "フリーフライト", "en": "Free Flight"},
+    "pt_dept_author": {"ja": "ミッション制作", "en": "Mission Author"},
+    "pt_dept_hours": {"ja": "飛行時間", "en": "Flight Hours"},
+    "pt_title_host": {"ja": "FFS 主催", "en": "FFS Host"},
+    "pt_title_lead": {"ja": "FFS リード", "en": "FFS Flight Lead"},
+    "pt_title_coop": {"ja": "FFS COOP参加", "en": "FFS COOP"},
+    "pt_title_free": {"ja": "FFS 飛行日", "en": "FFS Flight Day"},
+    "pt_title_author": {"ja": "FFS ミッション制作", "en": "FFS Mission Author"},
+    "pt_title_hours": {"ja": "FFS 飛行時間", "en": "FFS Flight Hours"},
+    "pt_unit_time": {"ja": "回", "en": "time"},
+    "pt_unit_times": {"ja": "回", "en": "times"},
+    "pt_unit_day": {"ja": "日", "en": "day"},
+    "pt_unit_days": {"ja": "日", "en": "days"},
+    "pt_unit_hour": {"ja": "時間", "en": "hour"},
+    "pt_unit_hours": {"ja": "時間", "en": "hours"},
+    "pt_col_rank": {"ja": "順位", "en": "Rank"},
+    "pt_col_name": {"ja": "パイロット", "en": "Pilot"},
+    "pt_col_title": {"ja": "称号", "en": "Title"},
+    "pt_board_empty": {"ja": "まだ記録がありません。", "en": "No records yet."},
+    "pt_board_pending": {
+        "ja": "ボードをまだ取得していません。数秒後に再読み込みしてください。",
+        "en": "The board has not been fetched yet. Reload in a few seconds.",
+    },
+    "pt_board_error": {
+        "ja": "ボードを取得できません。しばらくしてから再読み込みしてください。",
+        "en": "The board is unavailable right now. Please reload later.",
+    },
+    "pt_login_failed": {
+        "ja": "Discord ログインを完了できませんでした。時間をおいてもう一度お試しください。",
+        "en": "Discord login could not be completed. Please try again later.",
+    },
+    "pt_me_title": {"ja": "あなたの状況", "en": "Your standing"},
+    "pt_me_hint": {
+        "ja": "Discord でログインすると、自分のポイント・称号・順位を確認できます。",
+        "en": "Log in with Discord to see your points, titles and ranks.",
+    },
+    "pt_me_login": {"ja": "Discord でログイン", "en": "Log in with Discord"},
+    "pt_me_logout": {"ja": "ログアウト", "en": "Log out"},
+    "pt_me_name": {"ja": "DCS 名", "en": "DCS name"},
+    "pt_me_not_linked": {
+        "ja": "DCS サーバーで .linkme により Discord 連携してください。",
+        "en": "Link your Discord account on the DCS server with .linkme.",
+    },
+    "pt_me_preparing": {
+        "ja": "ポイント集計の準備中です。しばらくしてから再読み込みしてください。",
+        "en": "Point tallies are being prepared. Reload in a little while.",
+    },
+    "pt_me_unavailable": {
+        "ja": "ポイント情報を取得できません。しばらくしてから再読み込みしてください。",
+        "en": "Your points are unavailable right now. Please reload later.",
+    },
+    "pt_me_opted_out": {
+        "ja": "称号と感謝投稿の公開を停止中です (/points_privacy)。",
+        "en": "Public titles and thank-you posts are paused (/points_privacy).",
+    },
+    "pt_line_month": {"ja": "今月 {n} pt", "en": "{n} pt this month"},
+    "pt_line_total": {"ja": "累計 {n} pt", "en": "{n} pt all time"},
+    "pt_line_units": {"ja": "実績 {n} {unit}", "en": "{n} {unit} logged"},
+    "pt_line_hours": {"ja": "飛行時間 {n} 時間", "en": "Flight time: {n} h"},
+    "pt_no_title": {"ja": "称号なし", "en": "No title yet"},
+    "pt_next_fmt": {
+        "ja": "次の称号 {title} まであと {n} {unit}",
+        "en": "{n} more {unit} to {title}",
+    },
+    "pt_top_title": {"ja": "最上位の称号を獲得済み", "en": "Highest title reached"},
+    "pt_rank_none": {"ja": "未獲得", "en": "Not yet"},
+    "pt_rank_fmt": {"ja": "{rank} 位 ({of} 人中)", "en": "#{rank} of {of}"},
+    "pt_gap_fmt": {"ja": "上の順位に並ぶまであと {gap} pt", "en": "{gap} pt to tie the next rank"},
+    "pt_gap_top": {"ja": "首位", "en": "1st place"},
+    "pt_rank_month": {"ja": "今月の順位", "en": "Rank this month"},
+    "pt_rank_all": {"ja": "累計の順位", "en": "Rank all time"},
 }
 
 

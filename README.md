@@ -26,6 +26,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://freedomflight.jp/` | Home (intro + live stats) |
 | `https://freedomflight.jp/status` | サーバ状況 + Server Load 時系列 |
 | `https://freedomflight.jp/leaderboard` | 月次リーダーボード |
+| `https://freedomflight.jp/points` | フライトボード — 部門別ポイントの称号・順位 (総合 / 主催 / リード / COOP参加 / フリーフライト / ミッション制作)。Discord ログインで自分の状況も見られる。下の「フライトボードと Discord ログイン」参照 |
 | `https://freedomflight.jp/tracks` | DCS リプレイ (.trk) 一覧 + ダウンロード |
 | `https://freedomflight.jp/skyrunner` | Sunset Skyrunner — ブラウザ・フライトゲーム (6 自由度の飛行力学 + HUD、コックピット視点あり)。モードはリング・ラン / エアレース (パイロン) / 着陸。`app/static/skyrunner/` の静的 1 ページを FastAPI が返す (`world.js` が地形・島の飛行場・レースコース、`aircraft.js` が自機・`racer.js` がレース機の機体モデル、`cockpit.js` がコックピットの内装、`sound.js` が合成音)。飛行力学は `tests/skyrunner/flightmodel.test.js`、飛行場・コース・着陸は `tests/skyrunner/world.test.js` (どちらも `node` で実行) で検証 |
 | `https://freedomflight.jp/gca/` | Web GCA 管制卓 — 実体は姉妹 repo [DCSWebGCA](https://github.com/MasterMk2/DCSWebGCA) のコンテナ (`ffs-dcs-web-gca:8080`)。サブドメインではなく `handle_path /gca/*` で出しているので DNS 追加不要。WebSocket も同経路 |
@@ -34,6 +35,16 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://lardoon.freedomflight.jp/` | Lardoon (Tacview Replay archive) |
 | `https://gravitymap.freedomflight.jp/` | MyGravityMap — DCS とは無関係の個人ツール (姉妹 repo)、完全静的、file_server 配信 |
 | `https://freedomflight.jp/updates/<製品>/` | 自作デスクトップ製品のアプリ内更新とフルインストーラ。下の「更新配信」参照 |
+
+## フライトボードと Discord ログイン (/points)
+
+- **公開ボード**: DCSSB の ffs_points プラグインの `GET {DCSSB_POINTS_PREFIX}/board` を 60 秒毎にバックグラウンドで取得する (`app/main.py` の `points_cache`)。点数は表示しない。順位・名前・称号だけを出し、名前は HTML エスケープする。上流が落ちていてもページは表示し、汎用の案内文を出す。
+- **本人欄**: ログインしているときだけ `GET {DCSSB_POINTS_PREFIX}/member/{discord_id}` を都度呼ぶ。404 は「DCS と Discord の連携なし (.linkme)」、503 は「集計の準備中」として案内する。`opted_out` の人には公開停止の案内を出す。
+- **Discord ログイン**: OAuth2 の Authorization Code、scope は `identify` のみ。`state` は署名付き cookie `ffs_oauth_state` (10 分) で照合する。アクセストークンは保存せず、Discord ユーザー ID だけを署名付き cookie `ffs_session` (7 日、HttpOnly・Secure・SameSite=Lax) に入れる。ログアウトは POST で、CSRF トークン付き。
+- **署名**: 標準ライブラリの hmac (SHA-256) で行う。新規依存は入れていない。用途ごとに接頭辞を変えて、cookie の流用を防ぐ。
+- **無効化**: `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` / `DISCORD_REDIRECT_URI` / `SESSION_SECRET` (32 文字以上) がどれか欠けると、ログインボタンを出さず `/auth/discord/*` は 404 になる。公開ボードは動く。
+- **Discord Developer Portal**: Application を作る (Bot は不要)。OAuth2 → Redirects に `DISCORD_REDIRECT_URI` と同じ URL (例 `https://freedomflight.jp/auth/discord/callback`) を登録する。Client Secret は OAuth2 の画面で確認・再生成できる。
+- **テスト**: `tests/test_points_board.py` (公開ボードの表示と上流障害)、`tests/test_discord_login.py` (OAuth の state 照合、本人欄、ログアウト、無効化)。Discord と DCSSB は `auth.TRANSPORT` / `dcssb.TRANSPORT` を MockTransport に差し替えて偽装し、実際の通信はしない。
 
 ## 更新配信 (/updates/)
 

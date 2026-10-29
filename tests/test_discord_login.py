@@ -283,7 +283,7 @@ def test_successful_login_shows_own_standing(discord_on, discord, upstream):
     assert "今月 2 pt" in html
     assert "累計 6 pt" in html
     assert "FFS 飛行日 I" in html
-    assert "次の順位まであと 1 pt" in html
+    assert "上の順位に並ぶまであと 1 pt" in html
     assert "FFS 飛行時間 I" in html
     assert "12.5 時間" in html
     assert "次の称号 FFS 飛行時間 II まであと 37.5 時間" in html

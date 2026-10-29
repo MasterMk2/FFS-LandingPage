@@ -251,7 +251,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_top_title": {"ja": "最上位の称号を獲得済み", "en": "Highest title reached"},
     "pt_rank_none": {"ja": "未獲得", "en": "Not yet"},
     "pt_rank_fmt": {"ja": "{rank} 位 ({of} 人中)", "en": "#{rank} of {of}"},
-    "pt_gap_fmt": {"ja": "次の順位まであと {gap} pt", "en": "{gap} pt to the next rank"},
+    "pt_gap_fmt": {"ja": "上の順位に並ぶまであと {gap} pt", "en": "{gap} pt to tie the next rank"},
     "pt_gap_top": {"ja": "首位", "en": "1st place"},
     "pt_rank_month": {"ja": "今月の順位", "en": "Rank this month"},
     "pt_rank_all": {"ja": "累計の順位", "en": "Rank all time"},

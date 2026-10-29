@@ -312,6 +312,35 @@ footer small{font-size:.75rem}
 .dl-link{display:inline-block;color:var(--accent);text-decoration:none;padding:.2rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.78rem;transition:all .15s;white-space:nowrap}
 .dl-link:hover{background:rgba(var(--wash-rgb),.07);border-color:var(--accent)}
 
+/* フライトボード (/points): 期間・部門の切替、ランキング、本人欄 */
+.points-page .pts-header{margin-bottom:.75rem}
+.points-page .pts-header h2{margin:0 0 .25rem;font-size:1.4rem}
+.pts-nav{display:flex;flex-wrap:wrap;gap:.35rem;margin:.5rem 0}
+.pts-nav a{font-size:.8rem;color:var(--muted);text-decoration:none;padding:.3rem .65rem;border:1px solid var(--border);border-radius:999px;transition:color .15s,border-color .15s}
+.pts-nav a:hover{color:var(--fg);border-color:var(--accent-line)}
+.pts-nav a[aria-current="true"]{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+.pts-board,.pts-me{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;margin:.75rem 0;overflow-x:auto}
+.pts-board h3,.pts-me h3{margin:0 0 .5rem;font-size:1rem;color:var(--accent)}
+.pts-board h3 .count{color:var(--muted);font-size:.8rem;font-weight:400}
+.pts-table .pts-title-cell{color:var(--accent);font-size:.85rem;white-space:nowrap}
+.pts-hint{color:var(--muted);font-size:.88rem;margin:0 0 .5rem}
+.pts-name{font-size:.88rem;color:var(--muted);margin:0 0 .5rem}
+.pts-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.75rem;margin-top:.5rem}
+.pts-card{border:1px solid var(--border);border-radius:8px;padding:.6rem .75rem;min-width:0}
+.pts-card h4{margin:0 0 .3rem;font-size:.9rem}
+.pts-card .pts-title{margin:0 0 .3rem;color:var(--accent);font-size:.92rem;font-weight:600}
+.pts-card .pts-muted{color:var(--muted);font-weight:400}
+.pts-card .pts-line{margin:.15rem 0;font-size:.85rem;font-variant-numeric:tabular-nums}
+.pts-card .pts-next{margin:.3rem 0;font-size:.8rem;color:var(--muted)}
+.pts-ranks{list-style:none;margin:.45rem 0 0;padding:0;font-size:.8rem}
+.pts-ranks li{padding:.2rem 0;border-top:1px dashed var(--border)}
+.pts-ranks .pts-k{color:var(--muted);display:inline-block;min-width:6.5rem}
+.pts-ranks .pts-v{font-variant-numeric:tabular-nums}
+.pts-ranks .pts-gap{display:block;color:var(--muted);font-size:.76rem;margin-left:6.5rem}
+.pts-btn{display:inline-block;font:inherit;font-size:.82rem;color:var(--accent);text-decoration:none;background:transparent;padding:.35rem .8rem;border:1px solid var(--accent-line);border-radius:6px;cursor:pointer;transition:all .15s}
+.pts-btn:hover{background:rgba(var(--wash-rgb),.07);border-color:var(--accent)}
+.pts-logout{margin-top:.75rem}
+
 /* /known-issues page */
 .fixes-page .fixes-header{margin-bottom:1.25rem}
 .fixes-page .fixes-header h2{margin:0 0 .25rem;font-size:1.4rem}

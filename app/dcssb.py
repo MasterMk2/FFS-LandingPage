@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -21,6 +22,8 @@ DCSSB_BASE_URL = os.getenv("DCSSB_BASE_URL", "http://dcs-server-1:9876")
 DCSSB_API_PREFIX = os.getenv("DCSSB_API_PREFIX", "/stats")
 # Track 配布 endpoint の prefix (同 WebService に相乗り、同 api_key)。
 DCSSB_TRACKS_PREFIX = os.getenv("DCSSB_TRACKS_PREFIX", "/tracks")
+# 部門別ポイント (ffs_points プラグイン) の prefix。同じ WebService に相乗り、同 api_key。
+DCSSB_POINTS_PREFIX = os.getenv("DCSSB_POINTS_PREFIX", "/points")
 DCSSB_API_KEY = os.getenv("DCSSB_API_KEY", "")
 DCSSB_TIMEOUT = float(os.getenv("DCSSB_TIMEOUT", "3.0"))
 # .trk 転送用。接続は短めに打ち切り、read は「1 回の読み取り (チャンク) ごと」の上限。
@@ -109,6 +112,25 @@ async def get_tracks_summary() -> FetchResult:
 async def get_tracks_list(server: str) -> FetchResult:
     """Tracks API: GET /tracks/{server} — 個別サーバの trk 一覧 (newest first)。"""
     return await _get(f"/{server}", prefix=DCSSB_TRACKS_PREFIX)
+
+
+async def get_points_board() -> FetchResult:
+    """Points API: GET /points/board — 公開用の部門別ランキング (点数は含まない)。"""
+    return await _get("/board", prefix=DCSSB_POINTS_PREFIX)
+
+
+# Discord user id (snowflake)。パスに入れる前に必ず確かめる。
+_DISCORD_ID_RE = re.compile(r"[0-9]{5,25}")
+
+
+async def get_points_member(discord_id: str) -> FetchResult:
+    """Points API: GET /points/member/{discord_id} — 本人用。ログイン済みのときだけ呼ぶ。
+
+    404 は「DCS と連携していない / 候補が複数」、503 は「集計の準備中」。
+    """
+    if not _DISCORD_ID_RE.fullmatch(discord_id or ""):
+        return FetchResult(ok=False, error="invalid id")
+    return await _get(f"/member/{discord_id}", prefix=DCSSB_POINTS_PREFIX)
 
 
 async def open_track_stream(

@@ -4,7 +4,7 @@
 <article class="legal-page">
   <header>
     <h2>{% if lang == 'ja' %}プライバシーポリシー{% else %}Privacy Policy{% endif %}</h2>
-    <p class="legal-lead">{% if lang == 'ja' %}制定日: 2026年9月27日{% else %}Effective date: September 27, 2026{% endif %}</p>
+    <p class="legal-lead">{% if lang == 'ja' %}制定日: 2026年9月27日 ／ 改定日: 2026年10月30日{% else %}Effective date: September 27, 2026 ／ Revised: October 30, 2026{% endif %}</p>
   </header>
 
   {% if lang == 'ja' %}
@@ -18,7 +18,7 @@
     <li>スクロール、外部リンクのクリック、ファイルのダウンロードなどの操作と、その日時</li>
     <li>ブラウザを区別するために Cookie へ保存される、ランダムな識別子</li>
   </ul>
-  <p>これらの情報は、閲覧数や利用傾向を統計として把握するためだけに使います。氏名やメールアドレスなど、個人を特定する情報は収集しません。広告の配信やターゲティングにも使いません。</p>
+  <p>これらの情報は、閲覧数や利用傾向を統計として把握するためだけに使います。アクセス解析では、氏名やメールアドレスなど個人を特定する情報は収集しません（Discord ログインで扱う情報は後述します）。広告の配信やターゲティングにも使いません。</p>
   <p>Google による情報の取り扱いは、<a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener">Google のサービスを使用するサイトやアプリから収集した情報の Google による使用</a>と<a href="https://policies.google.com/privacy?hl=ja" target="_blank" rel="noopener">Google プライバシーポリシー</a>をご覧ください。</p>
 
   <h3>計測を拒否する方法</h3>
@@ -31,9 +31,22 @@
   <h3>本サイトが端末に保存する情報</h3>
   <ul>
     <li>Cookie <code>ffs_lang</code>: 選んだ表示言語（日本語 / 英語）を覚えておくため（有効期間 1 年）</li>
+    <li>Cookie <code>ffs_theme</code>: 選んだ表示テーマ（若葉 / 墨）を覚えておくため（有効期間 1 年）</li>
     <li>localStorage <code>ffs-dbar-dismissed</code>: Discord の案内バーを閉じたことを覚えておくため</li>
+    <li>Cookie <code>ffs_session</code> と <code>ffs_oauth_state</code>: Discord ログインに使う（下記）</li>
   </ul>
-  <p>どちらも表示の切り替えにだけ使い、本サイト以外へは送信しません。</p>
+  <p>表示の切り替えに使う情報は、本サイト以外へは送信しません。</p>
+
+  <h3>Discord ログイン（フライトボードの本人欄）</h3>
+  <p>フライトボード（<code>/points</code>）では、Discord アカウントでログインすると、自分のポイント・称号・順位を確認できます。ログインは任意で、ログインしなくてもボードは閲覧できます。</p>
+  <ul>
+    <li>取得する情報: Discord のユーザー ID のみ（認可の範囲は <code>identify</code> だけです）。ユーザー名・メールアドレス・アクセストークンは保存しません。</li>
+    <li>利用目的: ユーザー ID を使い、FFS の DCS サーバーに記録された本人のポイント・称号・順位を照会して表示します。第三者へは送信しません。</li>
+    <li>保存先: ユーザー ID は、署名付きの Cookie <code>ffs_session</code> としてブラウザに保存します（HttpOnly・Secure・SameSite=Lax、有効期間 7 日）。本サイトのサーバーには保存しません。</li>
+    <li>ログイン途中の照合: Cookie <code>ffs_oauth_state</code> に、なりすましを防ぐための値を 10 分間だけ保存し、ログインが完了すると削除します。</li>
+    <li>ログアウトすると <code>ffs_session</code> を削除します。ブラウザの Cookie を消しても同じ結果になります。</li>
+  </ul>
+  <p>ログイン時には Discord（discord.com）の認可画面へ移動します。その画面での取り扱いは Discord のプライバシーポリシーに従います。</p>
 
   <h3>外部から読み込むスクリプト</h3>
   <p>ステータス表示の自動更新に使うライブラリ（htmx）を unpkg.com から読み込んでいます。読み込みの際には、IP アドレスやブラウザの種類など、通常の通信に含まれる情報が同サービスへ届きます。</p>
@@ -54,7 +67,7 @@
     <li>Interactions such as scrolling, clicks on external links and file downloads, and when they occurred</li>
     <li>A random identifier stored in a cookie to distinguish browsers</li>
   </ul>
-  <p>This information is used only to measure page views and usage trends as statistics. We do not collect information that identifies you personally, such as your name or email address, and we do not use it for advertising or targeting.</p>
+  <p>This information is used only to measure page views and usage trends as statistics. In analytics, we do not collect information that identifies you personally, such as your name or email address (see the Discord login section below for what that feature handles), and we do not use it for advertising or targeting.</p>
   <p>For how Google handles this information, see <a href="https://policies.google.com/technologies/partner-sites?hl=en" target="_blank" rel="noopener">How Google uses information from sites or apps that use our services</a> and the <a href="https://policies.google.com/privacy?hl=en" target="_blank" rel="noopener">Google Privacy Policy</a>.</p>
 
   <h3>How to opt out</h3>
@@ -67,9 +80,22 @@
   <h3>Information stored on your device by this site</h3>
   <ul>
     <li>Cookie <code>ffs_lang</code>: remembers your display language (Japanese / English) for one year</li>
+    <li>Cookie <code>ffs_theme</code>: remembers your display theme (Wakaba / Dark) for one year</li>
     <li>localStorage <code>ffs-dbar-dismissed</code>: remembers that you closed the Discord banner</li>
+    <li>Cookies <code>ffs_session</code> and <code>ffs_oauth_state</code>: used for Discord login (below)</li>
   </ul>
-  <p>Both are used only to adjust the display and are never sent anywhere other than this site.</p>
+  <p>The display preferences are used only to adjust the display and are never sent anywhere other than this site.</p>
+
+  <h3>Discord login (your section on the Flight Board)</h3>
+  <p>On the Flight Board (<code>/points</code>), you can log in with your Discord account to see your own points, titles and ranks. Logging in is optional; the board can be viewed without it.</p>
+  <ul>
+    <li>Information obtained: only your Discord user ID (the only permission requested is <code>identify</code>). We do not store your username, email address or access token.</li>
+    <li>Purpose: the user ID is used to look up and display your points, titles and ranks recorded on the FFS DCS server. It is not shared with third parties.</li>
+    <li>Where it is kept: the user ID is kept in a signed cookie, <code>ffs_session</code>, in your browser (HttpOnly, Secure, SameSite=Lax, valid for 7 days). Nothing is stored on this site's server.</li>
+    <li>Login check: a cookie, <code>ffs_oauth_state</code>, holds a value that prevents forged logins for 10 minutes. It is deleted when login completes.</li>
+    <li>Logging out deletes <code>ffs_session</code>. Clearing your browser cookies has the same effect.</li>
+  </ul>
+  <p>Logging in takes you to Discord (discord.com) to approve access. Discord handles information on that screen under its own privacy policy.</p>
 
   <h3>Externally loaded scripts</h3>
   <p>The library used to refresh the status displays (htmx) is loaded from unpkg.com. When it loads, information included in any ordinary request, such as your IP address and browser type, reaches that service.</p>

@@ -9,6 +9,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, urlencode
 from zoneinfo import ZoneInfo
 
 from datetime import datetime as _datetime
@@ -16,12 +17,12 @@ from datetime import datetime as _datetime
 import anyio
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from . import cache, db, dcssb, fitbit as _fitbit, i18n, sysmon, theme
+from . import auth, cache, db, dcssb, fitbit as _fitbit, i18n, points, sysmon, theme
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,9 +83,13 @@ fitbit_cache = cache.Fetcher(
 fitbit7d_cache = cache.Fetcher(
     fetch=_fitbit.get_fitbit_7d, interval=600, name="fitbit7d"
 )
+# 部門別ポイントの公開ボード (点数を含まない)。本人欄はログイン時だけ都度取得する。
+points_cache = cache.Fetcher(
+    fetch=dcssb.get_points_board, interval=60, name="points"
+)
 ALL_CACHES = [
     servers_cache, load_cache, highscore_cache, tracks_cache,
-    sysmon_cache, fitbit_cache, fitbit7d_cache,
+    sysmon_cache, fitbit_cache, fitbit7d_cache, points_cache,
 ]
 
 
@@ -979,3 +984,158 @@ async def leaderboard(request: Request):
             "age": _fmt_age(cached.fetched_at),
         },
     )
+
+
+# --- フライトボード (/points) と Discord ログイン ---------------------------
+
+_POINTS_DEPT_KEYS = points.BOARD_DEPTS
+_POINTS_PERIOD_KEYS = points.PERIODS
+
+
+def _points_url(dept: str, period: str) -> str:
+    return "/points?" + urlencode({"dept": dept, "period": period})
+
+
+async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | None]:
+    """本人欄の状態を返す。上流の詳細は外に出さず、状態名だけ返す。
+
+    404 は「DCS と連携していない / 候補が複数」、503 は「集計の準備中」。
+    """
+    res = await dcssb.get_points_member(discord_id)
+    if res.ok:
+        view = points.member_view(res.data, lang)
+        if view is not None:
+            return "ok", view
+        return "unavailable", None
+    if res.status_code == 404:
+        return "not_linked", None
+    if res.status_code == 503:
+        return "preparing", None
+    return "unavailable", None
+
+
+@app.get("/points", response_class=HTMLResponse)
+async def points_page(request: Request):
+    lang = i18n.resolve_lang(request)
+    q = request.query_params
+    dept = q.get("dept") if q.get("dept") in _POINTS_DEPT_KEYS else "total"
+    period = q.get("period") if q.get("period") in _POINTS_PERIOD_KEYS else "month"
+
+    cached = points_cache.get()
+    board = None
+    if cached.value is None:
+        board_state = "error" if cached.error else "pending"
+    elif not cached.value.ok:
+        board_state = "error"
+    else:
+        board = points.parse_board(cached.value.data)
+        board_state = "ok" if board is not None else "error"
+    rows = points.board_rows(board, period, dept, lang) if board is not None else []
+
+    cfg = auth.config()
+    uid = None
+    csrf = ""
+    member_state, member = None, None
+    if cfg is not None:
+        session_token = request.cookies.get(auth.SESSION_COOKIE)
+        uid = auth.read_session(cfg, session_token)
+        if uid is not None:
+            csrf = auth.csrf_token(cfg, session_token)
+            member_state, member = await _points_member_state(uid, lang)
+
+    ctx = {
+        "dept_tabs": [
+            {"key": k, "label": i18n.t(lang, "pt_dept_" + k),
+             "href": _points_url(k, period), "active": k == dept}
+            for k in _POINTS_DEPT_KEYS
+        ],
+        "period_tabs": [
+            {"key": p, "label": i18n.t(lang, "pt_period_" + p),
+             "href": _points_url(dept, p), "active": p == period}
+            for p in _POINTS_PERIOD_KEYS
+        ],
+        "dept_label": i18n.t(lang, "pt_dept_" + dept),
+        "period_label": i18n.t(lang, "pt_period_" + period),
+        "board_state": board_state,
+        "rows": rows,
+        "login_enabled": cfg is not None,
+        "logged_in": uid is not None,
+        "member_state": member_state,
+        "member": member,
+        "csrf": csrf,
+        "login_failed": q.get("login") == "failed",
+        "updated_at": _fmt_dt(cached.fetched_at),
+        "age": _fmt_age(cached.fetched_at, lang),
+    }
+    resp = render(request, "points.html", ctx)
+    # 本人欄は Cookie で出し分けるので、共有キャッシュに載せない。
+    resp.headers["Vary"] = "Cookie"
+    if uid is not None:
+        resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+@app.get("/auth/discord/login")
+async def discord_login():
+    cfg = auth.config()
+    if cfg is None:
+        raise HTTPException(404)
+    state, state_cookie = auth.new_state(cfg)
+    resp = RedirectResponse(auth.authorize_url(cfg, state), status_code=303)
+    resp.set_cookie(
+        auth.STATE_COOKIE, state_cookie, max_age=auth.STATE_MAX_AGE,
+        path=auth.STATE_COOKIE_PATH, httponly=True, secure=True, samesite="lax",
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/auth/discord/callback")
+async def discord_callback(request: Request):
+    cfg = auth.config()
+    if cfg is None:
+        raise HTTPException(404)
+    q = request.query_params
+    # state が合わない・無い・期限切れなら Discord へは問い合わせない。
+    state_ok = not q.get("error") and auth.state_matches(
+        cfg, request.cookies.get(auth.STATE_COOKIE), q.get("state", "")
+    )
+    code = q.get("code", "")
+    discord_id = None
+    if state_ok and code and len(code) <= 512:
+        discord_id = await auth.exchange_code(cfg, code)
+    if discord_id is None:
+        log.warning("discord callback: login not completed")
+        resp = RedirectResponse("/points?login=failed", status_code=303)
+    else:
+        resp = RedirectResponse("/points", status_code=303)
+        resp.set_cookie(
+            auth.SESSION_COOKIE, auth.make_session(cfg, discord_id),
+            max_age=auth.SESSION_MAX_AGE, path="/",
+            httponly=True, secure=True, samesite="lax",
+        )
+    resp.delete_cookie(
+        auth.STATE_COOKIE, path=auth.STATE_COOKIE_PATH,
+        httponly=True, secure=True, samesite="lax",
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.post("/auth/discord/logout")
+async def discord_logout(request: Request):
+    cfg = auth.config()
+    if cfg is None:
+        raise HTTPException(404)
+    body = await request.body()
+    if len(body) > 4096:
+        raise HTTPException(413)
+    submitted = (parse_qs(body.decode("utf-8", "replace")).get("csrf") or [""])[0]
+    if not auth.csrf_ok(cfg, request.cookies.get(auth.SESSION_COOKIE), submitted):
+        raise HTTPException(403, "invalid request")
+    resp = RedirectResponse("/points", status_code=303)
+    resp.delete_cookie(
+        auth.SESSION_COOKIE, path="/", httponly=True, secure=True, samesite="lax",
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp

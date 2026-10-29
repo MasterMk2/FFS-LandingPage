@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ t('pt_title') }} — FFS DCS{% endblock %}
+{% macro rank_line(label, r, tr) -%}
+  <li>
+    <span class="pts-k">{{ label }}</span>
+    {%- if r.rank is none %} <span class="pts-v">{{ tr('pt_rank_none') }}</span>
+    {%- else %} <span class="pts-v">{{ tr('pt_rank_fmt').format(rank=r.rank, of=r.of) }}</span>
+      {%- if r.gap is not none %} <span class="pts-gap">{{ tr('pt_gap_fmt').format(gap=r.gap) }}</span>
+      {%- elif r.rank == 1 %} <span class="pts-gap">{{ tr('pt_gap_top') }}</span>
+      {%- endif %}
+    {%- endif %}
+  </li>
+{%- endmacro %}
+{% block content %}
+<section class="points-page">
+  <header class="pts-header">
+    <h2>{{ t('pt_title') }}</h2>
+    <p class="subtle">{{ t('pt_lead') }}</p>
+  </header>
+
+  {% if login_failed %}
+  <div class="error">{{ t('pt_login_failed') }}</div>
+  {% endif %}
+
+  <nav class="pts-nav" aria-label="{{ t('pt_period_label') }}">
+    {% for tab in period_tabs %}
+    <a href="{{ tab.href }}"{% if tab.active %} aria-current="true"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+  </nav>
+  <nav class="pts-nav" aria-label="{{ t('pt_dept_label') }}">
+    {% for tab in dept_tabs %}
+    <a href="{{ tab.href }}"{% if tab.active %} aria-current="true"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+  </nav>
+
+  <section class="pts-board" aria-labelledby="pts-board-title">
+    <h3 id="pts-board-title">{{ dept_label }} <span class="count">· {{ period_label }}</span></h3>
+    {% if board_state == 'pending' %}
+      <p class="notice">{{ t('pt_board_pending') }}</p>
+    {% elif board_state == 'error' %}
+      <div class="error">{{ t('pt_board_error') }}</div>
+    {% elif rows %}
+      <table class="lb-table pts-table">
+        <thead>
+          <tr>
+            <th class="rank">{{ t('pt_col_rank') }}</th>
+            <th>{{ t('pt_col_name') }}</th>
+            <th>{{ t('pt_col_title') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="rank">{{ r.rank }}</td>
+            <td>{{ r.name }}</td>
+            <td class="pts-title-cell">{{ r.title or '—' }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="lb-empty">{{ t('pt_board_empty') }}</p>
+    {% endif %}
+  </section>
+
+  {% if login_enabled %}
+  <section class="pts-me" aria-labelledby="pts-me-title">
+    <h3 id="pts-me-title">{{ t('pt_me_title') }}</h3>
+    {% if not logged_in %}
+      <p class="pts-hint">{{ t('pt_me_hint') }}</p>
+      <p><a class="pts-btn" href="/auth/discord/login">{{ t('pt_me_login') }}</a></p>
+    {% else %}
+      {% if member_state == 'ok' %}
+        {% if member.name %}
+        <p class="pts-name">{{ t('pt_me_name') }}: {{ member.name }}</p>
+        {% endif %}
+        {% if member.opted_out %}
+        <p class="notice">{{ t('pt_me_opted_out') }}</p>
+        {% endif %}
+        <div class="pts-cards">
+          {% for c in [member.total] + member.cards %}
+          <article class="pts-card">
+            <h4>{{ c.label }}</h4>
+            {% if c.title is defined and c.title %}
+            <p class="pts-title">{{ c.title }}</p>
+            {% elif c.title is defined %}
+            <p class="pts-title pts-muted">{{ t('pt_no_title') }}</p>
+            {% endif %}
+            <p class="pts-line">
+              {{ t('pt_line_month').format(n=c.points_month if c.points_month is not none else '-') }}
+              / {{ t('pt_line_total').format(n=c.points_total if c.points_total is not none else '-') }}
+            </p>
+            {% if c.units is defined and c.units is not none %}
+            <p class="pts-line">{{ t('pt_line_units').format(n=c.units, unit=c.units_unit) }}</p>
+            {% endif %}
+            {% if c.top is defined and c.top %}
+            <p class="pts-next">{{ t('pt_top_title') }}</p>
+            {% elif c.next_title is defined and c.next_title %}
+            <p class="pts-next">{{ t('pt_next_fmt').format(title=c.next_title, n=c.remaining, unit=c.unit) }}</p>
+            {% endif %}
+            <ul class="pts-ranks">
+              {{ rank_line(t('pt_rank_month'), c.rank.month, t) }}
+              {{ rank_line(t('pt_rank_all'), c.rank.all, t) }}
+            </ul>
+          </article>
+          {% endfor %}
+          <article class="pts-card">
+            <h4>{{ member.hours.label }}</h4>
+            {% if member.hours.title %}
+            <p class="pts-title">{{ member.hours.title }}</p>
+            {% else %}
+            <p class="pts-title pts-muted">{{ t('pt_no_title') }}</p>
+            {% endif %}
+            <p class="pts-line">{{ t('pt_line_hours').format(n=member.hours.hours) }}</p>
+            {% if member.hours.top %}
+            <p class="pts-next">{{ t('pt_top_title') }}</p>
+            {% elif member.hours.next_title %}
+            <p class="pts-next">{{ t('pt_next_fmt').format(title=member.hours.next_title, n=member.hours.remaining, unit=member.hours.unit) }}</p>
+            {% endif %}
+          </article>
+        </div>
+      {% elif member_state == 'not_linked' %}
+        <p class="notice">{{ t('pt_me_not_linked') }}</p>
+      {% elif member_state == 'preparing' %}
+        <p class="notice">{{ t('pt_me_preparing') }}</p>
+      {% else %}
+        <div class="error">{{ t('pt_me_unavailable') }}</div>
+      {% endif %}
+      <form method="post" action="/auth/discord/logout" class="pts-logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="pts-btn">{{ t('pt_me_logout') }}</button>
+      </form>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <p class="updated">updated {{ age }} ({{ updated_at }})</p>
+</section>
+{% endblock %}

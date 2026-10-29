@@ -63,6 +63,13 @@ services:
       TRACK_DOWNLOAD_PER_CLIENT: "${TRACK_DOWNLOAD_PER_CLIENT:-2}"
       # Google Analytics 4 の測定 ID (G-XXXXXXXXXX)。空なら計測タグを出さない。
       GA_MEASUREMENT_ID: "${GA_MEASUREMENT_ID:-}"
+      # フライトボード (/points)。DCSSB の ffs_points の prefix。通常は変えない。
+      DCSSB_POINTS_PREFIX: "${DCSSB_POINTS_PREFIX:-/points}"
+      # Discord ログイン (本人欄)。4 つすべて揃ったときだけ有効。値は .env で設定する。
+      DISCORD_CLIENT_ID: "${DISCORD_CLIENT_ID:-}"
+      DISCORD_CLIENT_SECRET: "${DISCORD_CLIENT_SECRET:-}"
+      DISCORD_REDIRECT_URI: "${DISCORD_REDIRECT_URI:-}"
+      SESSION_SECRET: "${SESSION_SECRET:-}"
       # psutil にホスト側 /proc を読ませて、コンテナ namespace でなく
       # ホスト全体の CPU / mem / loadavg を計測する。
       HOST_PROC: "/host/proc"

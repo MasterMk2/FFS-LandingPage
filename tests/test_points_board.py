@@ -72,7 +72,7 @@ def _section(html: str, cls: str) -> str:
 
 
 def _points(query: str = "") -> str:
-    r = TestClient(app).get(f"/points{query}")
+    r = TestClient(app).get(f"/rewards{query}")
     assert r.status_code == 200
     return r.text
 
@@ -149,24 +149,24 @@ def test_unknown_tab_values_fall_back_to_defaults(set_board, discord_off):
     set_board(_ok_board())
     html = _points("?lang=ja&dept=bogus&period=weekly")
 
-    assert 'href="/points?dept=total&amp;period=month" aria-current="true"' in html
-    assert 'href="/points?dept=total&amp;period=all"' in html
+    assert 'href="/rewards?dept=total&amp;period=month" aria-current="true"' in html
+    assert 'href="/rewards?dept=total&amp;period=all"' in html
 
 
 def test_tabs_keep_the_other_setting(set_board, discord_off):
     set_board(_ok_board())
     html = _points("?lang=ja&dept=coop&period=all")
 
-    assert 'href="/points?dept=coop&amp;period=month"' in html
-    assert 'href="/points?dept=host&amp;period=all"' in html
-    assert 'href="/points?dept=coop&amp;period=all" aria-current="true"' in html
+    assert 'href="/rewards?dept=coop&amp;period=month"' in html
+    assert 'href="/rewards?dept=host&amp;period=all"' in html
+    assert 'href="/rewards?dept=coop&amp;period=all" aria-current="true"' in html
 
 
 def test_nav_links_to_points_page(set_board, discord_off):
     set_board(_ok_board())
     html = TestClient(app).get("/?lang=ja").text
 
-    assert 'href="/points"' in html
+    assert 'href="/rewards"' in html
 
 
 def test_login_is_not_offered_when_discord_env_is_missing(set_board, discord_off):
@@ -239,3 +239,11 @@ def test_member_not_linked_is_reported_as_404(upstream):
 
     assert not res.ok
     assert res.status_code == 404
+
+
+def test_old_url_redirects_and_keeps_the_query():
+    client = TestClient(app, follow_redirects=False)
+    assert client.get("/points").headers["location"] == "/rewards"
+    r = client.get("/points?dept=coop&period=all")
+    assert r.status_code == 301
+    assert r.headers["location"] == "/rewards?dept=coop&period=all"

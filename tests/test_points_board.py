@@ -133,15 +133,15 @@ def test_names_are_html_escaped(set_board, discord_off):
     assert "<script>alert(1)</script>" not in html
 
 
-def test_free_flight_titles_use_flight_day_and_period_switch(set_board, discord_off):
+def test_free_flight_titles_use_department_name_and_period_switch(set_board, discord_off):
     set_board(_ok_board())
 
     month = _section(_points("?lang=ja&dept=free&period=month"), "pts-board")
-    assert "Delta" in month and "FFS 飛行日 II" in month
+    assert "Delta" in month and "FFS フリーフライト II" in month
     assert "Bravo" in month
 
     all_time = _section(_points("?lang=ja&dept=free&period=all"), "pts-board")
-    assert "FFS 飛行日 III" in all_time
+    assert "FFS フリーフライト III" in all_time
     assert "Bravo" not in all_time
 
 

@@ -190,7 +190,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_title_host": {"ja": "FFS 主催", "en": "FFS Host"},
     "pt_title_lead": {"ja": "FFS リード", "en": "FFS Flight Lead"},
     "pt_title_coop": {"ja": "FFS COOP参加", "en": "FFS COOP"},
-    "pt_title_free": {"ja": "FFS 飛行日", "en": "FFS Flight Day"},
+    "pt_title_free": {"ja": "FFS フリーフライト", "en": "FFS Free Flight"},
     "pt_title_author": {"ja": "FFS ミッション制作", "en": "FFS Mission Author"},
     "pt_title_hours": {"ja": "FFS 飛行時間", "en": "FFS Flight Hours"},
     "pt_unit_time": {"ja": "回", "en": "time"},

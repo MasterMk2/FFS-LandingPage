@@ -124,7 +124,7 @@ def _login(c: TestClient) -> TestClient:
     r2 = c.get("/auth/discord/callback", params={"code": "CODE-XYZ", "state": state},
                follow_redirects=False)
     assert r2.status_code == 303
-    assert r2.headers["location"] == "/points"
+    assert r2.headers["location"] == "/rewards"
     return c
 
 
@@ -201,7 +201,7 @@ def test_non_https_redirect_uri_disables_login(discord_on, monkeypatch):
 
 
 def test_points_page_hides_login_button_when_disabled(upstream):
-    html = TestClient(app).get("/points?lang=ja").text
+    html = TestClient(app).get("/rewards?lang=ja").text
 
     assert "/auth/discord/login" not in html
     assert 'class="pts-me"' not in html
@@ -217,7 +217,7 @@ def test_state_mismatch_is_rejected_before_contacting_discord(discord_on, discor
               follow_redirects=False)
 
     assert r.status_code == 303
-    assert r.headers["location"] == "/points?login=failed"
+    assert r.headers["location"] == "/rewards?login=failed"
     assert discord["calls"] == []
     assert not any(line.startswith(auth.SESSION_COOKIE + "=") for line in _set_cookies(r))
 
@@ -226,7 +226,7 @@ def test_callback_without_state_cookie_is_rejected(discord_on, discord):
     r = _client().get("/auth/discord/callback", params={"code": "CODE", "state": "abc"},
                       follow_redirects=False)
 
-    assert r.headers["location"] == "/points?login=failed"
+    assert r.headers["location"] == "/rewards?login=failed"
     assert discord["calls"] == []
 
 
@@ -238,7 +238,7 @@ def test_callback_with_discord_error_is_rejected(discord_on, discord):
     r2 = c.get("/auth/discord/callback",
                params={"error": "access_denied", "state": state}, follow_redirects=False)
 
-    assert r2.headers["location"] == "/points?login=failed"
+    assert r2.headers["location"] == "/rewards?login=failed"
     assert discord["calls"] == []
 
 
@@ -250,7 +250,7 @@ def test_expired_state_is_rejected(discord_on, discord):
     r = c.get("/auth/discord/callback", params={"code": "CODE", "state": "s1"},
               follow_redirects=False)
 
-    assert r.headers["location"] == "/points?login=failed"
+    assert r.headers["location"] == "/rewards?login=failed"
     assert discord["calls"] == []
 
 
@@ -263,8 +263,8 @@ def test_token_failure_shows_generic_message_without_detail(discord_on, discord,
 
     r2 = c.get("/auth/discord/callback", params={"code": "CODE", "state": state},
                follow_redirects=False)
-    assert r2.headers["location"] == "/points?login=failed"
-    html = c.get("/points?login=failed&lang=ja").text
+    assert r2.headers["location"] == "/rewards?login=failed"
+    html = c.get("/rewards?login=failed&lang=ja").text
 
     assert "Discord ログインを完了できませんでした" in html
     assert MARKER not in html
@@ -276,14 +276,14 @@ def test_token_failure_shows_generic_message_without_detail(discord_on, discord,
 def test_successful_login_shows_own_standing(discord_on, discord, upstream):
     c = _login(_client())
 
-    html = c.get("/points?lang=ja").text
+    html = c.get("/rewards?lang=ja").text
 
     assert 'class="pts-me"' in html
     assert "Bravo" in html
-    assert "今月 2 pt" in html
-    assert "累計 6 pt" in html
+    assert "今月 2 リワード" in html
+    assert "累計 6 リワード" in html
     assert "FFS フリーフライト I" in html
-    assert "上の順位に並ぶまであと 1 pt" in html
+    assert "上の順位に並ぶまであと 1 リワード" in html
     assert "FFS 飛行時間 I" in html
     assert "12.5 時間" in html
     assert "次の称号 FFS 飛行時間 II まであと 37.5 時間" in html
@@ -291,7 +291,7 @@ def test_successful_login_shows_own_standing(discord_on, discord, upstream):
 
 
 def test_member_request_uses_discord_id_and_api_key(discord_on, discord, upstream):
-    _login(_client()).get("/points")
+    _login(_client()).get("/rewards")
 
     member_calls = [r for r in upstream["seen"] if r.url.path.startswith("/points/member/")]
     assert member_calls
@@ -302,7 +302,7 @@ def test_member_request_uses_discord_id_and_api_key(discord_on, discord, upstrea
 def test_logged_in_page_is_not_shared_by_cache(discord_on, discord, upstream):
     c = _login(_client())
 
-    r = c.get("/points")
+    r = c.get("/rewards")
 
     assert r.headers["cache-control"] == "private, no-store"
     assert "Cookie" in r.headers["vary"]
@@ -331,7 +331,7 @@ def test_not_linked_shows_linkme_guidance(discord_on, discord, upstream):
     upstream["member_body"] = {"detail": "not_linked"}
     c = _login(_client())
 
-    html = c.get("/points?lang=ja").text
+    html = c.get("/rewards?lang=ja").text
 
     assert "DCS サーバーで .linkme により Discord 連携してください" in html
     assert 'class="pts-card"' not in html
@@ -342,14 +342,14 @@ def test_preparing_503_is_reported_as_preparing(discord_on, discord, upstream):
     upstream["member_body"] = {"detail": "not ready"}
     c = _login(_client())
 
-    assert "ポイント集計の準備中です" in c.get("/points?lang=ja").text
+    assert "リワード集計の準備中です" in c.get("/rewards?lang=ja").text
 
 
 def test_opted_out_shows_privacy_notice(discord_on, discord, upstream):
     upstream["member_body"] = {**MEMBER_OK, "opted_out": True}
     c = _login(_client())
 
-    assert "称号と感謝投稿の公開を停止中です (/points_privacy)" in c.get("/points?lang=ja").text
+    assert "称号と感謝投稿の公開を停止中です (/rewards_privacy)" in c.get("/rewards?lang=ja").text
 
 
 def test_member_failure_is_generic_and_does_not_break_board(discord_on, discord, upstream):
@@ -357,10 +357,10 @@ def test_member_failure_is_generic_and_does_not_break_board(discord_on, discord,
     upstream["member_body"] = {"detail": MARKER}
     c = _login(_client())
 
-    r = c.get("/points?lang=ja")
+    r = c.get("/rewards?lang=ja")
 
     assert r.status_code == 200
-    assert "ポイント情報を取得できません" in r.text
+    assert "リワード情報を取得できません" in r.text
     assert MARKER not in r.text
     assert 'class="pts-board"' in r.text
 
@@ -369,7 +369,7 @@ def test_member_name_is_escaped(discord_on, discord, upstream):
     upstream["member_body"] = {**MEMBER_OK, "name": "<img src=x onerror=alert(1)>"}
     c = _login(_client())
 
-    html = c.get("/points?lang=ja").text
+    html = c.get("/rewards?lang=ja").text
 
     assert "&lt;img src=x onerror=alert(1)&gt;" in html
     assert "<img src=x" not in html
@@ -383,7 +383,7 @@ def test_tampered_session_is_ignored(discord_on, discord, upstream):
     body, sig = session.split(".", 1)
     forged = f"{body}.{'A' if sig[0] != 'A' else 'B'}{sig[1:]}"
     # 偽造値は constructor の cookies で渡す (jar に後から足すと正規の cookie と併存する)。
-    html = TestClient(app, base_url=BASE, cookies={auth.SESSION_COOKIE: forged})         .get("/points?lang=ja").text
+    html = TestClient(app, base_url=BASE, cookies={auth.SESSION_COOKIE: forged})         .get("/rewards?lang=ja").text
 
     assert 'class="pts-me"' in html
     assert "/auth/discord/login" in html
@@ -394,7 +394,7 @@ def test_expired_session_is_ignored(discord_on, discord, upstream):
     cfg = auth.config()
     old = auth._seal(cfg, "session", {"uid": DISCORD_ID,
                                       "iat": int(time.time()) - 8 * 24 * 3600})
-    html = TestClient(app, base_url=BASE, cookies={auth.SESSION_COOKIE: old})         .get("/points?lang=ja").text
+    html = TestClient(app, base_url=BASE, cookies={auth.SESSION_COOKIE: old})         .get("/rewards?lang=ja").text
 
     assert "/auth/discord/login" in html
     assert upstream["seen"] == []
@@ -405,7 +405,7 @@ def test_session_with_bad_discord_id_is_ignored(discord_on, discord, upstream):
     bad = auth._seal(cfg, "session", {"uid": "../board", "iat": int(time.time())})
     c = TestClient(app, base_url=BASE, cookies={auth.SESSION_COOKIE: bad})
 
-    assert "/auth/discord/login" in c.get("/points?lang=ja").text
+    assert "/auth/discord/login" in c.get("/rewards?lang=ja").text
     assert upstream["seen"] == []
 
 
@@ -424,23 +424,23 @@ def test_logout_requires_matching_csrf(discord_on, discord, upstream):
 
     assert c.post("/auth/discord/logout", content=b"csrf=wrong").status_code == 403
     assert c.post("/auth/discord/logout", content=b"").status_code == 403
-    assert "Bravo" in c.get("/points?lang=ja").text
+    assert "Bravo" in c.get("/rewards?lang=ja").text
 
 
 def test_logout_with_csrf_clears_session(discord_on, discord, upstream):
     c = _login(_client())
-    token = _csrf(c.get("/points?lang=ja").text)
+    token = _csrf(c.get("/rewards?lang=ja").text)
 
     r = c.post("/auth/discord/logout", content=f"csrf={token}".encode(),
                headers={"content-type": "application/x-www-form-urlencoded"},
                follow_redirects=False)
 
     assert r.status_code == 303
-    assert r.headers["location"] == "/points"
+    assert r.headers["location"] == "/rewards"
     line = _cookie_line(r, auth.SESSION_COOKIE).lower()
     assert "max-age=0" in line or "expires=" in line
-    assert "Bravo" not in c.get("/points?lang=ja").text
-    assert "/auth/discord/login" in c.get("/points?lang=ja").text
+    assert "Bravo" not in c.get("/rewards?lang=ja").text
+    assert "/auth/discord/login" in c.get("/rewards?lang=ja").text
 
 
 def test_logout_is_post_only(discord_on, discord):
@@ -458,7 +458,7 @@ def test_csrf_token_is_bound_to_the_session(discord_on, discord, upstream):
 
 
 def test_logged_out_points_page_shows_login_button(discord_on, discord, upstream):
-    html = _client().get("/points?lang=ja").text
+    html = _client().get("/rewards?lang=ja").text
 
     assert 'href="/auth/discord/login"' in html
     assert upstream["seen"] == []
@@ -472,7 +472,7 @@ def test_board_still_renders_when_login_is_on(discord_on, discord, upstream, mon
             {"rank": 1, "name": "Charlie", "tier": 1}]}, "all": {}}}),
         fetched_at=_dt.now().astimezone(),
     ))
-    html = _client().get("/points?lang=ja&dept=host").text
+    html = _client().get("/rewards?lang=ja&dept=host").text
 
     assert "Charlie" in html
     assert "FFS 主催 I" in html
@@ -488,7 +488,7 @@ def test_fresh_state_cookie_is_accepted_positive_control(discord_on, discord, up
     r = c.get("/auth/discord/callback", params={"code": "CODE", "state": "s1"},
               follow_redirects=False)
 
-    assert r.headers["location"] == "/points"
+    assert r.headers["location"] == "/rewards"
     assert discord["calls"] == ["/api/oauth2/token", "/api/users/@me"]
 
 
@@ -496,5 +496,5 @@ def test_valid_session_cookie_is_accepted_positive_control(discord_on, discord, 
     session = auth._seal(auth.config(), "session", {"uid": DISCORD_ID, "iat": int(time.time())})
     c = TestClient(app, base_url=BASE, cookies={auth.SESSION_COOKIE: session})
 
-    assert 'class="pts-me"' in c.get("/points?lang=ja").text
-    assert "Bravo" in c.get("/points?lang=ja").text
+    assert 'class="pts-me"' in c.get("/rewards?lang=ja").text
+    assert "Bravo" in c.get("/rewards?lang=ja").text

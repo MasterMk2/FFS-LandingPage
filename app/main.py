@@ -83,7 +83,7 @@ fitbit_cache = cache.Fetcher(
 fitbit7d_cache = cache.Fetcher(
     fetch=_fitbit.get_fitbit_7d, interval=600, name="fitbit7d"
 )
-# 部門別ポイントの公開ボード (点数を含まない)。本人欄はログイン時だけ都度取得する。
+# 部門別リワードの公開ボード (数値を含まない)。本人欄はログイン時だけ都度取得する。
 points_cache = cache.Fetcher(
     fetch=dcssb.get_points_board, interval=60, name="points"
 )
@@ -986,14 +986,14 @@ async def leaderboard(request: Request):
     )
 
 
-# --- フライトボード (/points) と Discord ログイン ---------------------------
+# --- フライトボード (/rewards) と Discord ログイン ---------------------------
 
 _POINTS_DEPT_KEYS = points.BOARD_DEPTS
 _POINTS_PERIOD_KEYS = points.PERIODS
 
 
 def _points_url(dept: str, period: str) -> str:
-    return "/points?" + urlencode({"dept": dept, "period": period})
+    return "/rewards?" + urlencode({"dept": dept, "period": period})
 
 
 async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | None]:
@@ -1014,7 +1014,13 @@ async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | 
     return "unavailable", None
 
 
-@app.get("/points", response_class=HTMLResponse)
+@app.get("/points")
+async def points_moved(request: Request):
+    query = request.url.query
+    return RedirectResponse("/rewards" + ("?" + query if query else ""), status_code=301)
+
+
+@app.get("/rewards", response_class=HTMLResponse)
 async def points_page(request: Request):
     lang = i18n.resolve_lang(request)
     q = request.query_params
@@ -1106,9 +1112,9 @@ async def discord_callback(request: Request):
         discord_id = await auth.exchange_code(cfg, code)
     if discord_id is None:
         log.warning("discord callback: login not completed")
-        resp = RedirectResponse("/points?login=failed", status_code=303)
+        resp = RedirectResponse("/rewards?login=failed", status_code=303)
     else:
-        resp = RedirectResponse("/points", status_code=303)
+        resp = RedirectResponse("/rewards", status_code=303)
         resp.set_cookie(
             auth.SESSION_COOKIE, auth.make_session(cfg, discord_id),
             max_age=auth.SESSION_MAX_AGE, path="/",
@@ -1133,7 +1139,7 @@ async def discord_logout(request: Request):
     submitted = (parse_qs(body.decode("utf-8", "replace")).get("csrf") or [""])[0]
     if not auth.csrf_ok(cfg, request.cookies.get(auth.SESSION_COOKIE), submitted):
         raise HTTPException(403, "invalid request")
-    resp = RedirectResponse("/points", status_code=303)
+    resp = RedirectResponse("/rewards", status_code=303)
     resp.delete_cookie(
         auth.SESSION_COOKIE, path="/", httponly=True, secure=True, samesite="lax",
     )

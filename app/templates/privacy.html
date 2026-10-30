@@ -38,10 +38,10 @@
   <p>表示の切り替えに使う情報は、本サイト以外へは送信しません。</p>
 
   <h3>Discord ログイン（フライトボードの本人欄）</h3>
-  <p>フライトボード（<code>/points</code>）では、Discord アカウントでログインすると、自分のポイント・称号・順位を確認できます。ログインは任意で、ログインしなくてもボードは閲覧できます。</p>
+  <p>フライトボード（<code>/rewards</code>）では、Discord アカウントでログインすると、自分のリワード・称号・順位を確認できます。ログインは任意で、ログインしなくてもボードは閲覧できます。</p>
   <ul>
     <li>取得する情報: Discord のユーザー ID のみ（認可の範囲は <code>identify</code> だけです）。ユーザー名・メールアドレス・アクセストークンは保存しません。</li>
-    <li>利用目的: ユーザー ID を使い、FFS の DCS サーバーに記録された本人のポイント・称号・順位を照会して表示します。第三者へは送信しません。</li>
+    <li>利用目的: ユーザー ID を使い、FFS の DCS サーバーに記録された本人のリワード・称号・順位を照会して表示します。第三者へは送信しません。</li>
     <li>保存先: ユーザー ID は、署名付きの Cookie <code>ffs_session</code> としてブラウザに保存します（HttpOnly・Secure・SameSite=Lax、有効期間 7 日）。本サイトのサーバーには保存しません。</li>
     <li>ログイン途中の照合: Cookie <code>ffs_oauth_state</code> に、なりすましを防ぐための値を 10 分間だけ保存し、ログインが完了すると削除します。</li>
     <li>ログアウトすると <code>ffs_session</code> を削除します。ブラウザの Cookie を消しても同じ結果になります。</li>
@@ -87,10 +87,10 @@
   <p>The display preferences are used only to adjust the display and are never sent anywhere other than this site.</p>
 
   <h3>Discord login (your section on the Flight Board)</h3>
-  <p>On the Flight Board (<code>/points</code>), you can log in with your Discord account to see your own points, titles and ranks. Logging in is optional; the board can be viewed without it.</p>
+  <p>On the Flight Board (<code>/rewards</code>), you can log in with your Discord account to see your own rewards, titles and ranks. Logging in is optional; the board can be viewed without it.</p>
   <ul>
     <li>Information obtained: only your Discord user ID (the only permission requested is <code>identify</code>). We do not store your username, email address or access token.</li>
-    <li>Purpose: the user ID is used to look up and display your points, titles and ranks recorded on the FFS DCS server. It is not shared with third parties.</li>
+    <li>Purpose: the user ID is used to look up and display your rewards, titles and ranks recorded on the FFS DCS server. It is not shared with third parties.</li>
     <li>Where it is kept: the user ID is kept in a signed cookie, <code>ffs_session</code>, in your browser (HttpOnly, Secure, SameSite=Lax, valid for 7 days). Nothing is stored on this site's server.</li>
     <li>Login check: a cookie, <code>ffs_oauth_state</code>, holds a value that prevents forged logins for 10 minutes. It is deleted when login completes.</li>
     <li>Logging out deletes <code>ffs_session</code>. Clearing your browser cookies has the same effect.</li>

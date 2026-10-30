@@ -168,12 +168,12 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_title": {"ja": "フライトボード", "en": "Flight Board"},
     "pt_lead": {
         "ja": (
-            "部門ごとのポイントで決まる称号と順位です。点数は公開せず、"
+            "部門ごとのリワードで決まる称号と順位です。数値は公開せず、"
             "順位と称号だけを表示します。"
         ),
         "en": (
-            "Titles and ranks are decided by points in each department. "
-            "Points are not published; only ranks and titles are shown."
+            "Titles and ranks are decided by rewards in each department. "
+            "Reward totals are not published; only ranks and titles are shown."
         ),
     },
     "pt_period_label": {"ja": "期間", "en": "Period"},
@@ -217,8 +217,8 @@ MESSAGES: dict[str, dict[str, str]] = {
     },
     "pt_me_title": {"ja": "あなたの状況", "en": "Your standing"},
     "pt_me_hint": {
-        "ja": "Discord でログインすると、自分のポイント・称号・順位を確認できます。",
-        "en": "Log in with Discord to see your points, titles and ranks.",
+        "ja": "Discord でログインすると、自分のリワード・称号・順位を確認できます。",
+        "en": "Log in with Discord to see your rewards, titles and ranks.",
     },
     "pt_me_login": {"ja": "Discord でログイン", "en": "Log in with Discord"},
     "pt_me_logout": {"ja": "ログアウト", "en": "Log out"},
@@ -228,19 +228,19 @@ MESSAGES: dict[str, dict[str, str]] = {
         "en": "Link your Discord account on the DCS server with .linkme.",
     },
     "pt_me_preparing": {
-        "ja": "ポイント集計の準備中です。しばらくしてから再読み込みしてください。",
-        "en": "Point tallies are being prepared. Reload in a little while.",
+        "ja": "リワード集計の準備中です。しばらくしてから再読み込みしてください。",
+        "en": "Rewards are being tallied. Reload in a little while.",
     },
     "pt_me_unavailable": {
-        "ja": "ポイント情報を取得できません。しばらくしてから再読み込みしてください。",
-        "en": "Your points are unavailable right now. Please reload later.",
+        "ja": "リワード情報を取得できません。しばらくしてから再読み込みしてください。",
+        "en": "Your rewards are unavailable right now. Please reload later.",
     },
     "pt_me_opted_out": {
-        "ja": "称号と感謝投稿の公開を停止中です (/points_privacy)。",
-        "en": "Public titles and thank-you posts are paused (/points_privacy).",
+        "ja": "称号と感謝投稿の公開を停止中です (/rewards_privacy)。",
+        "en": "Public titles and thank-you posts are paused (/rewards_privacy).",
     },
-    "pt_line_month": {"ja": "今月 {n} pt", "en": "{n} pt this month"},
-    "pt_line_total": {"ja": "累計 {n} pt", "en": "{n} pt all time"},
+    "pt_line_month": {"ja": "今月 {n} リワード", "en": "Rewards this month: {n}"},
+    "pt_line_total": {"ja": "累計 {n} リワード", "en": "Rewards all time: {n}"},
     "pt_line_units": {"ja": "実績 {n} {unit}", "en": "{n} {unit} logged"},
     "pt_line_hours": {"ja": "飛行時間 {n} 時間", "en": "Flight time: {n} h"},
     "pt_no_title": {"ja": "称号なし", "en": "No title yet"},
@@ -251,7 +251,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_top_title": {"ja": "最上位の称号を獲得済み", "en": "Highest title reached"},
     "pt_rank_none": {"ja": "未獲得", "en": "Not yet"},
     "pt_rank_fmt": {"ja": "{rank} 位 ({of} 人中)", "en": "#{rank} of {of}"},
-    "pt_gap_fmt": {"ja": "上の順位に並ぶまであと {gap} pt", "en": "{gap} pt to tie the next rank"},
+    "pt_gap_fmt": {"ja": "上の順位に並ぶまであと {gap} リワード", "en": "{gap} more to tie the next rank"},
     "pt_gap_top": {"ja": "首位", "en": "1st place"},
     "pt_rank_month": {"ja": "今月の順位", "en": "Rank this month"},
     "pt_rank_all": {"ja": "累計の順位", "en": "Rank all time"},

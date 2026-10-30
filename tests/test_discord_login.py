@@ -337,6 +337,18 @@ def test_not_linked_shows_linkme_guidance(discord_on, discord, upstream):
     assert 'class="pts-card"' not in html
 
 
+def test_multiple_links_are_explained_apart_from_not_linked(discord_on, discord, upstream):
+    upstream["member_status"] = 409
+    upstream["member_body"] = {"detail": "multiple_links"}
+    c = _login(_client())
+
+    html = c.get("/rewards?lang=ja").text
+
+    assert "複数の DCS アカウントが連携している" in html
+    assert ".linkme" not in html
+    assert 'class="pts-card"' not in html
+
+
 def test_preparing_503_is_reported_as_preparing(discord_on, discord, upstream):
     upstream["member_status"] = 503
     upstream["member_body"] = {"detail": "not ready"}

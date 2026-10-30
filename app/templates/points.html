@@ -121,6 +121,8 @@
         </div>
       {% elif member_state == 'not_linked' %}
         <p class="notice">{{ t('pt_me_not_linked') }}</p>
+      {% elif member_state == 'multiple_links' %}
+        <p class="notice">{{ t('pt_me_multiple_links') }}</p>
       {% elif member_state == 'preparing' %}
         <p class="notice">{{ t('pt_me_preparing') }}</p>
       {% else %}

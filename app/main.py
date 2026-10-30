@@ -999,7 +999,8 @@ def _points_url(dept: str, period: str) -> str:
 async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | None]:
     """本人欄の状態を返す。上流の詳細は外に出さず、状態名だけ返す。
 
-    404 は「DCS と連携していない / 候補が複数」、503 は「集計の準備中」。
+    404 は「DCS と連携していない」、409 は「複数の DCS アカウントが連携している」、
+    503 は「集計の準備中」。
     """
     res = await dcssb.get_points_member(discord_id)
     if res.ok:
@@ -1009,6 +1010,8 @@ async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | 
         return "unavailable", None
     if res.status_code == 404:
         return "not_linked", None
+    if res.status_code == 409:
+        return "multiple_links", None
     if res.status_code == 503:
         return "preparing", None
     return "unavailable", None

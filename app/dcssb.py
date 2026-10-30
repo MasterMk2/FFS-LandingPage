@@ -126,7 +126,8 @@ _DISCORD_ID_RE = re.compile(r"[0-9]{5,25}")
 async def get_points_member(discord_id: str) -> FetchResult:
     """Points API: GET /points/member/{discord_id} — 本人用。ログイン済みのときだけ呼ぶ。
 
-    404 は「DCS と連携していない / 候補が複数」、503 は「集計の準備中」。
+    404 は「DCS と連携していない」、409 は「複数の DCS アカウントが連携している」、
+    503 は「集計の準備中」。
     """
     if not _DISCORD_ID_RE.fullmatch(discord_id or ""):
         return FetchResult(ok=False, error="invalid id")

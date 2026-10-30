@@ -264,6 +264,10 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "DCS サーバーで .linkme により Discord 連携してください。",
         "en": "Link your Discord account on the DCS server with .linkme.",
     },
+    "pt_me_multiple_links": {
+        "ja": "この Discord アカウントに複数の DCS アカウントが連携しているため、リワードを表示できません。記録は残っています。普段使っている DCS 名を運営に伝えて、連携を整理してもらってください。",
+        "en": "Several DCS accounts are linked to this Discord account, so your rewards can't be shown. Your records are safe. Tell the FFS staff which DCS name you use so they can fix the link.",
+    },
     "pt_me_preparing": {
         "ja": "リワード集計の準備中です。しばらくしてから再読み込みしてください。",
         "en": "Rewards are being tallied. Reload in a little while.",

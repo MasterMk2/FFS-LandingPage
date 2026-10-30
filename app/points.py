@@ -6,6 +6,9 @@
 """
 from __future__ import annotations
 
+import calendar
+from datetime import datetime
+
 from . import i18n
 
 PERIODS = ("month", "all")
@@ -109,19 +112,52 @@ def parse_board(data: object) -> dict[str, dict[str, list[dict]]] | None:
     return out
 
 
+def _badge(text: str, key: str, tier: int) -> dict:
+    """称号 1 つ分。top は段位のゲージの段数。"""
+    return {"text": text, "tier": tier, "top": _TITLES[key][1]}
+
+
+def held_titles(board: dict, lang: str) -> dict[str, list[dict]]:
+    """パイロット名ごとの称号を部門ボードから集める (段位の高い順)。
+
+    上流の総合ボードは段位を持たないので、ここから補う。段位は累計の実績で決まり期間に
+    よらない。部門ボードは上位だけなので、そこに載らない称号は出ない。
+    """
+    held: dict[str, dict[str, int]] = {}
+    for period in PERIODS:
+        for dept in MEMBER_DEPTS:
+            for row in board.get(period, {}).get(dept, []):
+                if title(lang, dept, row["tier"]) is not None:
+                    held.setdefault(row["name"], {})[dept] = row["tier"]
+    return {
+        name: [
+            _badge(f"{i18n.t(lang, 'pt_dept_' + dept)} {_ROMAN[tier - 1]}", dept, tier)
+            for dept, tier in sorted(depts.items(), key=lambda item: -item[1])
+        ]
+        for name, depts in held.items()
+    }
+
+
 def board_rows(board: dict, period: str, dept: str, lang: str) -> list[dict]:
-    """表示用の行 (称号名を付ける)。"""
+    """表示用の行 (称号を付ける)。総合は全部門の称号、部門はその部門の称号。"""
+    held = held_titles(board, lang) if dept == "total" else {}
     rows = []
     for row in board.get(period, {}).get(dept, []):
-        rows.append(
-            {
-                "rank": row["rank"],
-                "name": row["name"],
-                # 総合は段位を持たないので称号も出ない (title は未知のキーに None を返す)。
-                "title": title(lang, dept, row["tier"]),
-            }
-        )
+        badges = held.get(row["name"], [])
+        name = title(lang, dept, row["tier"])
+        if name is not None:
+            badges = [_badge(name, dept, row["tier"])]
+        rows.append({"rank": row["rank"], "name": row["name"], "badges": badges})
     return rows
+
+
+def month_closing(lang: str, now: datetime) -> str:
+    """今月のランキングの残り日数の文言。now は JST の現在時刻。"""
+    left = calendar.monthrange(now.year, now.month)[1] - now.day
+    if left == 0:
+        return i18n.t(lang, "pt_closing_today")
+    unit = i18n.t(lang, "pt_unit_day" if left == 1 else "pt_unit_days")
+    return i18n.t(lang, "pt_closing_fmt").format(n=left, unit=unit)
 
 
 def _standing(standing: object, period: str, key: str) -> dict:

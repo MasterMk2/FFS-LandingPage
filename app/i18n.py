@@ -166,7 +166,8 @@ MESSAGES: dict[str, dict[str, str]] = {
     # ── points.html (フライトボード) ──
     # 文中の {n} {rank} などは テンプレート側で str.format() に渡して埋める。
     "pt_title": {"ja": "フライトボード", "en": "Flight Board"},
-    "pt_lead": {
+    "pt_lead": {"ja": "飛んだ分だけ、称号が上がる。", "en": "Fly more, and your title climbs."},
+    "pt_note": {
         "ja": (
             "部門ごとのリワードで決まる称号と順位です。数値は公開せず、"
             "順位と称号だけを表示します。"
@@ -175,6 +176,39 @@ MESSAGES: dict[str, dict[str, str]] = {
             "Titles and ranks are decided by rewards in each department. "
             "Reward totals are not published; only ranks and titles are shown."
         ),
+    },
+    "pt_closing_fmt": {
+        "ja": "今月のランキングは残り {n} {unit}",
+        "en": "{n} {unit} left this month",
+    },
+    "pt_closing_today": {
+        "ja": "今月のランキングは今日まで",
+        "en": "Last day of this month",
+    },
+    # 部門ごとの記録のされ方。コマンド名とボタン名は FFS/points/README.md に合わせる。
+    "pt_how_total": {
+        "ja": "FFS のサーバーで飛ぶと、自動で記録が始まります。",
+        "en": "Fly on an FFS server and your record starts automatically.",
+    },
+    "pt_how_host": {
+        "ja": "coop告知に募集を投稿して開催すると記録されます。",
+        "en": "Post a call in the COOP announcements and run the event to be recorded.",
+    },
+    "pt_how_lead": {
+        "ja": "募集の「リード」ボタンか、ゲーム内の .coop lead で宣言して飛ぶと記録されます。",
+        "en": "Use the Lead button on a COOP call, or .coop lead in game, then fly.",
+    },
+    "pt_how_coop": {
+        "ja": "募集の「参加」ボタンか、ゲーム内の .coop join で宣言して飛ぶと記録されます。",
+        "en": "Use the Join button on a COOP call, or .coop join in game, then fly.",
+    },
+    "pt_how_free": {
+        "ja": "FFS のサーバーで飛ぶと、自動で記録されます。",
+        "en": "Fly on an FFS server and it is recorded automatically.",
+    },
+    "pt_how_author": {
+        "ja": "ゲーム内の .author で、動いているミッションの制作を宣言すると記録されます。",
+        "en": "Use .author in game to declare the running mission as yours.",
     },
     "pt_period_label": {"ja": "期間", "en": "Period"},
     "pt_period_month": {"ja": "今月", "en": "This month"},
@@ -202,7 +236,10 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_col_rank": {"ja": "順位", "en": "Rank"},
     "pt_col_name": {"ja": "パイロット", "en": "Pilot"},
     "pt_col_title": {"ja": "称号", "en": "Title"},
-    "pt_board_empty": {"ja": "まだ記録がありません。", "en": "No records yet."},
+    "pt_board_empty": {
+        "ja": "まだ誰も載っていません。最初の一人になれます。",
+        "en": "Nobody here yet. The first spot is open.",
+    },
     "pt_board_pending": {
         "ja": "ボードをまだ取得していません。数秒後に再読み込みしてください。",
         "en": "The board has not been fetched yet. Reload in a few seconds.",

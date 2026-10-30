@@ -4,10 +4,11 @@
    方針: 色は「意味」にだけ使う。リンク・選択中・CTA は色を付けず、明るい
    文字と下線で示す (--accent は白寄りの無彩色)。
 
-   色を持つのは次の 3 つだけ:
+   色を持つのは次の 4 つだけ:
      --up / --down / --warn  … 稼働状態 (緑 = 稼働 / 赤 = 停止 / 琥珀 = その他)
      .player-chip.side-RED / side-BLUE … DCS の陣営色
      --chart-rx / --chart-tx … 1 枚に 2 系列が重なるネットワークのグラフ
+     --medal-* … フライトボードの 1〜3 位 (順位の数字を必ず添える。押せる要素には使わない)
    以前の強調色 (真鍮 #c2a76c) は --warn とほぼ同じ色相で、押せる印と注意の印が
    見分けにくかったのでやめた。1 系列だけのグラフはラベルで区別できるので無彩色。
 
@@ -34,6 +35,9 @@
   --guide-warn-fg:#694a12; --req-fg:#9e3a31;
   /* 罫線 */
   --border:#d0dabd; --border-soft:#e1e8d3;
+  /* フライトボードのメダル。地の色によらず同じで、文字は常に --medal-ink */
+  --medal-gold:#e8bb3a; --medal-silver:#c5ccd4; --medal-bronze:#cf9163; --medal-ink:#231a05;
+  --medal-silver-rgb:140,152,166; --medal-bronze-rgb:190,120,70;
   /* DCS の陣営 */
   --side-red-fg:#a33a31; --side-blue-rgb:47,95,154; --side-blue-fg:#2b5893; --slot-fg:#4b5642;
   /* コード・外部ブランド */
@@ -313,16 +317,68 @@ footer small{font-size:.75rem}
 .dl-link:hover{background:rgba(var(--wash-rgb),.07);border-color:var(--accent)}
 
 /* フライトボード (/points): 期間・部門の切替、ランキング、本人欄 */
-.points-page .pts-header{margin-bottom:.75rem}
-.points-page .pts-header h2{margin:0 0 .25rem;font-size:1.4rem}
+.points-page .pts-header{margin-bottom:1rem}
+.points-page .pts-header h2{margin:0 0 .2rem;font-size:2.1rem;font-weight:800;letter-spacing:-.01em;line-height:1.2}
+.pts-lead{margin:0;font-size:1.05rem;font-weight:600;color:var(--fg)}
 .pts-nav{display:flex;flex-wrap:wrap;gap:.35rem;margin:.5rem 0}
 .pts-nav a{font-size:.8rem;color:var(--muted);text-decoration:none;padding:.3rem .65rem;border:1px solid var(--border);border-radius:999px;transition:color .15s,border-color .15s}
 .pts-nav a:hover{color:var(--fg);border-color:var(--accent-line)}
 .pts-nav a[aria-current="true"]{color:var(--bg);background:var(--accent);border-color:var(--accent)}
-.pts-board,.pts-me{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;margin:.75rem 0;overflow-x:auto}
+.pts-board,.pts-me{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:.75rem 1rem;margin:.75rem 0}
+.pts-me{overflow-x:auto}
 .pts-board h3,.pts-me h3{margin:0 0 .5rem;font-size:1rem;color:var(--accent)}
 .pts-board h3 .count{color:var(--muted);font-size:.8rem;font-weight:400}
-.pts-table .pts-title-cell{color:var(--accent);font-size:.85rem;white-space:nowrap}
+.pts-board-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:.1rem 1rem;margin-bottom:.6rem}
+.pts-board-head h3{margin:0}
+.pts-closing{margin:0;font-size:.82rem;font-weight:700;color:var(--fg)}
+.pts-list,.pts-badges{list-style:none;margin:0;padding:0}
+.pts-list{display:grid;gap:.4rem}
+.pts-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:.25rem .75rem;padding:.4rem .6rem;border-radius:8px;font-size:.95rem;animation:pts-rise .36s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*55ms)}
+.pts-medal{display:inline-grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:50%;border:1px solid var(--border);color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+.pts-pilot{min-width:0;overflow-wrap:anywhere;font-weight:600}
+.pts-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.pts-badges{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.3rem}
+.pts-badge{display:inline-flex;align-items:center;gap:.4rem;padding:.16rem .55rem;border:1px solid var(--border);border-radius:999px;font-size:.78rem;font-weight:600;white-space:nowrap}
+.pts-gauge{display:inline-flex;align-items:flex-end;gap:2px;height:.8rem}
+.pts-gauge i{display:block;width:3px;background:currentColor;opacity:.22}
+.pts-gauge i.on{opacity:1}
+.pts-gauge i:nth-child(1){height:35%}
+.pts-gauge i:nth-child(2){height:52%}
+.pts-gauge i:nth-child(3){height:68%}
+.pts-gauge i:nth-child(4){height:84%}
+.pts-gauge i:nth-child(5){height:100%}
+.pts-rank-2,.pts-rank-3{padding:.6rem .75rem;font-size:1.1rem}
+.pts-rank-2{background:rgba(var(--medal-silver-rgb),.16)}
+.pts-rank-3{background:rgba(var(--medal-bronze-rgb),.14)}
+.pts-rank-2 .pts-medal,.pts-rank-3 .pts-medal{width:2.3rem;height:2.3rem;border:0;color:var(--medal-ink)}
+.pts-rank-2 .pts-medal{background:var(--medal-silver)}
+.pts-rank-3 .pts-medal{background:var(--medal-bronze)}
+/* 1 位の帯。右の階段は段位のゲージと同じ「上がっていく」形 */
+.pts-rank-1{position:relative;overflow:hidden;padding:1.05rem 1.25rem;border-radius:12px;background:var(--medal-gold);color:var(--medal-ink);font-size:1.65rem}
+.pts-rank-1::after{content:"";position:absolute;right:0;bottom:0;width:min(46%,20rem);height:100%;background:rgba(35,26,5,.08);clip-path:polygon(0 100%,0 80%,20% 80%,20% 60%,40% 60%,40% 40%,60% 40%,60% 20%,80% 20%,80% 0,100% 0,100% 100%)}
+.pts-rank-1::before{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.55) 50%,transparent 60%);transform:translateX(-100%);animation:pts-glint .8s ease-out both;animation-delay:calc(var(--i)*55ms + .3s)}
+.pts-rank-1>*{position:relative;z-index:1}
+.pts-rank-1 .pts-medal{width:3.1rem;height:3.1rem;border:2px solid var(--medal-ink);color:var(--medal-ink);font-size:1.7rem;font-weight:800}
+.pts-rank-1 .pts-pilot{font-weight:800;line-height:1.2}
+.pts-rank-1 .pts-badge{border-color:rgba(35,26,5,.45);background:rgba(255,255,255,.35)}
+.pts-empty{margin:.25rem 0 .1rem;font-size:1.05rem;font-weight:700}
+.pts-how{margin:.75rem 0 .1rem;font-size:.85rem;color:var(--muted)}
+.pts-note{margin:.75rem 0 0;font-size:.8rem;color:var(--muted)}
+/* 動きが止まっても順位が読めるよう、透明にはしない */
+@keyframes pts-rise{from{transform:translateY(14px)}}
+@keyframes pts-glint{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){
+  .pts-row{animation:none}
+  .pts-rank-1::before{display:none}
+}
+@media (max-width:560px){
+  .points-page .pts-header h2{font-size:1.75rem}
+  .pts-row{grid-template-columns:auto minmax(0,1fr)}
+  .pts-badges{grid-column:2;justify-content:flex-start}
+  .pts-badge{white-space:normal}
+  .pts-rank-1{padding:.9rem 1rem;font-size:1.35rem}
+  .pts-rank-1 .pts-medal{width:2.7rem;height:2.7rem;font-size:1.45rem}
+}
 .pts-hint{color:var(--muted);font-size:.88rem;margin:0 0 .5rem}
 .pts-name{font-size:.88rem;color:var(--muted);margin:0 0 .5rem}
 .pts-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.75rem;margin-top:.5rem}

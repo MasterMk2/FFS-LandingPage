@@ -15,7 +15,7 @@
 <section class="points-page">
   <header class="pts-header">
     <h2>{{ t('pt_title') }}</h2>
-    <p class="subtle">{{ t('pt_lead') }}</p>
+    <p class="pts-lead">{{ t('pt_lead') }}</p>
   </header>
 
   {% if login_failed %}
@@ -34,33 +34,37 @@
   </nav>
 
   <section class="pts-board" aria-labelledby="pts-board-title">
-    <h3 id="pts-board-title">{{ dept_label }} <span class="count">· {{ period_label }}</span></h3>
+    <div class="pts-board-head">
+      <h3 id="pts-board-title">{{ dept_label }} <span class="count">· {{ period_label }}</span></h3>
+      {% if closing %}<p class="pts-closing">{{ closing }}</p>{% endif %}
+    </div>
     {% if board_state == 'pending' %}
       <p class="notice">{{ t('pt_board_pending') }}</p>
     {% elif board_state == 'error' %}
       <div class="error">{{ t('pt_board_error') }}</div>
     {% elif rows %}
-      <table class="lb-table pts-table">
-        <thead>
-          <tr>
-            <th class="rank">{{ t('pt_col_rank') }}</th>
-            <th>{{ t('pt_col_name') }}</th>
-            <th>{{ t('pt_col_title') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for r in rows %}
-          <tr>
-            <td class="rank">{{ r.rank }}</td>
-            <td>{{ r.name }}</td>
-            <td class="pts-title-cell">{{ r.title or '—' }}</td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
+      <ol class="pts-list">
+      {% for r in rows %}
+        <li class="pts-row pts-rank-{{ r.rank if r.rank <= 3 else 'n' }}" style="--i:{{ loop.revindex0 }}">
+          <span class="pts-medal"><span class="pts-sr">{{ t('pt_col_rank') }} </span>{{ r.rank }}</span>
+          <span class="pts-pilot">{{ r.name }}</span>
+          {% if r.badges %}
+          <ul class="pts-badges">
+            {% for b in r.badges %}
+            <li class="pts-badge">
+              <span class="pts-gauge" aria-hidden="true">{% for i in range(1, b.top + 1) %}<i{% if i <= b.tier %} class="on"{% endif %}></i>{% endfor %}</span>
+              {{ b.text }}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </li>
+      {% endfor %}
+      </ol>
     {% else %}
-      <p class="lb-empty">{{ t('pt_board_empty') }}</p>
+      <p class="pts-empty">{{ t('pt_board_empty') }}</p>
     {% endif %}
+    {% if board_state == 'ok' %}<p class="pts-how">{{ how_to }}</p>{% endif %}
   </section>
 
   {% if login_enabled %}
@@ -134,6 +138,7 @@
   </section>
   {% endif %}
 
+  <p class="pts-note">{{ t('pt_note') }}</p>
   <p class="updated">updated {{ age }} ({{ updated_at }})</p>
 </section>
 {% endblock %}

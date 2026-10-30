@@ -1062,6 +1062,8 @@ async def points_page(request: Request):
         ],
         "dept_label": i18n.t(lang, "pt_dept_" + dept),
         "period_label": i18n.t(lang, "pt_period_" + period),
+        "closing": points.month_closing(lang, datetime.now(_JST)) if period == "month" else "",
+        "how_to": i18n.t(lang, "pt_how_" + dept),
         "board_state": board_state,
         "rows": rows,
         "login_enabled": cfg is not None,

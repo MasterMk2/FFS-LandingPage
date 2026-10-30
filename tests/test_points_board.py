@@ -4,6 +4,7 @@
 """
 import asyncio
 import re
+from datetime import datetime
 
 import httpx
 import pytest
@@ -60,8 +61,6 @@ def discord_off(monkeypatch):
 
 
 def _ok_board(data=BOARD) -> CachedValue:
-    from datetime import datetime
-
     return CachedValue(value=FetchResult(ok=True, data=data),
                        fetched_at=datetime.now().astimezone())
 
@@ -114,9 +113,58 @@ def test_total_ranking_has_no_title_and_no_points(set_board, discord_off):
     section = _section(_points("?lang=ja&dept=total"), "pts-board")
 
     assert "Charlie" in section
+    assert "主催 I" in section  # 総合の称号は部門ボードから補う
     assert "999" not in section
     assert "pt" not in re.split(r'[ <>"=/]+', section)
-    assert "—" in section
+
+
+def test_total_ranking_collects_titles_from_every_department(set_board, discord_off):
+    set_board(_ok_board())
+    section = _section(_points("?lang=ja&dept=total&period=all"), "pts-board")
+
+    assert "Delta" in section
+    assert "フリーフライト III" in section
+
+
+def test_rank_is_shown_as_text_with_ties_and_tier_gauge_matches_the_title(set_board, discord_off):
+    tied = dict(BOARD)
+    tied["boards"] = {
+        "month": {**BOARD["boards"]["month"],
+                  "free": [{"rank": 2, "name": "Echo", "tier": 3},
+                           {"rank": 2, "name": "Foxtrot", "tier": 0}]},
+        "all": BOARD["boards"]["all"],
+    }
+    set_board(_ok_board(tied))
+    section = _section(_points("?lang=ja&dept=free"), "pts-board")
+
+    assert section.count('class="pts-row pts-rank-2"') == 2
+    assert section.count("</i>") == 5  # 称号のある Echo のフリーフライトは全 5 段
+    assert section.count('<i class="on">') == 3
+
+
+def test_empty_department_invites_the_first_entry(set_board, discord_off):
+    set_board(_ok_board())
+    section = _section(_points("?lang=ja&dept=lead"), "pts-board")
+
+    assert "最初の一人" in section
+    assert ".coop lead" in section
+
+
+def test_closing_shows_only_on_the_monthly_board(set_board, discord_off):
+    set_board(_ok_board())
+
+    assert "pts-closing" in _points("?lang=ja&period=month")
+    assert "pts-closing" not in _points("?lang=ja&period=all")
+
+
+@pytest.mark.parametrize("day, lang, expected", [
+    (30, "ja", "今月のランキングは残り 1 日"),
+    (31, "ja", "今月のランキングは今日まで"),
+    (29, "en", "2 days left this month"),
+    (30, "en", "1 day left this month"),
+])
+def test_month_closing_counts_days_left(day, lang, expected):
+    assert points.month_closing(lang, datetime(2026, 10, day, 12)) == expected
 
 
 def test_names_are_html_escaped(set_board, discord_off):

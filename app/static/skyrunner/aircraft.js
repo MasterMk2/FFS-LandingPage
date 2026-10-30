@@ -1,21 +1,22 @@
 /*
- * aircraft.js - the player's jet for the external view: an original twin-engine stealth fighter in the
- * F-22 mould (chined nose, caret intakes, diamond wing, canted twin tails, 2D thrust-vectoring nozzles).
- * Clean, smoothly shaded panels meeting at crisp character lines (chines, shoulders, leading and trailing
- * edges, intake lips), so the jet reads as sharp and angular without looking low-poly.
- * Plain browser script: needs the global THREE (r128). Defines the global `SkyrunnerJet`.
+ * aircraft.js - the player's jet for the external view: an F-15 type twin-engine air-superiority fighter. The airframe
+ * is the procedural model of the Blender project ffs_f15 (original build, own markings), baked into f15model.js by
+ * tools/export_f15.py: fuselage, wings and tails, rotating inlet cowls, the dorsal speed brake, F100-style nozzles with
+ * the afterburner duct behind them, canopy, pilot and seat. The skin is shaded here from the same panel-line maps
+ * as in Blender (projected along the airframe axes): two-tone camouflage, panel lines, fasteners, grime and heat tint.
+ * Plain browser script: needs the global THREE (r128) and SkyrunnerF15 (f15model.js). Defines the global `SkyrunnerJet`.
  * Body axes as in flightmodel.js: +X right wing, +Y up, -Z out of the nose; the origin is the CG.
  *
  *   var jet = SkyrunnerJet.create(scene);  // jet.root is the airframe group: copy fm.pos / fm.q into it
- *   jet.update(fm, dt, {visible, engine, camera, dark, time});  // once per frame, after the camera moved
+ *   jet.update(fm, dt, {visible, engine, camera, dark, time, cockpit});  // once per frame, after the camera moved
  *   jet.reset();                           // drop the wingtip vapour trails (respawn / teleport)
  *
  * update() reads fm.elevator / aileron / rudder (the actual surface angles, pilot sense), throttleActual,
- * afterburnerLevel, gLoad, alpha and tas, so the surfaces, nozzles, afterburner and vapour follow the flight model.
+ * afterburnerLevel, gLoad, alpha and tas, so the surfaces, inlets, afterburner and vapour follow the flight model.
  * Optional, when the flight model provides them: gearPos / gearComp / params.gear* (landing gear) and
- * speedBrakePos (the rudders splay outward).
- * Surface signs: elevator + = stabilator trailing edge up (nozzles vector the same way), aileron + = right
- * flaperon and right stabilator trailing edges up, rudder + = both rudder trailing edges to the right.
+ * speedBrakePos (the dorsal speed brake). opts.cockpit hides the pilot, seat and consoles (cockpit.js draws its own).
+ * Surface signs: elevator + = stabilator trailing edge up, aileron + = right aileron and right stabilator trailing
+ * edges up, rudder + = both rudder trailing edges to the right.
  * opts.dark (0 = noon .. 1 = night) sets how strongly the navigation / formation lights stand out.
  */
 (function (root) {
@@ -25,32 +26,26 @@
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function sstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
   function mid(a, b) { return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]; }
-  function lerp3(a, b, t) { return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]; }
-
-  // ---------------------------------------------------------------- paint (hex is linear; the sRGB output lifts it)
-  // Two-tone split on the chine: dark gunmetal above, lighter grey on the lower sides and belly.
-  var C = {
-    top: 0x15181d, side: 0x1d2127, belly: 0x262a30,
-    edge: 0x0a0b0e, dark: 0x08090b, black: 0x020203, duct: 0x0c0d0f,
-    metal: 0x14110f, burnt: 0x0d0a08, glass: 0x221304,
-    heat1: 0x22170e, heat2: 0x19131f                        // heat tint toward the nozzle exit: bronze, then blue-violet
-  };
 
   // Cheap sky reflection for the skin (no envMap, no extra lights): the surface mirrors a sky gradient
   // whose zenith / horizon / ground colours follow the scene's hemisphere light and fog, stronger at grazing angles.
+  // alpha (glass): the reflection also makes the surface more opaque at grazing angles.
   var ENV = {top: new THREE.Color(0x7f8fc0), hor: new THREE.Color(0xe9a07a), low: new THREE.Color(0x4a3528)};
-  function envify(mat, k) {
-    mat.onBeforeCompile = function (sh) {
-      sh.uniforms.uEnvTop = {value: ENV.top}; sh.uniforms.uEnvHor = {value: ENV.hor}; sh.uniforms.uEnvLow = {value: ENV.low}; sh.uniforms.uEnvK = {value: k};
-      sh.fragmentShader = 'uniform vec3 uEnvTop, uEnvHor, uEnvLow; uniform float uEnvK;\n' + sh.fragmentShader.replace('#include <envmap_fragment>',
-        'vec3 eV = normalize(vViewPosition); vec3 eR = (vec4(reflect(-eV, normal), 0.0) * viewMatrix).xyz;\n' +
-        'vec3 eC = eR.y > 0.0 ? mix(uEnvHor, uEnvTop, pow(eR.y, 0.6)) : mix(uEnvHor, uEnvLow, pow(-eR.y, 0.45));\n' +
-        'outgoingLight += eC * uEnvK * (0.03 + 0.97 * pow(1.0 - clamp(dot(normal, eV), 0.0, 1.0), 5.0));');
-    };
+  function envPatch(sh, k, alpha) {
+    sh.uniforms.uEnvTop = {value: ENV.top}; sh.uniforms.uEnvHor = {value: ENV.hor}; sh.uniforms.uEnvLow = {value: ENV.low};
+    sh.uniforms.uEnvK = {value: k}; sh.uniforms.uEnvA = {value: alpha || 0};
+    sh.fragmentShader = 'uniform vec3 uEnvTop, uEnvHor, uEnvLow; uniform float uEnvK, uEnvA;\n' + sh.fragmentShader.replace('#include <envmap_fragment>',
+      'vec3 eV = normalize(vViewPosition); vec3 eR = (vec4(reflect(-eV, normal), 0.0) * viewMatrix).xyz;\n' +
+      'vec3 eC = eR.y > 0.0 ? mix(uEnvHor, uEnvTop, pow(eR.y, 0.6)) : mix(uEnvHor, uEnvLow, pow(-eR.y, 0.45));\n' +
+      'float eF = 0.03 + 0.97 * pow(1.0 - clamp(dot(normal, eV), 0.0, 1.0), 5.0);\n' +
+      'outgoingLight += eC * uEnvK * eF; diffuseColor.a = min(1.0, diffuseColor.a + uEnvA * eF);');
+  }
+  function envify(mat, k, alpha) {
+    mat.onBeforeCompile = function (sh) { envPatch(sh, k, alpha); };
     return mat;
   }
 
-  // ---------------------------------------------------------------- mesh builder
+  // ---------------------------------------------------------------- mesh builder (shared with racer.js and cockpit.js)
   // Flat-coloured triangles, each wound to face away from an "inside" point so FrontSide culling works. Every face
   // carries a smoothing group: normals are averaged only within a group, and only across folds under CREASE, so a
   // panel shades as one clean surface while the borders between groups stay crisp character lines.
@@ -141,7 +136,6 @@
     if (o.capA != null) b.face(rings[0], o.capA, centre(rings[1], o.sym), o.flip, base + 62);
     if (o.capB != null) b.face(rings[last], o.capB, centre(rings[last - 1], o.sym), o.flip, base + 63);
   }
-  function fixed(p) { return function () { return p; }; }
 
   // Centripetal Catmull-Rom between b and c (neighbours a, d): no overshoot loops on unevenly spaced points.
   function cr(a, b, c, d, t) {
@@ -187,7 +181,6 @@
   }
   // ring segments: 0-7 upper surface, 8 end face, 9-16 lower surface. Leading edge, trailing edge and hinge stay crisp.
   function foilGroup(j) { return j < 8 ? 0 : j === 8 ? 1 : 2; }
-  function foilPaint(i, j) { return j < 2 || j > 14 ? C.edge : j === 8 ? C.dark : j < 8 ? C.top : C.belly; }
   // Control-surface ring from the hinge (chord fraction h) to the trailing edge, matching foil() at the hinge:
   // [hinge upper, mid upper, trailing edge, mid lower, hinge lower]; segments 0-1 upper, 2-3 lower, 4 the hinge face.
   function tailRing(map, zLE, chord, t, h) {
@@ -197,150 +190,160 @@
   }
   function tailGroup(j) { return j < 2 ? 0 : j < 4 ? 2 : 1; }
 
-  // ---------------------------------------------------------------- planform
-  // Drawn in design metres, then scaled by SCALE so the span matches the flight model's b = 9.5 m
-  // (nose tip at z = -7.6). The landing gear is not scaled: it sits on the flight model's own contact points.
-  var SCALE = 0.864;
-  function wLE(x) { return -1.2 + (x - 1.65) * 0.9; }            // wing leading edge, 42 deg
-  function wTE(x) { return 4.75 - (x - 1.65) * 0.306; }          // trailing edge, swept forward 17 deg
-  function wY(x) { return 0.15 - (x - 1.5) * 0.05; }             // ~3 deg anhedral
-  function wT(x) { return 0.3 - (x - 1.5) * 0.057; }             // thickness 0.30 m root -> 0.07 m tip
-  function wHinge(x) { return wTE(x) - (0.95 - (x - 3) * 0.21); } // flaperon hinge line (x >= 3)
-  function wHingeF(x) { return (wHinge(x) - wLE(x)) / (wTE(x) - wLE(x)); }
-  function wingAt(x) { var y = wY(x); return function (z, v) { return [x, y + v, z]; }; }
-  var TIP = 5.5;
-  function sLE(x) { return 4.95 + (x - 1.25) * 0.9; }            // stabilator edges parallel to the wing's
-  function sTE(x) { return 8.25 - (x - 1.25) * 0.18; }
-  var SY = 0.02;
-  var CANT = 27 * DEG, FSX = Math.sin(CANT), FSY = Math.cos(CANT); // twin fins canted outboard
-  function finPt(u, z, v) { return [1.18 + FSX * u + FSY * v, 0.4 + FSY * u - FSX * v, z]; } // span u, chord z, thickness v
-  function fLE(u) { return 2.55 + u * 0.62; }
-  function fTE(u) { return 5.85 - u * 0.08; }
-  function fHinge(u) { return fTE(u) - (0.85 - u * 0.12); }
-  function fT(u) { return 0.16 - u * 0.035; }
-  function fHingeF(u) { return (fHinge(u) - fLE(u)) / (fTE(u) - fLE(u)); }
-  function finAt(u) { return function (z, v) { return finPt(u, z, v); }; }
-  var NX = 0.62, NY = -0.04, NZ = 6.42, NLEN = 0.62;              // nozzle centre and flap hinge
-  // glowing liner: exit half-size and depth (it must end aft of the fuselage end cap at z = 5.9, which would hide it)
-  var LINER_W = 0.42, LINER_H = 0.32, LINER_D = 0.5;
+  // ---------------------------------------------------------------- the F-15 data (f15model.js)
+  // Model metres in body axes about the Blender model's origin. Placement: scaled so the span matches the flight
+  // model's b = 9.5 m (as the previous airframe was), and placed so the canopy fits round cockpit.js's design eye
+  // (0, 0.79, -3.0): rail 0.23 m below the eye, canopy top 0.19 m above it, the windscreen bow just over the HUD.
+  var F = root.SkyrunnerF15;
+  var SCALE = 9.5 / (F.pts.tipR[0] - F.pts.tipL[0]), OFS = [0, 0.015, 0.44];
+  function place(p) { return [p[0] * SCALE + OFS[0], p[1] * SCALE + OFS[1], p[2] * SCALE + OFS[2]]; }
 
-  // Fuselage half rings, top centre -> chine -> bottom centre: [z, top y, (x, y) x5, bottom y]
-  var FUS = [
-    [-8.8, -0.04],
-    [-8.1, 0.11, 0.06, 0.10, 0.14, 0.06, 0.25, -0.04, 0.14, -0.12, 0.06, -0.14, -0.15],
-    [-7.0, 0.30, 0.14, 0.29, 0.32, 0.19, 0.56, -0.03, 0.33, -0.22, 0.15, -0.28, -0.29],
-    [-5.7, 0.50, 0.22, 0.49, 0.48, 0.35, 0.80, 0.00, 0.50, -0.34, 0.24, -0.44, -0.46],
-    [-4.3, 0.62, 0.28, 0.61, 0.58, 0.45, 0.98, 0.04, 0.62, -0.43, 0.30, -0.54, -0.56],
-    [-3.0, 0.68, 0.34, 0.67, 0.68, 0.52, 1.10, 0.07, 0.72, -0.48, 0.36, -0.59, -0.61],
-    [-1.6, 0.70, 0.50, 0.70, 0.95, 0.60, 1.72, 0.16, 1.50, -0.40, 0.70, -0.60, -0.62],
-    [1.0, 0.68, 0.55, 0.68, 1.10, 0.62, 1.80, 0.17, 1.58, -0.40, 0.75, -0.60, -0.62],
-    [3.6, 0.62, 0.55, 0.63, 1.12, 0.57, 1.70, 0.16, 1.50, -0.36, 0.75, -0.56, -0.58],
-    [5.0, 0.50, 0.50, 0.52, 1.08, 0.47, 1.42, 0.14, 1.30, -0.32, 0.70, -0.50, -0.52],
-    [5.9, 0.38, 0.45, 0.40, 1.02, 0.38, 1.18, 0.12, 1.12, -0.30, 0.60, -0.44, -0.45]
-  ];
-  function fusRing(s) {
-    var z = s[0], r = [], k;
-    if (s.length === 2) { for (k = 0; k < 7; k++) r.push([0, s[1], z]); return r; }
-    r.push([0, s[1], z]);
-    for (k = 2; k < 12; k += 2) r.push([s[k], s[k + 1], z]);
-    r.push([0, s[12], z]); return r;
+  function unb64(s, Type) {
+    var bin = atob(s), u8 = new Uint8Array(bin.length), i;
+    for (i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return new Type(u8.buffer);
   }
-  // Canopy bubble and the dorsal spine behind it: [z, top y, (x, y) x3]
-  var CANOPY = [[-6.2, 0.43, 0, 0.43, 0, 0.43, 0, 0.43], [-5.2, 0.86, 0.22, 0.82, 0.37, 0.66, 0.44, 0.40],
-    [-4.2, 1.06, 0.28, 1.01, 0.45, 0.84, 0.52, 0.48], [-3.1, 1.04, 0.28, 0.99, 0.45, 0.83, 0.52, 0.56],
-    [-2.2, 0.92, 0.24, 0.88, 0.39, 0.77, 0.46, 0.60]];
-  var SPINE = [CANOPY[4], [-1.0, 0.80, 0.22, 0.78, 0.42, 0.72, 0.60, 0.64], [0.6, 0.70, 0.20, 0.70, 0.40, 0.69, 0.60, 0.67]];
-  function domeRing(s) { return [[0, s[1], s[0]], [s[2], s[3], s[0]], [s[4], s[5], s[0]], [s[6], s[7], s[0]]]; }
-
-  function buildAirframe() {
-    var b = new Builder(), rings = FUS.map(fusRing), lip, back, lc, inset;
-    // fuselage: nose curved through refined stations, straight panels aft (no overshoot round the intakes).
-    // Smoothing groups top deck | upper side | lower side | belly: the shoulder, chine and lower edge stay crisp.
-    rings = refineGrid(rings.slice(0, 6), 1, 3, false).concat(rings.slice(6));
-    loft(b, rings, function (i, j) { return j < 3 ? C.top : j === 3 ? C.side : C.belly; },
-      {sym: true, capB: C.dark, group: function (j) { return j < 2 ? 0 : j === 2 ? 1 : j === 3 ? 2 : 3; }});
-    loft(b, refineGrid(SPINE.map(domeRing), 3, 2, true), fixed(C.top), {sym: true});
-    // caret intakes: lips swept back both outboard and downward, a dark duct behind them
-    lip = [[1.02, 0.2, -3.15], [1.78, 0.17, -2.75], [1.62, -0.4, -2.35], [1.02, -0.44, -2.75]];
-    back = [[1.0, 0.24, -0.6], [1.8, 0.18, -0.6], [1.6, -0.42, -0.6], [1.0, -0.5, -0.6]];
-    lc = centre(lip);
-    inset = lip.map(function (p) { return [lc[0] + (p[0] - lc[0]) * 0.78, lc[1] + (p[1] - lc[1]) * 0.78, p[2] + 0.5]; });
-    loft(b, [lip, back], function (i, j) { return [C.top, C.side, C.belly, C.side][j]; }, {closed: true});
-    loft(b, [lip, inset], fixed(C.duct), {closed: true, capB: C.black, flip: true});
-    // wing: inner panel to the trailing edge, outer panel to the flaperon hinge
-    loft(b, [foil(wingAt(1.5), wLE(1.5), wTE(1.5) - wLE(1.5), wT(1.5), 1), foil(wingAt(3), wLE(3), wTE(3) - wLE(3), wT(3), 1)],
-      foilPaint, {closed: true, capB: C.dark, group: foilGroup});
-    loft(b, [foil(wingAt(3), wLE(3), wTE(3) - wLE(3), wT(3), wHingeF(3)), foil(wingAt(TIP), wLE(TIP), wTE(TIP) - wLE(TIP), wT(TIP), wHingeF(TIP))],
-      foilPaint, {closed: true, capB: C.edge, group: foilGroup});
-    // twin fins (rudders hinge on their trailing edge)
-    function finFoil(u) { return foil(finAt(u), fLE(u), fTE(u) - fLE(u), fT(u), fHingeF(u)); }
-    loft(b, [finFoil(-0.15), finFoil(3)], function (i, j) { return j < 2 || j > 14 ? C.edge : j === 8 ? C.dark : C.side; },
-      {closed: true, capB: C.edge, group: foilGroup});
-    // tail booms that carry the stabilators, and the flat "stinger" between the nozzles
-    function boom(z, s) { return [[1.22, -0.02 + 0.18 * s, z], [1.22 + 0.14 * s, -0.02, z], [1.22, -0.02 - 0.2 * s, z], [1.22 - 0.12 * s, -0.02, z]]; }
-    loft(b, [boom(4.9, 1), boom(6.9, 1), boom(7.75, 0.3)], fixed(C.side), {closed: true, capB: C.edge});
-    loft(b, [[5.6, 0.26, 0.16, 0.18, 0.16, -0.22, -0.28], [7.0, 0.06, 0.09, 0.04, 0.09, -0.06, -0.08], [7.5, 0, 0, 0, 0, 0, 0]].map(function (s) {
-      return [[0, s[1], s[0]], [s[2], s[3], s[0]], [s[4], s[5], s[0]], [0, s[6], s[0]]];
-    }), function (i, j) { return j === 0 ? C.top : j === 1 ? C.side : C.belly; }, {sym: true});
-    // panel lines and vents: thin dark inlays just proud of upward-facing skin
-    function fusTopY(x, z) {                                  // fuselage upper surface aft of the intakes
-      var i = 6, a, c;
-      while (i < FUS.length - 2 && FUS[i + 1][0] < z) i++;
-      a = FUS[i]; c = FUS[i + 1];
-      function at(s) {
-        var r = fusRing(s), k = 0;
-        while (k < 2 && r[k + 1][0] < x) k++;
-        return r[k][1] + (r[k + 1][1] - r[k][1]) * clamp((x - r[k][0]) / (r[k + 1][0] - r[k][0]), 0, 1);
+  // chunk geometries by group: {static: [{mat, geo}], crew: [...], stabL: [...], ...}, decoded once
+  var GEO = null;
+  function geometries() {
+    if (GEO) return GEO;
+    GEO = {};
+    F.chunks.forEach(function (c) {
+      var q = unb64(c.p, Int16Array), nq = unb64(c.nrm, Int8Array), idx = unb64(c.idx, c.i32 ? Uint32Array : Uint16Array);
+      var pos = new Float32Array(c.n * 3), nrm = new Float32Array(c.n * 3), k, x, y, z, l;
+      for (k = 0; k < c.n * 3; k++) pos[k] = c.lo[k % 3] + (q[k] + 32768) / 65535 * c.ext[k % 3];
+      for (k = 0; k < c.n; k++) {
+        x = nq[3 * k]; y = nq[3 * k + 1]; z = nq[3 * k + 2]; l = Math.sqrt(x * x + y * y + z * z) || 1;
+        nrm[3 * k] = x / l; nrm[3 * k + 1] = y / l; nrm[3 * k + 2] = z / l;
       }
-      return at(a) + (at(c) - at(a)) * clamp((z - a[0]) / (c[0] - a[0]), 0, 1) + 0.008;
-    }
-    function inlay(pts, w) {
-      for (var i = 0; i < pts.length - 1; i++) {
-        var p = pts[i], q = pts[i + 1], dx = q[0] - p[0], dz = q[2] - p[2], l = Math.sqrt(dx * dx + dz * dz), sx = -dz / l * w / 2, sz = dx / l * w / 2;
-        b.face([[p[0] - sx, p[1], p[2] - sz], [p[0] + sx, p[1], p[2] + sz], [q[0] + sx, q[1], q[2] + sz], [q[0] - sx, q[1], q[2] - sz]],
-          C.black, [(p[0] + q[0]) / 2, p[1] - 1, (p[2] + q[2]) / 2]);
-      }
-    }
-    function wingLine(f, x0, x1) {                            // spanwise line at chord fraction f, upper skin
-      return [x0, x1].map(function (x) { return [x, wY(x) + foilY(f, wT(x)) + 0.008, wLE(x) + f * (wTE(x) - wLE(x))]; });
-    }
-    inlay(wingLine(0.14, 1.85, TIP - 0.06), 0.04);            // leading-edge flap
-    inlay(wingLine(0.8, 1.85, 2.97), 0.04);                   // inboard trailing-edge flap
-    inlay([0.6, 1.8, 3.0, 4.2, 4.9].map(function (z) { return [0.62, fusTopY(0.62, z), z]; }), 0.035);
-    [[1.3, 1.75], [1.95, 2.4]].forEach(function (zz) {        // dorsal vents
-      b.face([[0.18, fusTopY(0.18, zz[0]), zz[0]], [0.42, fusTopY(0.42, zz[0]), zz[0]], [0.42, fusTopY(0.42, zz[1]), zz[1]], [0.18, fusTopY(0.18, zz[1]), zz[1]]],
-        C.black, [0.3, 0, (zz[0] + zz[1]) / 2]);
+      var g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      (GEO[c.g] = GEO[c.g] || []).push({mat: c.m, geo: g});
     });
-    // nozzle shroud (fixed), heat-tinted toward the exit, with a lip down to the glowing liner (built in create());
-    // thin sidewalls run on to the exit and end in a sawtooth
-    function shroud(z, w, h, bulge) { return [[NX - w, NY + h, z], [NX + w, NY + h, z], [NX + w + bulge, NY, z], [NX + w, NY - h, z], [NX - w, NY - h, z], [NX - w - bulge, NY, z]]; }
-    loft(b, [shroud(5.4, 0.47, 0.4, 0.05), shroud(5.95, 0.46, 0.38, 0.05), shroud(6.25, 0.45, 0.36, 0.05), shroud(NZ + 0.03, 0.44, 0.34, 0.05)],
-      function (i) { return [C.metal, C.heat1, C.heat2][i]; }, {closed: true});
-    (function () {
-      var S = shroud(NZ + 0.03, 0.44, 0.34, 0.05), L = shroud(NZ + 0.03, LINER_W, LINER_H, 0), j;
-      for (j = 0; j < 6; j++) b.face([S[j], S[(j + 1) % 6], L[(j + 1) % 6], L[j]], C.burnt, [NX, NY, NZ - 1]);
-    })();
-    [-1, 1].forEach(function (sd) {
-      var x0 = NX + sd * 0.445, x1 = x0 + sd * 0.03, ze = NZ + 0.66, k, ya, yb, ym;
-      loft(b, [[[x0, NY + 0.34, NZ], [x1, NY + 0.34, NZ], [x1, NY - 0.34, NZ], [x0, NY - 0.34, NZ]],
-        [[x0, NY + 0.13, ze], [x1, NY + 0.13, ze], [x1, NY - 0.13, ze], [x0, NY - 0.13, ze]]],
-      fixed(C.heat1), {closed: true});
-      for (k = 0; k < 3; k++) {
-        ya = NY - 0.13 + k * 0.26 / 3; yb = ya + 0.26 / 3; ym = (ya + yb) / 2;
-        loft(b, [[[x0, ya, ze], [x1, ya, ze], [x1, yb, ze], [x0, yb, ze]], [[x0, ym, ze + 0.12], [x1, ym, ze + 0.12], [x1, ym, ze + 0.12], [x0, ym, ze + 0.12]]],
-          fixed(C.heat2), {closed: true});
-      }
-    });
-    b.mirrorX();
-    return b.geometry();
+    return GEO;
+  }
+  function chunk(group, mat) {
+    var list = geometries()[group] || [], i;
+    for (i = 0; i < list.length; i++) if (list[i].mat === mat) return list[i].geo;
+    return null;
   }
 
-  function buildCanopy() {                                    // one smooth bubble; the reflection does the shading
-    var b = new Builder();
-    loft(b, refineGrid(CANOPY.map(domeRing), 3, 3, true), fixed(C.glass), {sym: true});
-    b.mirrorX();
-    return b.geometry();
+  // ---------------------------------------------------------------- skin
+  // The three panel-line maps (R lines, G fasteners, B grime / panel tone) projected along the model axes and blended
+  // by |n|^6, as the Blender material does. Over a two-tone camouflage noise they darken the paint; the grime also
+  // sets the gloss, lines and fasteners give a slight bump, and the skin around the nozzles turns to burnt metal.
+  var SKIN_VS = 'varying vec3 vMP; varying vec3 vMN;\n';
+  var SKIN_FS = [
+    'uniform sampler2D tTop, tSide, tFront; uniform vec4 uTop, uSide, uFront; uniform vec3 uLight, uDark; uniform float uCamo, uBump, uHeatK;',
+    'varying vec3 vMP; varying vec3 vMN;',
+    'float sHash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }',
+    'float sNoise(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(mix(sHash(i), sHash(i + vec3(1.0, 0.0, 0.0)), f.x), mix(sHash(i + vec3(0.0, 1.0, 0.0)), sHash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),',
+    '    mix(mix(sHash(i + vec3(0.0, 0.0, 1.0)), sHash(i + vec3(1.0, 0.0, 1.0)), f.x), mix(sHash(i + vec3(0.0, 1.0, 1.0)), sHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z); }'
+  ].join('\n');
+  var SKIN_COLOUR = [
+    'vec3 sB = vec3(-vMP.z, -vMP.x, vMP.y);',                  // the maps' axes (Blender): x nose, y left, z up
+    'vec3 sW = pow(abs(normalize(vec3(-vMN.z, -vMN.x, vMN.y))), vec3(6.0)); sW /= sW.x + sW.y + sW.z;',
+    'vec3 sT = texture2D(tTop, (sB.xy - uTop.xz) / uTop.yw).rgb * sW.z + texture2D(tSide, (sB.xz - uSide.xz) / uSide.yw).rgb * sW.y',
+    '  + texture2D(tFront, (sB.yz - uFront.xz) / uFront.yw).rgb * sW.x;',
+    'vec3 sQ = vMP * 0.16 + vec3(3.7, 1.3, 8.1);',
+    'float sCam = smoothstep(0.505, 0.525, 0.5 * sNoise(sQ) + 0.3 * sNoise(sQ * 2.03) + 0.2 * sNoise(sQ * 4.1));',
+    'vec3 sCol = mix(uLight, uDark, sCam * uCamo) * mix(0.45, 1.0, sT.r) * mix(0.72, 1.0, sT.g) * (0.62 + 0.76 * sT.b);',
+    // heat: Blender's Perlin noise (detail 4) stays near 0.5, so sum octaves as for the camouflage; the tint is a
+    // metal (metallic 0.75): little diffuse, the rest is a reflection in its own colour (below and in the env term)
+    'vec3 sHq = vMP * 6.0; float sHn = 0.5 * sNoise(sHq) + 0.3 * sNoise(sHq * 2.03) + 0.2 * sNoise(sHq * 4.1);',
+    'float sHeat = uHeatK * clamp(clamp((-6.9 - sB.x) / 1.1, 0.0, 1.0) * clamp((0.75 - sB.z) / 0.4, 0.0, 1.0) * mix(0.6, 1.3, sHn), 0.0, 1.0);',
+    'vec3 sHc = sHn < 0.5 ? mix(vec3(0.30, 0.26, 0.22), vec3(0.22, 0.17, 0.14), sHn * 2.0) : mix(vec3(0.22, 0.17, 0.14), vec3(0.16, 0.16, 0.22), sHn * 2.0 - 1.0);',
+    'float sMet = 0.75 * sHeat;',
+    'diffuseColor.rgb *= mix(sCol, sHc, sHeat) * (1.0 - sMet);',
+    'float sRough = clamp(mix(0.72, 0.44, clamp((sT.b - 0.3) / 0.3, 0.0, 1.0)) + 0.14 * (sNoise(vMP * 1.4) - 0.5), 0.0, 1.0);',
+    'float sH = sT.r * sT.g + 0.25 * sT.b;'
+  ].join('\n');
+  // bump from the screen-space slope of the height (three.js's perturbNormalArb)
+  var SKIN_BUMP = [
+    '#if __VERSION__ >= 300 || defined(GL_OES_standard_derivatives)',
+    '{ vec3 sp = -vViewPosition, sx = dFdx(sp), sy = dFdy(sp), r1 = cross(sy, normal), r2 = cross(normal, sx);',
+    '  float det = dot(sx, r1) * faceDirection; vec2 dh = vec2(dFdx(sH), dFdy(sH)) * uBump;',
+    '  normal = normalize(abs(det) * normal - sign(det) * (dh.x * r1 + dh.y * r2)); }',
+    '#endif'
+  ].join('\n');
+  var TEX = null;
+  function skinTextures() {
+    if (TEX) return TEX;
+    TEX = {};
+    ['top', 'side', 'front'].forEach(function (k) {
+      var img = new Image(), t = new THREE.Texture(img);
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.anisotropy = 8;
+      img.onload = function () { t.needsUpdate = true; };
+      img.src = F.tex[k];                                      // data URI: no request, works from file:// too
+      TEX[k] = t;
+    });
+    return TEX;
   }
+  function skinMaterial(light, dark, camo, heat) {
+    var T = skinTextures(), M = F.maps;
+    var mat = new THREE.MeshPhongMaterial({color: 0xffffff, shininess: 38, specular: 0x262a30});
+    mat.extensions = {derivatives: true};
+    mat.onBeforeCompile = function (sh) {
+      envPatch(sh, 0.25);
+      sh.uniforms.tTop = {value: T.top}; sh.uniforms.tSide = {value: T.side}; sh.uniforms.tFront = {value: T.front};
+      ['top', 'side', 'front'].forEach(function (k) {
+        var m = M[k]; sh.uniforms['u' + k[0].toUpperCase() + k.slice(1)] = {value: new THREE.Vector4(m.u0, m.U, m.v0, m.V)};
+      });
+      sh.uniforms.uLight = {value: new THREE.Vector3().fromArray(light)}; sh.uniforms.uDark = {value: new THREE.Vector3().fromArray(dark)};
+      sh.uniforms.uCamo = {value: camo ? 1 : 0}; sh.uniforms.uHeatK = {value: heat === false ? 0 : 1}; sh.uniforms.uBump = {value: 0.0015};
+      sh.vertexShader = SKIN_VS + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vMP = position; vMN = normal;');
+      sh.fragmentShader = SKIN_FS + '\n' + sh.fragmentShader
+        .replace('#include <color_fragment>', '#include <color_fragment>\n' + SKIN_COLOUR)
+        .replace('#include <specularmap_fragment>', 'float specularStrength = 1.6 * (1.0 - sRough);')
+        .replace('outgoingLight += eC * uEnvK * eF;', 'outgoingLight += eC * (uEnvK * eF * (1.0 - sMet) + sMet * mix(sHc, vec3(1.0), eF));')
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SKIN_BUMP);
+    };
+    return mat;
+  }
+
+  // plain parts: [linear colour, roughness, metallic] as in the Blender materials (f15.py make_mats)
+  var PLAIN = {
+    F15_Cockpit: [[0.045, 0.048, 0.05], 0.7, 0], F15_Black: [[0.01, 0.01, 0.01], 0.5, 0], F15_Dielectric: [[0.05, 0.055, 0.06], 0.55, 0],
+    F15_Frame: [[0.10, 0.105, 0.11], 0.45, 0.2], F15_Marking: [[0.17, 0.185, 0.2], 0.55, 0], F15_Rail: [[0.32, 0.34, 0.36], 0.5, 0.3],
+    F15_Well: [[0.07, 0.075, 0.08], 0.65, 0], F15_IntakeDark: [[0.025, 0.026, 0.028], 0.75, 0], F15_IntakeWall: [[0.30, 0.31, 0.32], 0.6, 0],
+    F15_FlightSuit: [[0.16, 0.17, 0.10], 0.9, 0], F15_GVest: [[0.09, 0.10, 0.065], 0.85, 0], F15_Helmet: [[0.30, 0.31, 0.28], 0.45, 0],
+    F15_Visor: [[0.25, 0.16, 0.04], 0.05, 1], F15_Mask: [[0.03, 0.03, 0.03], 0.6, 0], F15_Seat: [[0.05, 0.055, 0.045], 0.8, 0],
+    F15_YellowBlack: [[0.8, 0.6, 0.02], 0.5, 0], F15_PanelBlack: [[0.015, 0.015, 0.016], 0.4, 0]
+  };
+  function plainMaterial(d) {
+    var c = new THREE.Color(d[0][0], d[0][1], d[0][2]), r = d[1], m = d[2];
+    var spec = new THREE.Color(0.04, 0.04, 0.04).lerp(c, m).multiplyScalar(1.6 * (1 - r));
+    var mat = new THREE.MeshPhongMaterial({color: c.clone().multiplyScalar(1 - 0.7 * m), specular: spec, shininess: clamp(2 / Math.pow(Math.max(r, 0.08), 4) - 2, 2, 150)});
+    return m > 0.1 || r < 0.5 ? envify(mat, 0.15 + 0.3 * m) : mat;
+  }
+  // burnt nozzle metal and the sooty insides of the flaps: colour ramps along the axis with a little noise, as vertex colours
+  function hash3(x, y, z) { var s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); }
+  function vnoise(x, y, z) {
+    var ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z), fx = x - ix, fy = y - iy, fz = z - iz, r = 0, a, b, c;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+    for (a = 0; a < 2; a++) for (b = 0; b < 2; b++) for (c = 0; c < 2; c++)
+      r += hash3(ix + a, iy + b, iz + c) * (a ? fx : 1 - fx) * (b ? fy : 1 - fy) * (c ? fz : 1 - fz);
+    return r;
+  }
+  function ramp(stops, t) {
+    var i = 1; t = clamp(t, 0, 1);
+    while (i < stops.length - 1 && stops[i][0] < t) i++;
+    var a = stops[i - 1], b = stops[i], w = clamp((t - a[0]) / (b[0] - a[0]), 0, 1);
+    return [a[1] + (b[1] - a[1]) * w, a[2] + (b[2] - a[2]) * w, a[3] + (b[3] - a[3]) * w];
+  }
+  function tintAlongZ(geo, z0, z1, top, amp, freq, stops) {
+    var p = geo.attributes.position, col = new Float32Array(p.count * 3), i, c;
+    for (i = 0; i < p.count; i++) {
+      c = ramp(stops, top * clamp((p.getZ(i) - z0) / (z1 - z0), 0, 1) + amp * vnoise(p.getX(i) * freq, p.getY(i) * freq, p.getZ(i) * freq));
+      col[3 * i] = c[0]; col[3 * i + 1] = c[1]; col[3 * i + 2] = c[2];
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  }
+  var METAL_RAMP = [[0, 0.42, 0.40, 0.38], [0.3, 0.36, 0.28, 0.20], [0.55, 0.20, 0.17, 0.25], [0.8, 0.16, 0.13, 0.11], [1, 0.10, 0.09, 0.08]];
+  var INNER_RAMP = [[0, 0.40, 0.37, 0.33], [0.4, 0.32, 0.29, 0.25], [0.75, 0.16, 0.145, 0.13], [1, 0.075, 0.07, 0.065]];
 
   // ---------------------------------------------------------------- engine fire
   // Plume: additive cone with a colour ramp along it, soft at grazing angles, churned by travelling turbulence.
@@ -357,9 +360,9 @@
       vertexShader: PLUME_VS, fragmentShader: PLUME_FS, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide
     });
   }
-  function plumeGeo(r0, r1, len) {                            // cone along +Z from the nozzle exit, flattened like the 2D nozzle
+  function plumeGeo(r0, r1, len) {                            // cone along +Z from the round nozzle exit
     var g = new THREE.CylinderGeometry(r1, r0, len, 24, 16, true);
-    g.rotateX(Math.PI / 2); g.translate(0, 0, len / 2); g.scale(1, 0.6, 1); return g;
+    g.rotateX(Math.PI / 2); g.translate(0, 0, len / 2); return g;
   }
   // Shock diamond: a rhombus that turns about the plume axis to face the camera (an axial billboard), so it keeps
   // its pointed shape from the side and becomes a bright knot when seen down the exhaust.
@@ -376,35 +379,14 @@
     g.setAttribute('aUV', new THREE.Float32BufferAttribute([-1, 0, 0, 1, 1, 0, 0, -1], 2));
     g.setIndex([0, 1, 2, 0, 2, 3]); return g;
   }
-  // Inside the nozzle: liner panels that glow hotter with depth (dull red at military power, white-orange in
-  // afterburner), and the flameholder rings at the back. aD = depth, 0 at the exit .. 1 at the flameholder.
-  var HOT_VS = 'attribute float aD; varying float vD; void main(){ vD=aD; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
-  var HOT_FS = 'uniform float uHeat,uAB,uT; varying float vD;\n' +
-    'void main(){ float s=fract(vD*7.0), rib=0.5+0.5*smoothstep(0.0,0.1,s)*smoothstep(1.0,0.86,s);\n' +
-    '  vec3 hot=mix(vec3(0.85,0.2,0.03),vec3(1.0,0.62,0.3),uAB)*(uHeat*0.8+uAB*1.7)*(0.06+0.94*pow(vD,1.3));\n' +
-    '  gl_FragColor=vec4(vec3(0.016,0.014,0.013)*rib+hot*rib*(0.93+0.07*sin(uT*53.0+vD*17.0)),1.0); }';
-  var HOLDER_VS = 'attribute vec2 aUV; varying vec2 vUV; void main(){ vUV=aUV; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
-  // round flameholder (concentric V-gutter rings on 8 spokes round a hot tail cone), seen through the 4:3 duct
-  var HOLDER_FS = 'uniform float uHeat,uAB,uT; varying vec2 vUV;\n' +
-    'void main(){ vec2 q=vUV*vec2(1.3,1.0); float r=length(q), a=atan(q.y,q.x);\n' +
-    '  float ring=smoothstep(0.08,0.0,abs(fract(r*2.6+0.3)-0.5)-0.07)*step(0.22,r);\n' +
-    '  float spoke=smoothstep(0.1,0.0,abs(sin(a*4.0))*r-0.015)*step(0.22,r)*step(r,1.05);\n' +
-    '  float cone=smoothstep(0.24,0.12,r);\n' +
-    '  vec3 hot=mix(vec3(0.9,0.22,0.04),vec3(1.0,0.78,0.5),uAB)*(uHeat*0.9+uAB*2.0);\n' +
-    '  float k=0.12+0.8*cone+0.95*max(ring,spoke*0.8)*(0.6+0.4*(1.0-min(r,1.0)));\n' +
-    '  gl_FragColor=vec4(vec3(0.012)+hot*k*(0.9+0.1*sin(uT*61.0+r*9.0)),1.0); }';
-  function quadsGeo(quads, attr, size) {                      // quads: [p0, p1, p2, p3, a0, a1, a2, a3] (a: attr per corner)
-    var pos = [], at = [], idx = [], i, k, q;
-    for (i = 0; i < quads.length; i++) {
-      q = quads[i];
-      for (k = 0; k < 4; k++) { pos.push(q[k][0], q[k][1], q[k][2]); at.push.apply(at, size > 1 ? q[4 + k] : [q[4 + k]]); }
-      idx.push(4 * i, 4 * i + 1, 4 * i + 2, 4 * i, 4 * i + 2, 4 * i + 3);
-    }
-    var g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute(attr, new THREE.Float32BufferAttribute(at, size));
-    g.setIndex(idx); return g;
-  }
+  // Inside the engine: the corrugated afterburner liner, flameholder and turbine glow hotter with depth (dull red at
+  // military power, white-orange in afterburner). Depth runs from the liner's exit (0) to the flameholder (1).
+  var HOT_VS = 'uniform vec2 uHotZ; varying float vD; varying vec3 vN;\n' +
+    'void main(){ vD=clamp((uHotZ.x-position.z)/(uHotZ.x-uHotZ.y),0.0,1.25); vN=normal; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
+  var HOT_FS = 'uniform float uHeat,uAB,uT; varying float vD; varying vec3 vN;\n' +
+    'void main(){ float d=min(vD,1.0), sh=0.75+0.25*abs(normalize(vN).z);\n' +
+    '  vec3 hot=mix(vec3(0.85,0.2,0.03),vec3(1.0,0.62,0.3),uAB)*(uHeat*0.8+uAB*1.7)*(0.06+0.94*pow(d,1.3));\n' +
+    '  gl_FragColor=vec4((vec3(0.016,0.014,0.013)+hot*(0.93+0.07*sin(uT*53.0+vD*17.0)))*sh,1.0); }';
   var GLOW = null;
   function glowTexture() {
     if (GLOW) return GLOW;
@@ -425,21 +407,20 @@
   var VAPOR_FS = 'uniform float uI,uT; varying float vF; varying vec3 vP;\n' +
     'void main(){ float n=0.7+0.3*sin(uT*37.0+vP.x*2.9+vP.z*5.3)*sin(uT*23.0-vP.z*3.7+vP.x);\n' +
     '  gl_FragColor=vec4(0.93,0.95,1.0,clamp(uI*vF*n,0.0,1.0)); }';
-  // Condensation sheet hugging the wing tops (both wings), densest just aft of the leading edge.
+  // Condensation sheet hugging the wing tops (both wings), densest just aft of the leading edge: lifted off the
+  // exported upper-skin grid (span x chord, root to tip, leading edge back).
+  var VAP_FS = [0.4, 0.95, 1, 0.75, 0.15], VAP_FC = [0.3, 0.9, 1, 0.6, 0];
   function vaporGeo(lift) {
-    var xs = [1.7, 2.6, 3.6, 4.6, 5.35], fx = [0.4, 0.95, 1, 0.75, 0.15], cs = [0, 0.12, 0.3, 0.5, 0.66], fc = [0.3, 0.9, 1, 0.6, 0];
-    var pos = [], fade = [], idx = [], i, j, x, t, f, y, nc = cs.length, base;
-    for (var sd = 1; sd >= -1; sd -= 2) {
-      base = pos.length / 3;
-      for (i = 0; i < xs.length; i++) for (j = 0; j < nc; j++) {
-        x = xs[i]; t = wT(x); f = cs[j];
-        y = wY(x) + foilY(f, t) + lift;
-        pos.push(sd * x, y, wLE(x) + f * (wTE(x) - wLE(x))); fade.push(fx[i] * fc[j]);
+    var pos = [], fade = [], idx = [], nc = VAP_FC.length, i, j, base, grid, p;
+    ['vaporR', 'vaporL'].forEach(function (k) {
+      grid = F.pts[k]; base = pos.length / 3;
+      for (i = 0; i < VAP_FS.length; i++) for (j = 0; j < nc; j++) {
+        p = place(grid[i * nc + j]); pos.push(p[0], p[1] + lift, p[2]); fade.push(VAP_FS[i] * VAP_FC[j]);
       }
-      for (i = 0; i < xs.length - 1; i++) for (j = 0; j < nc - 1; j++) {
+      for (i = 0; i < VAP_FS.length - 1; i++) for (j = 0; j < nc - 1; j++) {
         var a = base + i * nc + j; idx.push(a, a + 1, a + nc, a + 1, a + nc + 1, a + nc);
       }
-    }
+    });
     var g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('aF', new THREE.Float32BufferAttribute(fade, 1));
@@ -452,113 +433,89 @@
   // ================================================================= the jet
   function create(scene) {
     var group = new THREE.Group(), body = new THREE.Group(), tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3();
-    var skinMat = envify(new THREE.MeshPhongMaterial({vertexColors: true, shininess: 55, specular: 0x343a44}), 0.25);
-    var glassMat = envify(new THREE.MeshPhongMaterial({vertexColors: true, emissive: 0x0e0701, specular: 0xffe2a8, shininess: 120}), 1.2);
-    var hemi = null;
-    body.scale.setScalar(SCALE); group.add(body);
-    body.add(new THREE.Mesh(buildAirframe(), skinMat));
-    body.add(new THREE.Mesh(buildCanopy(), glassMat));
+    var P = F.pts, hemi = null;
+    body.scale.setScalar(SCALE); body.position.fromArray(OFS); group.add(body);
 
-    // moving surfaces: built for the right side in airframe coordinates, mirrored for the left, hinged in a group
-    function hinged(bld, pivot) {
-      var r = new THREE.Group(), l = new THREE.Group();
-      r.position.set(pivot[0], pivot[1], pivot[2]); l.position.set(-pivot[0], pivot[1], pivot[2]);
-      r.add(new THREE.Mesh(bld.geometry(pivot), skinMat));
-      l.add(new THREE.Mesh(bld.mirrored().geometry([-pivot[0], pivot[1], pivot[2]]), skinMat));
-      body.add(r, l); return [r, l];
+    // materials by Blender material name
+    var LIGHT = [0.205, 0.225, 0.245], DARK = [0.118, 0.13, 0.145];
+    var hotM = new THREE.ShaderMaterial({uniforms: {uHeat: {value: 0}, uAB: {value: 0}, uT: {value: 0}, uHotZ: {value: new THREE.Vector2(P.hotZ[0], P.hotZ[1])}},
+      vertexShader: HOT_VS, fragmentShader: HOT_FS, side: THREE.DoubleSide});
+    var stripMat = new THREE.MeshBasicMaterial({color: 0x8dffc0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false});
+    var mats = {
+      F15_Skin: skinMaterial(LIGHT, DARK, true), F15_StabSkin: skinMaterial(LIGHT, DARK, true, false), F15_RadomeSkin: skinMaterial([0.15, 0.165, 0.18], [0.15, 0.165, 0.18], false),
+      F15_CanopyGlass: envify(new THREE.MeshPhongMaterial({color: 0x0b0a07, specular: 0xffe2a8, shininess: 120, transparent: true, opacity: 0.32, depthWrite: false}), 1.2, 0.7),
+      F15_HUDGlass: envify(new THREE.MeshPhongMaterial({color: 0x0a1a10, specular: 0x88ffaa, shininess: 120, transparent: true, opacity: 0.3, depthWrite: false}), 0.8, 0.5),
+      F15_Formation: stripMat, F15_NozzleLiner: hotM, F15_Turbine: hotM,
+      F15_NozzleMetal: envify(new THREE.MeshPhongMaterial({vertexColors: true, color: 0x5a5a5a, specular: 0x6a625a, shininess: 30}), 0.45),
+      F15_NozzleInner: new THREE.MeshPhongMaterial({vertexColors: true, shininess: 6, specular: 0x111111})
+    };
+    mats.F15_Marking = plainMaterial(PLAIN.F15_Marking);
+    mats.F15_Marking.polygonOffset = true; mats.F15_Marking.polygonOffsetFactor = -1; mats.F15_Marking.polygonOffsetUnits = -2;
+    function material(name, grp) {
+      if (name === 'F15_Skin' && /^stab/.test(grp)) name = 'F15_StabSkin';   // the heat tint stops at the tail booms
+      return mats[name] || (mats[name] = plainMaterial(PLAIN[name] || [[0.1, 0.1, 0.1], 0.6, 0]));
     }
-    function axisOf(a, b) { return [new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]).normalize(), new THREE.Vector3(a[0] - b[0], b[1] - a[1], b[2] - a[2]).normalize()]; }
-    // flaperons (roll)
-    function flapRing(x) { return tailRing(wingAt(x), wLE(x), wTE(x) - wLE(x), wT(x), wHingeF(x)); }
-    var fb = new Builder(), fA = flapRing(3.03), fB = flapRing(TIP - 0.02);
-    loft(fb, [fA, fB], function (i, j) { return j < 2 ? C.top : j < 4 ? C.belly : C.dark; }, {closed: true, capA: C.dark, capB: C.edge, group: tailGroup});
-    var flapPivot = mid(fA[0], fA[4]), flapAxis = axisOf(flapPivot, mid(fB[0], fB[4])), flap = hinged(fb, flapPivot);
-    // all-moving stabilators (pitch, plus differential for roll)
-    function stabFoil(x) { return foil(function (z, v) { return [x, SY + v, z]; }, sLE(x), sTE(x) - sLE(x), 0.14 - (x - 1.15) * 0.04, 1); }
-    var sb = new Builder();
-    loft(sb, [stabFoil(1.15), stabFoil(3.6)], foilPaint, {closed: true, capA: C.dark, capB: C.edge, group: foilGroup});
-    var stab = hinged(sb, [1.25, SY, 6.2]);
-    // rudders
-    function rudRing(u) { return tailRing(finAt(u), fLE(u), fTE(u) - fLE(u), fT(u), fHingeF(u)); }
-    var rb = new Builder(), rA = rudRing(0.02), rB = rudRing(2.97);
-    loft(rb, [rA, rB], function (i, j) { return j < 4 ? C.side : C.dark; }, {closed: true, capA: C.dark, capB: C.edge, group: tailGroup});
-    var rudPivot = mid(rA[0], rA[4]), rudAxis = axisOf(rudPivot, mid(rB[0], rB[4])), rud = hinged(rb, rudPivot);
+    function addGroup(parent, name, pivot) {
+      (geometries()[name] || []).forEach(function (c) {
+        if (c.mat === 'F15_NozzleMetal' && !c.geo.attributes.color) tintAlongZ(c.geo, P.metalRamp[0], P.metalRamp[1], 1, 0.25 * 0.6, 12, METAL_RAMP);
+        if (c.mat === 'F15_NozzleInner' && !c.geo.attributes.color) tintAlongZ(c.geo, P.innerRamp[0], P.innerRamp[1], 0.7, 0.35 * 0.6, 25, INNER_RAMP);
+        var m = new THREE.Mesh(c.geo, material(c.mat, name));
+        if (pivot) m.position.set(-pivot[0], -pivot[1], -pivot[2]);
+        if (c.mat === 'F15_CanopyGlass' || c.mat === 'F15_HUDGlass') m.renderOrder = 2;
+        parent.add(m);
+      });
+    }
+    // hinged parts: a group at the pivot; the mesh keeps its model coordinates (the skin maps are painted in them)
+    function hinged(name) {
+      var gdef = F.groups[name], g = new THREE.Group();
+      g.position.fromArray(gdef.pivot); body.add(g); addGroup(g, name, gdef.pivot);
+      if (gdef.hinge) g.axis = new THREE.Vector3().fromArray(gdef.hinge[1]).sub(new THREE.Vector3().fromArray(gdef.hinge[0])).normalize();
+      return g;
+    }
+    addGroup(body, 'static');
+    var crew = new THREE.Group(); body.add(crew); addGroup(crew, 'crew');
+    var stab = [hinged('stabR'), hinged('stabL')], ail = [hinged('ailR'), hinged('ailL')], rud = [hinged('rudR'), hinged('rudL')];
+    var inlet = [hinged('inletR'), hinged('inletL')], sbrake = hinged('sb');
+    // speed brake actuator: from its fixed end in the bay to a point under the panel that swings with it
+    var rodA = new THREE.Vector3().fromArray(P.sbRod[0]), rodB0 = new THREE.Vector3().fromArray(P.sbRod[1]).sub(sbrake.position);
+    var rod = new THREE.Mesh(new THREE.CylinderGeometry(P.sbRod[2] * 0.9, P.sbRod[2], 1, 10), mats.F15_NozzleMetal.clone());
+    rod.material.vertexColors = false; rod.material.color.setRGB(0.3, 0.29, 0.27); body.add(rod);
+    var inletA = 0;
 
-    // 2D thrust-vectoring nozzles: upper/lower flaps converge on the exit, the fire hangs off them
-    var nb = new Builder(), w = 0.42;
-    [1, -1].forEach(function (sd) {
-      loft(nb, [[[-w, 0.33 * sd, 0], [w, 0.33 * sd, 0], [w, 0.27 * sd, 0], [-w, 0.27 * sd, 0]],
-        [[-w, 0.19 * sd, NLEN], [w, 0.19 * sd, NLEN], [w, 0.15 * sd, NLEN], [-w, 0.15 * sd, NLEN]]],
-      function () { return function (nx, ny) { return ny * sd < 0 ? C.burnt : C.heat2; }; }, {closed: true, capB: C.burnt});
-    });
-    var nozGeo = nb.geometry(), DN = 0.12;                     // the flaps sit just aft of the liner: barely "deep"
-    // glowing insides, shared by both engines: liner + flameholder (fixed), and the flaps' inner faces (they vector)
-    var hotM = new THREE.ShaderMaterial({uniforms: {uHeat: {value: 0}, uAB: {value: 0}, uT: {value: 0}}, vertexShader: HOT_VS, fragmentShader: HOT_FS, side: THREE.DoubleSide});
-    var holderM = new THREE.ShaderMaterial({uniforms: hotM.uniforms, vertexShader: HOLDER_VS, fragmentShader: HOLDER_FS});
-    var flapHotG = quadsGeo([1, -1].map(function (sd) {
-      var y0 = (0.27 - 0.004) * sd, y1 = (0.15 - 0.004) * sd;
-      return [[-w + 0.01, y0, 0], [w - 0.01, y0, 0], [w - 0.01, y1, NLEN], [-w + 0.01, y1, NLEN], DN, DN, 0, 0];
-    }), 'aD', 1);
-    [1, -1].forEach(function (sd) {
-      var cx = sd * NX, z0 = NZ + 0.03, z1 = NZ + 0.03 - LINER_D, a = [[-1, 1], [1, 1], [1, -1], [-1, -1]], q = [], k, k2;
-      for (k = 0; k < 4; k++) {
-        k2 = (k + 1) % 4;
-        q.push([[cx + a[k][0] * LINER_W, NY + a[k][1] * LINER_H, z0], [cx + a[k2][0] * LINER_W, NY + a[k2][1] * LINER_H, z0],
-          [cx + a[k2][0] * (LINER_W - 0.02), NY + a[k2][1] * (LINER_H - 0.02), z1], [cx + a[k][0] * (LINER_W - 0.02), NY + a[k][1] * (LINER_H - 0.02), z1], 0, 0, 1, 1]);
-      }
-      body.add(new THREE.Mesh(quadsGeo(q, 'aD', 1), hotM));
-      body.add(new THREE.Mesh(quadsGeo([[[cx - LINER_W + 0.02, NY - LINER_H + 0.02, z1], [cx + LINER_W - 0.02, NY - LINER_H + 0.02, z1],
-        [cx + LINER_W - 0.02, NY + LINER_H - 0.02, z1], [cx - LINER_W + 0.02, NY + LINER_H - 0.02, z1], [-1, -1], [1, -1], [1, 1], [-1, 1]]], 'aUV', 2), holderM));
-    });
-    var coreM = plumeMat(0xfff6e6, 0xffa848, 0xc03010, 2.6, 1.1),
-      outerM = plumeMat(0x8a8cff, 0xff7a2a, 0x601008, 6.5, 1.5), heatM = plumeMat(0xff9a50, 0xff5a20, 0x401008, 2.8, 2.2);
-    var coreG = plumeGeo(0.33, 0.05, 2.6), outerG = plumeGeo(0.44, 0.18, 6.5), heatG = plumeGeo(0.36, 0.22, 2.8);
-    var diamondG = diamondGeo(), noz = [], fire = [];
-    [1, -1].forEach(function (sd) {
-      var g = new THREE.Group(), f = {diamonds: []};
-      g.position.set(sd * NX, NY, NZ); g.add(new THREE.Mesh(nozGeo, skinMat), new THREE.Mesh(flapHotG, hotM));
-      var ex = new THREE.Group(); ex.position.z = NLEN; g.add(ex);
+    // afterburner: plume, shock diamonds and exit glow on each round nozzle (effects live in unscaled body axes)
+    var R0 = P.nozzleR0 * SCALE;
+    var coreM = plumeMat(0xfff6e6, 0xffa848, 0xc03010, 3.0, 1.1),
+      outerM = plumeMat(0x8a8cff, 0xff7a2a, 0x601008, 7.5, 1.5), heatM = plumeMat(0xff9a50, 0xff5a20, 0x401008, 3.2, 2.2);
+    var coreG = plumeGeo(R0 * 0.9, R0 * 0.14, 3.0), outerG = plumeGeo(R0 * 1.15, R0 * 0.5, 7.5), heatG = plumeGeo(R0, R0 * 0.62, 3.2);
+    var diamondG = diamondGeo(), fire = [];
+    ['nozzleR', 'nozzleL'].forEach(function (k) {
+      var ex = new THREE.Group(), f = {diamonds: []};
+      ex.position.fromArray(place(P[k])); group.add(ex);
       f.heat = new THREE.Mesh(heatG, heatM); f.core = new THREE.Mesh(coreG, coreM); f.outer = new THREE.Mesh(outerG, outerM);
       ex.add(f.heat, f.outer, f.core);
-      for (var k = 0; k < 5; k++) {
-        var d = new THREE.Mesh(diamondG, new THREE.ShaderMaterial({uniforms: {uLen: {value: 0.42 * (1 - k * 0.07)}, uWid: {value: 0.15 * (1 - k * 0.1)},
+      for (var j = 0; j < 5; j++) {
+        var d = new THREE.Mesh(diamondG, new THREE.ShaderMaterial({uniforms: {uLen: {value: 0.48 * (1 - j * 0.07)}, uWid: {value: 0.18 * (1 - j * 0.1)},
           uCol: {value: new THREE.Color(0xffd9a0)}, uI: {value: 0}}, vertexShader: DIAMOND_VS, fragmentShader: DIAMOND_FS,
           transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide}));
-        d.frustumCulled = false; d.position.z = 0.45 + k * 0.66; d.z0 = d.position.z; ex.add(d); f.diamonds.push(d);
+        d.frustumCulled = false; d.position.z = 0.5 + j * 0.74; d.z0 = d.position.z; ex.add(d); f.diamonds.push(d);
       }
-      f.glow = glowSprite(0xff7a30, 1.6); f.glow.position.z = 0.12; ex.add(f.glow);
-      body.add(g); noz.push(g); fire.push(f);
+      f.glow = glowSprite(0xff7a30, 1.7); f.glow.position.z = 0.1; ex.add(f.glow);
+      fire.push(f);
     });
     var prevAB = 0, pop = 0;                                    // afterburner light-up flash
 
-    // lights: red/green wingtip navigation lights, white strobes, green formation strips
-    var tipY = wY(TIP), navZ = wLE(TIP) + 0.45;
+    // lights: red (left) / green (right) navigation lights on the wingtips, red anti-collision beacons on the fin tips
     var navR = glowSprite(0x30ff70, 1.1), navL = glowSprite(0xff2a20, 1.1);
-    navR.position.set(TIP + 0.05, tipY, navZ); navL.position.set(-TIP - 0.05, tipY, navZ);
-    var strobes = [glowSprite(0xffffff, 2.4), glowSprite(0xffffff, 2.4)];
-    strobes[0].position.set(TIP + 0.05, tipY, wTE(TIP) - 0.15); strobes[1].position.set(-TIP - 0.05, tipY, wTE(TIP) - 0.15);
-    body.add(navR, navL, strobes[0], strobes[1]);
-    var lb = new Builder();
-    (function () {
-      var o = 0.015, zt = wLE(TIP - 0.3);
-      function finSurf(u, dz) { return finPt(u, fLE(u) + dz, foilY(dz / (fTE(u) - fLE(u)), fT(u)) + o); }   // fin outer skin
-      function wingSurf(x, z) { return [x, wY(x) + foilY((z - wLE(x)) / (wTE(x) - wLE(x)), wT(x)) + o, z]; } // wing upper skin
-      lb.face([finSurf(1.9, 0.32), finSurf(2.7, 0.32), finSurf(2.7, 0.5), finSurf(1.9, 0.5)], 0xffffff, [0, 0, 0]);
-      var r0 = fusRing(FUS[3]), r1 = fusRing(FUS[4]);             // forward fuselage, just above the chine
-      lb.face([lerp3(r0[2], r0[3], 0.55), lerp3(r1[2], r1[3], 0.55), lerp3(r1[2], r1[3], 0.68), lerp3(r0[2], r0[3], 0.68)].map(function (p) {
-        return [p[0] + 0.02, p[1] + 0.016, p[2]];
-      }), 0xffffff, [0, 0, -5]);
-      lb.face([wingSurf(TIP - 0.45, zt + 0.3), wingSurf(TIP - 0.08, zt + 0.55), wingSurf(TIP - 0.08, zt + 0.75), wingSurf(TIP - 0.45, zt + 0.5)], 0xffffff, [TIP, -5, 0]);
-    })();
-    lb.mirrorX();
-    var stripMat = new THREE.MeshBasicMaterial({color: 0x8dffc0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false});
-    var strips = new THREE.Mesh(lb.geometry(), stripMat); body.add(strips);
+    navR.position.fromArray(place(P.navR)); navL.position.fromArray(place(P.navL)); navR.position.x += 0.04; navL.position.x -= 0.04;
+    var strobes = [glowSprite(0xff3a20, 2.2), glowSprite(0xff3a20, 2.2)];
+    strobes[0].position.fromArray(place(P.beaconR)); strobes[1].position.fromArray(place(P.beaconL));
+    group.add(navR, navL, strobes[0], strobes[1]);
 
     // vapour: a sheet over the wings at high g, and world-space vortex trails off the wingtips
     var vaporM = new THREE.ShaderMaterial({uniforms: {uI: {value: 0}, uT: {value: 0}}, vertexShader: VAPOR_VS, fragmentShader: VAPOR_FS,
       transparent: true, depthWrite: false, side: THREE.DoubleSide});
     var vapor = [new THREE.Mesh(vaporGeo(0.05), vaporM), new THREE.Mesh(vaporGeo(0.22), vaporM)];
-    vapor[1].scale.set(1.02, 1, 1.04); body.add(vapor[0], vapor[1]);
+    vapor[1].scale.set(1.02, 1, 1.03); group.add(vapor[0], vapor[1]);
     var trailM = new THREE.ShaderMaterial({vertexShader: TRAIL_VS, fragmentShader: TRAIL_FS, transparent: true, depthWrite: false, side: THREE.DoubleSide});
     function makeTrail() {
       var g = new THREE.BufferGeometry(), idx = [], i;
@@ -569,7 +526,7 @@
       var m = new THREE.Mesh(g, trailM); m.frustumCulled = false; m.visible = false; scene.add(m);
       return {mesh: m, p: new Float32Array(TRAIL_N * 3), s: new Float32Array(TRAIL_N), n: 0};
     }
-    var trails = [makeTrail(), makeTrail()], tipLocal = [new THREE.Vector3(TIP, tipY, wTE(TIP) - 0.2), new THREE.Vector3(-TIP, tipY, wTE(TIP) - 0.2)];
+    var trails = [makeTrail(), makeTrail()], tipLocal = [new THREE.Vector3().fromArray(place(P.tipR)), new THREE.Vector3().fromArray(place(P.tipL))];
     function feedTrail(t, p, s) {
       var k = (t.n > 0) ? (p.x - t.p[0]) * (p.x - t.p[0]) + (p.y - t.p[1]) * (p.y - t.p[1]) + (p.z - t.p[2]) * (p.z - t.p[2]) : 0;
       if (k > 80 * 80) t.n = 0;                                  // teleported: start over
@@ -596,11 +553,18 @@
     }
     // landing gear, in the flight model's own (unscaled) body axes. Built on first use from fm.params, so it only
     // exists when the flight model has gear: fm.gearPos 0 = up .. 1 = down, fm.gearComp = [nose, left, right] strut compression.
+    // The tyres sit on the flight model's contact points; the legs hinge just inside the F-15's belly (found by a ray).
     var gearMat = new THREE.MeshPhongMaterial({color: 0x8d939b, shininess: 50, specular: 0x333333});
     var tyreMat = new THREE.MeshPhongMaterial({color: 0x101114, shininess: 6});
-    var doorMat = envify(new THREE.MeshPhongMaterial({color: C.belly, shininess: 45, specular: 0x262b33}), 0.25);
+    var doorMat = envify(new THREE.MeshPhongMaterial({color: new THREE.Color(LIGHT[0], LIGHT[1], LIGHT[2]), shininess: 38, specular: 0x262a30}), 0.25);
     var gear = null;
-    function rod(a, b, r) {
+    function bellyY(x, z) {                                     // body-axes height of the airframe's underside at (x, z)
+      var probe = new THREE.Mesh(chunk('static', 'F15_Skin'), new THREE.MeshBasicMaterial()), rc = new THREE.Raycaster(), hit;
+      rc.set(new THREE.Vector3((x - OFS[0]) / SCALE, -5, (z - OFS[2]) / SCALE), new THREE.Vector3(0, 1, 0));
+      probe.updateMatrixWorld(); hit = rc.intersectObject(probe)[0];
+      return hit ? hit.point.y * SCALE + OFS[1] : -0.5;
+    }
+    function rod3(a, b, r) {
       var d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.length(), 10), gearMat);
       m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
       m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); return m;
@@ -611,22 +575,22 @@
       var tyre = new THREE.Mesh(new THREE.CylinderGeometry(r, r, w, 20), tyreMat), hub = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.55, r * 0.55, w + 0.03, 14), gearMat);
       g.position.set(pivot[0], pivot[1], pivot[2]);
       tyre.rotation.z = hub.rotation.z = Math.PI / 2; tyre.position.fromArray(D); hub.position.fromArray(D);
-      g.add(rod([0, 0, 0], [D[0] * 0.62, D[1] * 0.62, D[2] * 0.62], r * 0.24), rod([D[0] * 0.15, D[1] * 0.15, D[2] * 0.15 - 0.5], [D[0] * 0.5, D[1] * 0.5, D[2] * 0.5], 0.035));
-      oleo.add(rod([D[0] * 0.5, D[1] * 0.5, D[2] * 0.5], D, r * 0.15), tyre, hub); g.add(oleo);
+      g.add(rod3([0, 0, 0], [D[0] * 0.62, D[1] * 0.62, D[2] * 0.62], r * 0.24), rod3([D[0] * 0.15, D[1] * 0.15, D[2] * 0.15 - 0.5], [D[0] * 0.5, D[1] * 0.5, D[2] * 0.5], 0.035));
+      oleo.add(rod3([D[0] * 0.5, D[1] * 0.5, D[2] * 0.5], D, r * 0.15), tyre, hub); g.add(oleo);
       return {g: g, oleo: oleo, D: D};
     }
     function makeDoor(hinge, w, l, dir) {                       // panel hinged along z at `hinge`, extending w along dir*x
-      var g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, l), doorMat);
-      m.position.x = dir * w / 2; g.position.set(hinge[0], hinge[1], hinge[2]); g.add(m); return g;
+      var g = new THREE.Group(), m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, l), doorMat);
+      m.position.set(dir * w / 2, -0.01, 0); g.position.set(hinge[0], hinge[1], hinge[2]); g.add(m); return g;
     }
-    function buildGear(P) {
-      var gg = new THREE.Group(), y = P.gearY, xm = P.gearTrack / 2, zn = P.gearNoseZ, zm = P.gearMainZ, rn = 0.27, rm = 0.38;
-      gear = {root: gg, nose: makeLeg([0, -0.42, zn], [0, y + rn, zn], rn, 0.18), mains: [], doors: [], light: glowSprite(0xfff0d8, 1.8)};
+    function buildGear(Pm) {
+      var gg = new THREE.Group(), y = Pm.gearY, xm = Pm.gearTrack / 2, zn = Pm.gearNoseZ, zm = Pm.gearMainZ, rn = 0.27, rm = 0.38, xp = 0.95;
+      gear = {root: gg, nose: makeLeg([0, bellyY(0, zn) + 0.06, zn], [0, y + rn, zn], rn, 0.18), mains: [], doors: [], light: glowSprite(0xfff0d8, 1.8)};
       gg.add(gear.nose.g);
       [-1, 1].forEach(function (sd) {                         // [left, right], the order of fm.gearComp[1..2]
-        var l = makeLeg([sd * 1.35, -0.28, zm], [sd * xm, y + rm, zm], rm, 0.26);
-        l.tilt = Math.atan2(xm - 1.35, -0.28 - (y + rm)); l.sd = sd; gear.mains.push(l); gg.add(l.g);
-        var dm = makeDoor([sd * 0.3, -0.5, zm], 1.0, 1.5, sd), dn = makeDoor([sd * 0.21, -0.45, zn - 0.05], 0.2, 1.0, -sd);
+        var py = bellyY(sd * xp, zm) + 0.06, l = makeLeg([sd * xp, py, zm], [sd * xm, y + rm, zm], rm, 0.26);
+        l.tilt = Math.atan2(xm - xp, py - (y + rm)); l.sd = sd; gear.mains.push(l); gg.add(l.g);
+        var dm = makeDoor([sd * 0.42, bellyY(sd * 0.42, zm) - 0.004, zm], 0.5, 1.2, sd), dn = makeDoor([sd * 0.15, bellyY(sd * 0.15, zn) - 0.004, zn - 0.05], 0.14, 0.9, -sd);
         dm.sd = sd; dm.main = true; dn.sd = sd; gear.doors.push(dm, dn); gg.add(dm, dn);
       });
       var D = gear.nose.D; gear.light.position.set(0, D[1] * 0.78, -0.18); gear.nose.oleo.add(gear.light);
@@ -651,18 +615,26 @@
 
     function reset() { trails[0].n = trails[1].n = 0; vapI = 0; }
 
-    var vapI = 0, flick = [1, 1, 1, 1];
+    var vapI = 0, flick = [1, 1, 1, 1], hingeQ = new THREE.Quaternion();
     function update(fm, dt, o) {
       o = o || {};
       var de = fm.elevator || 0, da = fm.aileron || 0, dr = fm.rudder || 0, i, k, f, d;
+      // stabilators (pitch, differential for roll), ailerons, rudders; group rotation -x lifts the trailing edge
       stab[0].rotation.x = -(de + 0.5 * da); stab[1].rotation.x = -(de - 0.5 * da);
-      flap[0].quaternion.setFromAxisAngle(flapAxis[0], -da); flap[1].quaternion.setFromAxisAngle(flapAxis[1], -da);
-      var sb = 0.45 * (fm.speedBrakePos || 0);                 // speed brake: the rudders splay outward
-      rud[0].quaternion.setFromAxisAngle(rudAxis[0], dr + sb); rud[1].quaternion.setFromAxisAngle(rudAxis[1], dr - sb);
-      noz[0].rotation.x = noz[1].rotation.x = clamp(-0.8 * de, -0.35, 0.35);
+      ail[0].quaternion.setFromAxisAngle(ail[0].axis, -da); ail[1].quaternion.setFromAxisAngle(ail[1].axis, -da);
+      rud[0].quaternion.setFromAxisAngle(rud[0].axis, dr); rud[1].quaternion.setFromAxisAngle(rud[1].axis, dr);
+      // dorsal speed brake (its actuator follows), inlet cowls nod down with the angle of attack
+      sbrake.rotation.x = -P.sbOpen * (fm.speedBrakePos || 0);
+      tmp.copy(rodB0).applyQuaternion(hingeQ.setFromEuler(sbrake.rotation)).add(sbrake.position);
+      rod.position.copy(rodA).add(tmp).multiplyScalar(0.5); rod.scale.set(1, tmp.distanceTo(rodA), 1);
+      rod.quaternion.setFromUnitVectors(tmp2.set(0, 1, 0), tmp3.copy(tmp).sub(rodA).normalize());
+      var ia = clamp(0.7 * (fm.alpha || 0), P.inletRange[0], P.inletRange[1]);
+      if (dt > 0) inletA += (ia - inletA) * (1 - Math.exp(-dt * 4));
+      inlet[0].rotation.x = inlet[1].rotation.x = -inletA;
+      crew.visible = !o.cockpit;                               // the cockpit view's eye sits in the pilot's helmet
 
-      // engines: the liner and flameholder glow with throttle (dull red) and afterburner (white-orange); the plume,
-      // shock diamonds and exit glow grow with the afterburner level, with a flash as it lights
+      // engines: the liner, flameholder and turbine glow with throttle (dull red) and afterburner (white-orange); the
+      // plume, shock diamonds and exit glow grow with the afterburner level, with a flash as it lights
       var on = o.engine !== false, thr = on ? fm.throttleActual || 0 : 0, ab = on ? fm.afterburnerLevel || 0 : 0, time = o.time || 0;
       if (dt > 0) {
         for (i = 0; i < 4; i++) flick[i] = 0.9 + 0.2 * Math.random();
@@ -683,7 +655,7 @@
           d.material.uniforms.uI.value = ab * (1 - k * 0.17) * (0.85 + 0.3 * flick[(i + k + 1) % 4]) * (1 + pop);
         }
         f.glow.material.opacity = on ? 0.06 + 0.1 * thr * thr + 0.28 * ab + 0.35 * pop : 0;
-        f.glow.scale.set((1.1 + 0.9 * ab * flick[i]) * (1 + 0.8 * pop), (0.55 + 0.35 * ab * flick[i]) * (1 + 0.8 * pop), 1);
+        f.glow.scale.set((1.3 + 1.0 * ab * flick[i]) * (1 + 0.8 * pop), (1.3 + 1.0 * ab * flick[i]) * (1 + 0.8 * pop), 1);
       }
 
       // sky reflection follows the time of day through the scene's own hemisphere light and fog
@@ -711,7 +683,7 @@
       var ts = Math.max(sstep(3.5, 6.5, g), sstep(11 * DEG, 17 * DEG, al)) * sstep(60, 110, V);
       group.updateMatrixWorld(true);
       for (i = 0; i < 2; i++) {
-        if (dt > 0) feedTrail(trails[i], tmp.copy(tipLocal[i]).applyMatrix4(body.matrixWorld), ts);
+        if (dt > 0) feedTrail(trails[i], tmp.copy(tipLocal[i]).applyMatrix4(group.matrixWorld), ts);
         trails[i].mesh.visible = !!o.visible && trails[i].n > 1;
         if (trails[i].mesh.visible && o.camera) drawTrail(trails[i], o.camera.position);
       }
@@ -720,14 +692,35 @@
     return {root: group, update: update, reset: reset};
   }
 
-  // For the cockpit view (cockpit.js): the canopy glass in airframe metres, and its half sections (top centre ->
-  // sill, x >= 0) front to back, so the interior's sills and frames sit on the exterior glass edges.
-  function canopyGeometry() { var g = buildCanopy(); g.scale(SCALE, SCALE, SCALE); return g; }
-  function canopyRings() {
-    return refineGrid(CANOPY.map(domeRing), 3, 3, true).map(function (r) { return r.map(function (p) { return [p[0] * SCALE, p[1] * SCALE, p[2] * SCALE]; }); });
+  // For the cockpit view (cockpit.js): the whole canopy glass in body axes, and its half sections (top centre ->
+  // right sill, x >= 0) front to back as far as the aft frame, so the interior's sills and frames sit on the glass edges.
+  function canopyGeometry() {
+    var g = chunk('static', 'F15_CanopyGlass').clone();
+    g.scale(SCALE, SCALE, SCALE); g.translate(OFS[0], OFS[1], OFS[2]); return g;
   }
-  root.SkyrunnerJet = {create: create, canopyGeometry: canopyGeometry, canopyRings: canopyRings};
-  // shared with racer.js: the mesh builder, lofting, aerofoil rings, the sky-reflection skin and glow sprites
+  function canopyRings() { return F.pts.canopy.map(function (r) { return r.map(place); }); }
+  // The windscreen frame (its arch and lower edge) in body axes: it comes inside the world camera's near plane, so the
+  // cockpit draws it with the interior.
+  function windscreenFrame() {
+    var src = chunk('static', 'F15_Frame'), p = src.attributes.position, idx = src.index.array, keep = [], i, k, y, z;
+    for (i = 0; i < idx.length; i += 3) {
+      y = z = 0;
+      for (k = 0; k < 3; k++) { y += p.getY(idx[i + k]) / 3; z += p.getZ(idx[i + k]) / 3; }
+      y = y * SCALE + OFS[1]; z = z * SCALE + OFS[2];
+      if (y > 0.5 && z > -4.5 && z < -3.25) keep.push(idx[i], idx[i + 1], idx[i + 2]);
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', p.clone()); g.setAttribute('normal', src.attributes.normal.clone()); g.setIndex(keep);
+    g.scale(SCALE, SCALE, SCALE); g.translate(OFS[0], OFS[1], OFS[2]); return g;
+  }
+  // Points of the airframe the game checks against the ground (body axes): [x, y, z, what touched]
+  function bodyPoints() {
+    var P = F.pts;
+    return [place(P.belly).concat('胴体が地面に接触'), place(P.tail).concat('尾部を擦った（テールストライク）'),
+      place(P.nose).concat('機首が地面に接触'), place(P.tipL).concat('翼端が地面に接触'), place(P.tipR).concat('翼端が地面に接触')];
+  }
+  root.SkyrunnerJet = {create: create, canopyGeometry: canopyGeometry, canopyRings: canopyRings, windscreenFrame: windscreenFrame, bodyPoints: bodyPoints};
+  // shared with racer.js and cockpit.js: the mesh builder, lofting, aerofoil rings, the sky-reflection skin and glow sprites
   root.SkyrunnerKit = {Builder: Builder, loft: loft, refineGrid: refineGrid, foil: foil, foilY: foilY, foilGroup: foilGroup,
     tailRing: tailRing, tailGroup: tailGroup, envify: envify, ENV: ENV, glowSprite: glowSprite, mid: mid, clamp: clamp, sstep: sstep};
 })(typeof globalThis !== 'undefined' ? globalThis : window);

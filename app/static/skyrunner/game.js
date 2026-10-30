@@ -134,7 +134,7 @@ var VIEWS=["hud","cockpit","ext"], VIEW_NAME={hud:"HUD視点",cockpit:"コック
 try{ var savedView=localStorage.getItem("skyrunner.view"); if(VIEWS.indexOf(savedView)>=0) view=savedView; }catch(e){}
 var ckScene=new THREE.Scene(), ckCam=new THREE.PerspectiveCamera(70,1,0.02,30);
 var ckSun=new THREE.DirectionalLight(0xffffff,1), ckHemi=new THREE.HemisphereLight(0xffffff,0x000000,0.5); ckScene.add(ckSun,ckHemi);
-var cockpits={jet:SkyrunnerCockpit.create("jet",{rings:SkyrunnerJet.canopyRings(),canopy:SkyrunnerJet.canopyGeometry()}),
+var cockpits={jet:SkyrunnerCockpit.create("jet",{rings:SkyrunnerJet.canopyRings(),canopy:SkyrunnerJet.canopyGeometry(),frame:SkyrunnerJet.windscreenFrame()}),
   racer:SkyrunnerCockpit.create("racer",{rings:SkyrunnerRacer.canopyRings(),canopy:SkyrunnerRacer.canopyGeometry()})};
 ckScene.add(cockpits.jet.root,cockpits.racer.root);
 function cockpit(){ return mode==="race"?cockpits.racer:cockpits.jet; }
@@ -874,7 +874,7 @@ function openMenu(){
 // Crash rules. Race plane: any of its contact points (wheels, wingtips, propeller disc, tail) in the water or the
 // ground. Jet, gear up: the old 2.5 m CG clearance. Gear down and locked: the tyres may touch only the runway, no
 // other part of the airframe may touch at all, and the touchdown sink rate / strut travel must stay within limits.
-var BODY_PTS=[[0,-0.85,0,"胴体が地面に接触"],[0,-0.7,6.8,"尾部を擦った（テールストライク）"],[0,-0.3,-7.6,"機首が地面に接触"],[-4.75,-0.15,1.2,"翼端が地面に接触"],[4.75,-0.15,1.2,"翼端が地面に接触"]];
+var BODY_PTS=SkyrunnerJet.bodyPoints();
 function groundCheck(vsB,wowB){
   var i, p, x, z;
   if(mode==="race"){

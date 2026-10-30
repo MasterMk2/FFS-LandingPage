@@ -1,6 +1,6 @@
 /*
  * cockpit.js - the cockpit interiors for the cockpit view.
- *   Jet: a glass cockpit in the F-22 manner. HUD combiner on a deep glare shield, four colour displays (attitude,
+ *   Jet: a modern glass cockpit. HUD combiner on a deep glare shield, four colour displays (attitude,
  *   moving map, flight controls, engines with the alert list), two up-front displays and the keypad, a standby attitude
  *   ball and standby gauges, the gear handle with three greens, master warning / caution lamps, side-stick and twin
  *   throttles, rudder pedals and an ejection seat.
@@ -15,7 +15,8 @@
  * meant for a scene of its own, drawn after the world with the depth buffer cleared: it lies 0.2-1.2 m from the eye,
  * well inside the world camera's near plane.
  *
- *   var ck = SkyrunnerCockpit.create('jet', {rings: SkyrunnerJet.canopyRings(), canopy: SkyrunnerJet.canopyGeometry()});
+ *   var ck = SkyrunnerCockpit.create('jet', {rings: SkyrunnerJet.canopyRings(), canopy: SkyrunnerJet.canopyGeometry(),
+ *     frame: SkyrunnerJet.windscreenFrame()});   // frame (optional): exterior frame parts that come inside the near plane
  *   ck.root        the interior (body axes): add it to the cockpit scene
  *   ck.eye         design eye point; ck.combiner: HUD glass corners [bl, br, tr, tl] (body axes) or null (no HUD)
  *   ck.mirror      jet only: {target} - render the view aft from the eye into it (cockpit camera with layer 1 on:
@@ -444,14 +445,18 @@
   }
 
   // FCS: control surfaces on a planform, trim, gear, speed brake, stick and pedal positions
-  var PLAN = {fus: [[0, -7.6], [0.22, -7.0], [0.48, -6.05], [0.69, -4.92], [0.85, -3.72], [0.95, -2.59], [1.3, -1.15], [4.75, 1.96], [4.75, 3.09], [1.3, 4.14], [1.23, 4.32], [0.99, 4.2], [3.11, 6.1], [3.11, 6.76], [0.99, 7.14], [0.9, 7.6], [0, 7.5]],
-    flap: [[2.59, 2.93], [4.75, 2.72], [4.75, 3.09], [2.59, 3.75]], stab: [[0.99, 4.2], [3.11, 6.1], [3.11, 6.76], [0.99, 7.14]], fin: [[1.05, 2.2], [1.6, 4.9]]};
+  // the jet's right half in body axes [x, z] (traced from the airframe in aircraft.js): outline, aileron, stabilator, fin
+  var PLAN = {fus: [[0, -6.66], [0.19, -6.46], [0.32, -5.85], [0.41, -5.04], [0.46, -4.23], [0.5, -3.3], [0.95, -2.95], [1.05, -2.6], [1.15, -1.8],
+    [1.3, -1.0], [1.45, 0.1], [2.14, 0.4], [3.01, 1.6], [4.28, 2.85], [4.74, 3.25], [4.74, 3.67], [4.28, 4.45], [1.45, 4.68], [1.6, 5.12],
+    [2.21, 5.12], [3.17, 6.12], [2.33, 7.3], [1.83, 7.52], [1.4, 7.3], [0.85, 6.6], [0, 6.6]],
+    ail: [[3.01, 3.74], [4.03, 4.13], [3.66, 4.53], [3.01, 4.57]], stab: [[1.6, 5.12], [2.21, 5.12], [3.17, 6.12], [2.33, 7.3], [1.83, 7.52], [1.4, 7.3]],
+    fin: [[1.18, 5.1], [1.22, 6.9]]};
   function pageFCS(c, S, fm, o) {
     var cx = S * 0.4, cy = S * 0.47, kp = S * 0.026, inp = o.inp || {}, i, s;
     c.fillStyle = D.bg; c.fillRect(0, 0, S, S);
     function P(x, z) { return [cx + x * kp, cy + z * kp]; }
     function poly(pts, sx, fill, stroke) { c.beginPath(); pts.forEach(function (p, i) { var q = P(p[0] * sx, p[1]); if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); }); c.closePath(); if (fill) { c.fillStyle = fill; c.fill(); } if (stroke) { c.strokeStyle = stroke; c.stroke(); } }
-    var de = fm.elevator || 0, da = fm.aileron || 0, dr = fm.rudder || 0, sb = 0.45 * (fm.speedBrakePos || 0);
+    var de = fm.elevator || 0, da = fm.aileron || 0, dr = fm.rudder || 0;
     function col(a) { a = Math.abs(a * R2D); return a > 20 ? D.a : a > 2 ? D.g : '#1f6b38'; }
     c.lineWidth = 2;
     // full planform (both halves), surfaces filled by deflection
@@ -459,15 +464,13 @@
     c.closePath(); c.fillStyle = 'rgba(94,106,126,0.18)'; c.fill(); c.strokeStyle = D.dim; c.stroke();
     [1, -1].forEach(function (sd) {
       var fl = sd * da, stb = de + sd * 0.5 * da;
-      poly(PLAN.flap, sd, col(fl), D.w); poly(PLAN.stab, sd, col(stb), D.w);
+      poly(PLAN.ail, sd, col(fl), D.w); poly(PLAN.stab, sd, col(stb), D.w);
       var a = P(PLAN.fin[0][0] * sd, PLAN.fin[0][1]), b = P(PLAN.fin[1][0] * sd, PLAN.fin[1][1]); c.strokeStyle = col(dr); c.lineWidth = 6; line(c, a[0], a[1], b[0], b[1]); c.lineWidth = 2;
       c.font = Math.round(S * 0.032) + 'px ' + MONO; c.fillStyle = D.w; c.textAlign = 'center'; c.textBaseline = 'middle';
-      var f = P(sd * 3.7, 4.35), t = P(sd * 2.2, 7.9), r = P(sd * 1.35, 1.6);
+      var f = P(sd * 3.9, 5.0), t = P(sd * 2.2, 7.9), r = P(sd * 1.3, 4.3);
       c.fillText(((fl >= 0 ? '+' : '') + (fl * R2D).toFixed(0)), f[0], f[1]); c.fillText(((stb >= 0 ? '+' : '') + (stb * R2D).toFixed(0)), t[0], t[1]);
-      c.fillStyle = D.c; c.fillText(((dr + sd * sb) * R2D).toFixed(0), r[0] + sd * S * 0.05, r[1]);
+      c.fillStyle = D.c; c.fillText((dr * R2D).toFixed(0), r[0], r[1]);
     });
-    var tv = clamp(-0.8 * de, -0.35, 0.35) * R2D, nz = P(0, 8.5);
-    c.fillStyle = D.w; c.fillText('TV ' + (tv >= 0 ? '+' : '') + tv.toFixed(0) + '°', nz[0], nz[1]);
     // right column: trim, gear, speed brake
     var rx = S * 0.78;
     c.textAlign = 'left'; c.font = Math.round(S * 0.034) + 'px ' + MONO; c.fillStyle = D.w; c.fillText('PITCH TRIM', rx - S * 0.04, S * 0.13);
@@ -562,16 +565,19 @@
   // =================================================================== the jet
   function buildJet(opt) {
     var rootG = new THREE.Group(), EYE = new THREE.Vector3(0, 0.79, -3.0);
-    var U = sunUniforms([0.44, 0.43, -3.75, -1.95], [0.665, 0.38, -4.4, -3.5], [[0, 0.8, -2.92, 0.14], [0, 0.34, -2.82, 0.21], [0, 0.74, -2.57, 0.15]]), P = painter(U);
+    // the sun comes in above the exterior glass's sills, from under the glare shield back to the aft frame
+    var rings = opt.rings, sills = rings.map(function (r) { return r[r.length - 1]; }), sillW = Math.max.apply(null, sills.map(function (s) { return s[0]; }));
+    var U = sunUniforms([sills[0][1], sillW - 0.03, -3.75, rings[rings.length - 1][0][2] - 0.07], [0.665, 0.32, -4.2, -3.5],
+      [[0, 0.8, -2.92, 0.14], [0, 0.34, -2.82, 0.21], [0, 0.74, -2.57, 0.15]]), P = painter(U);
     P.U = U; P.dials = [];
     var PAINT = 0x0d0f12, CONS = 0x121418, BLACK = 0x040405, BEZEL = 0x060708, RAIL = 0x1d2024, METAL = 0x34383e, OLIVE = 0x14160c,
       SUIT = 0x32371e, GSUIT = 0x2a2615, GLOVE = 0x241b10, HARN = 0x1a1d10, YEL = 0xc98a02, PAD = 0x0b0c0d;
     var glintMat = glassMaterial({scratch: 0.25, fres: 0.12, tint: 0x020202});
 
     // ---- canopy: inner glass, sill rails along the exterior glass's lower edge, aft frame
-    var rings = opt.rings, sills = rings.map(function (r) { return r[r.length - 1]; });
     var canopyGlass = glassMaterial({side: THREE.BackSide, glowAt: [0, 0.32, -3.7], glowCol: 0x5dff9a, fres: 0.22, tint: 0x060403});
     mesh(rootG, opt.canopy, canopyGlass).renderOrder = 10;
+    if (opt.frame) mesh(rootG, opt.frame, P(0x15171a, 20, 0x202020));
     (function () {
       var b = new K.Builder(), rail = [], i, s;
       for (i = 0; i < sills.length; i++) {
@@ -588,23 +594,24 @@
       K.loft(b, arch, function () { return RAIL; }, {closed: true, capB: RAIL});
       b.mirrorX();
       mesh(rootG, b.geometry(), shade(new THREE.MeshPhongMaterial({vertexColors: true, shininess: 25, specular: 0x1a1a1a}), U));
-      // canopy seal (black rubber strip) and the jettison handle on the right rail
-      [-1, 1].forEach(function (sd) { var hp = sd * 0.40; box(rootG, 0.03, 0.02, 0.12, P(YEL, 20), hp, 0.47, -2.55); });
+      // jettison handles on the rails' inner faces
+      var hs = sills.reduce(function (a, s) { return Math.abs(s[2] + 2.55) < Math.abs(a[2] + 2.55) ? s : a; });
+      [-1, 1].forEach(function (sd) { box(rootG, 0.03, 0.02, 0.12, P(YEL, 20), sd * (hs[0] - 0.077), hs[1] - 0.03, -2.55); });
     })();
 
-    // ---- rear-view mirrors just inside the canopy's front quarters. The game renders the view aft from the eye into
+    // ---- rear-view mirrors just inside the windscreen bow, either side of the HUD. The game renders the view aft from the eye into
     // mirror.target; each mirror shows its own side of it, flipped. The pilot's helmet (layer 1) is seen only there.
     var mirrorRT = new THREE.WebGLRenderTarget(512, 160); mirrorRT.texture.encoding = THREE.sRGBEncoding;
     [[-1, 1, 0.5], [1, 0.5, 0]].forEach(function (m) {
-      var sd = m[0], M = new THREE.Vector3(sd * 0.22, 0.84, -3.66), v = M.clone().sub(EYE).normalize();
+      var sd = m[0], M = new THREE.Vector3(sd * 0.165, 0.825, -3.38), v = M.clone().sub(EYE).normalize();
       var n = new THREE.Vector3(sd * 0.25, 0.02, 1).normalize().sub(v).normalize(), g = group(rootG, M.x, M.y, M.z), k;
       g.lookAt(M.clone().add(n));
-      box(g, 0.136, 0.05, 0.014, P(0x0c0d0f, 30, 0x2a2a2a), 0, 0, -0.008);
-      var geo = new THREE.PlaneGeometry(0.124, 0.04), uv = geo.attributes.uv;
+      box(g, 0.104, 0.04, 0.014, P(0x0c0d0f, 30, 0x2a2a2a), 0, 0, -0.008);
+      var geo = new THREE.PlaneGeometry(0.094, 0.031), uv = geo.attributes.uv;
       for (k = 0; k < uv.count; k++) uv.setX(k, m[1] + uv.getX(k) * (m[2] - m[1]));
       mesh(g, geo, new THREE.MeshBasicMaterial({map: mirrorRT.texture, color: 0xd0d6de}), 0, 0, 0.0005);
-      mesh(g, new THREE.PlaneGeometry(0.124, 0.04), glintMat, 0, 0, 0.001);
-      rod(rootG, [M.x, M.y + 0.02, M.z], [sd * 0.225, 0.878, -3.67], 0.004, 0.004, P(0x1a1c20, 30, 0x333333), 6);   // stalk to the glass
+      mesh(g, new THREE.PlaneGeometry(0.094, 0.031), glintMat, 0, 0, 0.001);
+      rod(rootG, [M.x, M.y + 0.016, M.z], [sd * 0.165, 0.89, -3.39], 0.004, 0.004, P(0x1a1c20, 30, 0x333333), 6);   // stalk to the glass
     });
     var helmet = group(rootG, 0, 0, 0), helmetOff = new THREE.Vector3(0, 0.03, 0.09);
     blob(helmet, 0.125, P(0x4e535a, 30, 0x333333), [0, 0, 0], [1, 1.05, 1.12]);
@@ -662,9 +669,10 @@
     box(sg, 0.012, 0.008, 0.012, P(0x8a0c08, 20), 0, 0.13, -0.012); box(sg, 0.01, 0.012, 0.014, P(0x30333a, 20), -0.012, 0.11, -0.022);
 
     // ---- glare shield (deep coaming, its rear edge curving back round the HUD)
-    var gs = new THREE.Shape(), rear = [[-0.38, 3.66], [-0.3, 3.6], [-0.16, 3.5], [0, 3.46], [0.16, 3.5], [0.3, 3.6], [0.38, 3.66]];
+    // its sides follow the windscreen inward toward the front, staying inside the glass
+    var gs = new THREE.Shape(), rear = [[-0.32, 3.66], [-0.26, 3.6], [-0.14, 3.5], [0, 3.46], [0.14, 3.5], [0.26, 3.6], [0.32, 3.66]];
     gs.moveTo(rear[0][0], rear[0][1]); gs.splineThru(rear.slice(1).map(function (p) { return new THREE.Vector2(p[0], p[1]); }));
-    gs.lineTo(0.33, 4.05); gs.lineTo(0.24, 4.4); gs.lineTo(-0.24, 4.4); gs.lineTo(-0.33, 4.05); gs.lineTo(rear[0][0], rear[0][1]);
+    gs.lineTo(0.3, 3.86); gs.lineTo(0.255, 4.03); gs.lineTo(0.18, 4.2); gs.lineTo(-0.18, 4.2); gs.lineTo(-0.255, 4.03); gs.lineTo(-0.3, 3.86); gs.lineTo(rear[0][0], rear[0][1]);
     var gsGeo = slab(gs, 0.034, 0.006), gp = gsGeo.attributes.position, gi;
     gsGeo.rotateX(-Math.PI / 2);
     // forward of the lip the coaming slopes down toward the windscreen (~11 deg), keeping it under the line of sight
@@ -675,8 +683,8 @@
     // master warning / caution lamps on the coaming lip
     var lampArt = function (txt, col) { var t = canvasTex(128, 64); t.c.fillStyle = '#000'; t.c.fillRect(0, 0, 128, 64); label(t.c, txt, 64, 33, 30, col); return t.tex; };
     var warnLamp = new THREE.MeshBasicMaterial({map: lampArt('WARN', '#ff5a40'), color: 0x333333}), cautLamp = new THREE.MeshBasicMaterial({map: lampArt('CAUTION', '#ffc040'), color: 0x333333});
-    box(rootG, 0.056, 0.03, 0.012, P(BEZEL), -0.215, 0.645, -3.523); mesh(rootG, new THREE.PlaneGeometry(0.048, 0.022), warnLamp, -0.215, 0.645, -3.516);
-    box(rootG, 0.056, 0.03, 0.012, P(BEZEL), 0.215, 0.645, -3.523); mesh(rootG, new THREE.PlaneGeometry(0.048, 0.022), cautLamp, 0.215, 0.645, -3.516);
+    box(rootG, 0.056, 0.03, 0.012, P(BEZEL), -0.19, 0.645, -3.526); mesh(rootG, new THREE.PlaneGeometry(0.048, 0.022), warnLamp, -0.19, 0.645, -3.519);
+    box(rootG, 0.056, 0.03, 0.012, P(BEZEL), 0.19, 0.645, -3.526); mesh(rootG, new THREE.PlaneGeometry(0.048, 0.022), cautLamp, 0.19, 0.645, -3.519);
 
     // ---- HUD: body, combiner posts, combiner glass (the symbology itself is drawn by the game, clipped to the glass)
     // the HUD body sits mostly inside the coaming, its top flush under the combiner's lower edge
@@ -695,16 +703,18 @@
 
     // ---- main instrument panel (a reclined plate under the coaming); everything on it in the panel's own x / v / w
     var TILT = 18 * DEG, panel = group(rootG, 0, 0.3, -3.6, -TILT, 0, 0);
-    var po = new THREE.Shape(); po.moveTo(-0.4, 0.36); po.lineTo(0.4, 0.36); po.lineTo(0.4, -0.02); po.lineTo(0.31, -0.3); po.lineTo(-0.31, -0.3); po.lineTo(-0.4, -0.02); po.lineTo(-0.4, 0.36);
+    // its upper corners are cut back so they stay inside the canopy rails
+    var po = new THREE.Shape(); po.moveTo(-0.3, 0.36); po.lineTo(0.3, 0.36); po.lineTo(0.4, 0.17); po.lineTo(0.4, -0.02); po.lineTo(0.31, -0.3);
+    po.lineTo(-0.31, -0.3); po.lineTo(-0.4, -0.02); po.lineTo(-0.4, 0.17); po.lineTo(-0.3, 0.36);
     var panArt = panelArt(1024, 1024, '#1a1d22', function (c, W, H) {
       function X(x) { return (x + 0.4) / 0.8 * W; } function Y(v) { return (0.36 - v) / 0.66 * H; }
       c.strokeStyle = 'rgba(0,0,0,0.55)'; c.lineWidth = 4;
       [[-0.4, 0.36, 0.8, 0.14], [-0.4, 0.22, 0.8, 0.3], [-0.31, -0.08, 0.62, 0.22]].forEach(function (r) { c.strokeRect(X(r[0]) + 4, Y(r[1]) + 4, r[2] / 0.8 * W - 8, r[3] / 0.66 * H - 8); });
-      [[-0.385, 0.345], [0.385, 0.345], [-0.385, 0.235], [0.385, 0.235], [-0.385, -0.05], [0.385, -0.05], [-0.295, -0.285], [0.295, -0.285]].forEach(function (p) { screw(c, X(p[0]), Y(p[1]), 7); });
+      [[-0.285, 0.345], [0.285, 0.345], [-0.37, 0.205], [0.37, 0.205], [-0.385, -0.05], [0.385, -0.05], [-0.295, -0.285], [0.295, -0.285]].forEach(function (p) { screw(c, X(p[0]), Y(p[1]), 7); });
       label(c, 'LDG GEAR', X(-0.25), Y(-0.045), 22); label(c, 'STBY', X(0.255), Y(-0.03), 22); label(c, 'ICP', X(0), Y(0.322), 18, '#8a929c');
-      label(c, 'EMER JETT', X(-0.355), Y(0.2), 15, '#ffd060'); label(c, 'MASTER ARM', X(0.355), Y(0.2), 14);
-      c.strokeStyle = '#ffd060'; c.lineWidth = 3; c.setLineDash([10, 8]); c.strokeRect(X(-0.385), Y(0.18), 0.06 / 0.8 * W, 0.045 / 0.66 * H); c.setLineDash([]);
-      toggle(c, X(0.355), Y(0.155), 11, false); knob(c, X(-0.355), Y(0.155), 15);
+      label(c, 'EMER JETT', X(-0.355), Y(0.175), 15, '#ffd060'); label(c, 'MASTER ARM', X(0.355), Y(0.175), 14);
+      c.strokeStyle = '#ffd060'; c.lineWidth = 3; c.setLineDash([10, 8]); c.strokeRect(X(-0.385), Y(0.155), 0.06 / 0.8 * W, 0.045 / 0.66 * H); c.setLineDash([]);
+      toggle(c, X(0.355), Y(0.13), 11, false); knob(c, X(-0.355), Y(0.13), 15);
     });
     fitUV(panArt.tex, -0.4, -0.3, 0.4, 0.36);
     var panMat = shade(new THREE.MeshPhongMaterial({map: panArt.tex, emissiveMap: panArt.tex, emissive: 0, shininess: 8}), U);

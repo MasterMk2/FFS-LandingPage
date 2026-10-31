@@ -297,6 +297,11 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_me_login": {"ja": "Discord でログイン", "en": "Log in with Discord"},
     "pt_me_logout": {"ja": "ログアウト", "en": "Log out"},
     "pt_me_name": {"ja": "DCS 名", "en": "DCS name"},
+    "pt_me_discord_name": {"ja": "Discord 名", "en": "Discord name"},
+    "pt_me_discord_only": {
+        "ja": "DCS アカウントと未連携のため、Discord の実績だけを表示しています。DCS サーバーで .linkme を使うと、飛行の記録と一つにまとまります。",
+        "en": "Only your Discord record is shown because no DCS account is linked. Use .linkme on the DCS server to combine it with your flights.",
+    },
     "pt_me_not_linked": {
         "ja": "DCS サーバーで .linkme により Discord 連携してください。",
         "en": "Link your Discord account on the DCS server with .linkme.",

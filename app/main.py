@@ -1006,7 +1006,7 @@ def _points_closing(lang: str, period: str, season: dict | None) -> str:
 async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | None]:
     """本人欄の状態を返す。上流の詳細は外に出さず、状態名だけ返す。
 
-    404 は「DCS と連携していない」、409 は「複数の DCS アカウントが連携している」、
+    404 は「記録も DCS 連携もない」、409 は「複数の DCS アカウントが連携している」(旧版の Bot)、
     503 は「集計の準備中」。
     """
     res = await dcssb.get_points_member(discord_id)

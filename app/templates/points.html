@@ -48,6 +48,7 @@
         <li class="pts-row pts-rank-{{ r.rank if r.rank <= 3 else 'n' }}" style="--i:{{ loop.revindex0 }}">
           <span class="pts-medal"><span class="pts-sr">{{ t('pt_col_rank') }} </span>{{ r.rank }}</span>
           <span class="pts-pilot">{{ r.name }}</span>
+          {% if r.medal %}<span class="pts-season-medal pts-season-{{ r.medal.key }}">{{ r.medal.label }}</span>{% endif %}
           {% if r.badges %}
           <ul class="pts-badges">
             {% for b in r.badges %}
@@ -82,6 +83,22 @@
         <p class="notice">{{ t('pt_me_opted_out') }}</p>
         {% endif %}
         <div class="pts-cards">
+          {% if member.season %}
+          <article class="pts-card">
+            <h4>{{ t('pt_season_card').format(id=member.season.id) }}</h4>
+            {% if member.season.medal %}
+            <p class="pts-title"><span class="pts-season-medal pts-season-{{ member.season.medal.key }}">{{ member.season.medal.label }}</span></p>
+            {% else %}
+            <p class="pts-title pts-muted">{{ t('pt_season_none') }}</p>
+            {% endif %}
+            <p class="pts-line">{{ t('pt_season_points').format(n=member.season.points if member.season.points is not none else '-') }}</p>
+            {% if member.season.next_medal %}
+            <p class="pts-next">{{ t('pt_season_next').format(medal=member.season.next_medal.label, n=member.season.remaining) }}</p>
+            {% else %}
+            <p class="pts-next">{{ t('pt_season_top') }}</p>
+            {% endif %}
+          </article>
+          {% endif %}
           {% for c in [member.total] + member.cards %}
           <article class="pts-card">
             <h4>{{ c.label }}</h4>
@@ -123,6 +140,14 @@
             {% endif %}
           </article>
         </div>
+        {% if member.season_history %}
+        <h4 class="pts-history-title">{{ t('pt_season_history') }}</h4>
+        <ul class="pts-history">
+          {% for h in member.season_history %}
+          <li>{{ h.season }} <span class="pts-season-medal pts-season-{{ h.medal.key }}">{{ h.medal.label }}</span></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
       {% elif member_state == 'not_linked' %}
         <p class="notice">{{ t('pt_me_not_linked') }}</p>
       {% elif member_state == 'multiple_links' %}

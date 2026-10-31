@@ -36,7 +36,7 @@
   /* 罫線 */
   --border:#d0dabd; --border-soft:#e1e8d3;
   /* フライトボードのメダル。地の色によらず同じで、文字は常に --medal-ink */
-  --medal-gold:#e8bb3a; --medal-silver:#c5ccd4; --medal-bronze:#cf9163; --medal-ink:#231a05;
+  --medal-gold:#e8bb3a; --medal-silver:#c5ccd4; --medal-bronze:#cf9163; --medal-platinum:#b5e2e4; --medal-ink:#231a05;
   --medal-silver-rgb:140,152,166; --medal-bronze-rgb:190,120,70;
   /* DCS の陣営 */
   --side-red-fg:#a33a31; --side-blue-rgb:47,95,154; --side-blue-fg:#2b5893; --slot-fg:#4b5642;
@@ -361,6 +361,15 @@ footer small{font-size:.75rem}
 .pts-rank-1 .pts-medal{width:3.1rem;height:3.1rem;border:2px solid var(--medal-ink);color:var(--medal-ink);font-size:1.7rem;font-weight:800}
 .pts-rank-1 .pts-pilot{font-weight:800;line-height:1.2}
 .pts-rank-1 .pts-badge{border-color:rgba(35,26,5,.45);background:rgba(255,255,255,.35)}
+.pts-season-medal{display:inline-block;padding:.12rem .55rem;border-radius:999px;font-size:.78rem;font-weight:700;color:var(--medal-ink)}
+.pts-season-bronze{background:var(--medal-bronze)}
+.pts-season-silver{background:var(--medal-silver)}
+.pts-season-gold{background:var(--medal-gold)}
+.pts-season-platinum{background:var(--medal-platinum)}
+.pts-rank-1 .pts-season-medal{border:1px solid rgba(35,26,5,.45)}
+.pts-row:has(.pts-season-medal){grid-template-columns:auto minmax(0,1fr) auto auto}
+.pts-history-title{margin:.9rem 0 .3rem;font-size:.9rem}
+.pts-history{display:flex;flex-wrap:wrap;gap:.4rem .9rem;list-style:none;margin:0;padding:0;font-size:.85rem;font-variant-numeric:tabular-nums}
 .pts-empty{margin:.25rem 0 .1rem;font-size:1.05rem;font-weight:700}
 .pts-how{margin:.75rem 0 .1rem;font-size:.85rem;color:var(--muted)}
 .pts-note{margin:.75rem 0 0;font-size:.8rem;color:var(--muted)}
@@ -373,8 +382,8 @@ footer small{font-size:.75rem}
 }
 @media (max-width:560px){
   .points-page .pts-header h2{font-size:1.75rem}
-  .pts-row{grid-template-columns:auto minmax(0,1fr)}
-  .pts-badges{grid-column:2;justify-content:flex-start}
+  .pts-row,.pts-row:has(.pts-season-medal){grid-template-columns:auto minmax(0,1fr) auto}
+  .pts-badges{grid-column:2 / -1;justify-content:flex-start}
   .pts-badge{white-space:normal}
   .pts-rank-1{padding:.9rem 1rem;font-size:1.35rem}
   .pts-rank-1 .pts-medal{width:2.7rem;height:2.7rem;font-size:1.45rem}

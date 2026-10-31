@@ -282,11 +282,11 @@ def test_successful_login_shows_own_standing(discord_on, discord, upstream):
     assert "Bravo" in html
     assert "今月 2 リワード" in html
     assert "累計 6 リワード" in html
-    assert "FFS フリーフライト I" in html
+    assert "FFS フリーフライト 二等空士" in html
     assert "上の順位に並ぶまであと 1 リワード" in html
-    assert "FFS 飛行時間 I" in html
+    assert "FFS 飛行時間 二等空士" in html
     assert "12.5 時間" in html
-    assert "次の称号 FFS 飛行時間 II まであと 37.5 時間" in html
+    assert "次の称号 FFS 飛行時間 一等空士 まであと 37.5 時間" in html
     assert "2 位 (3 人中)" in html  # free の今月と総合の今月
 
 
@@ -487,7 +487,7 @@ def test_board_still_renders_when_login_is_on(discord_on, discord, upstream, mon
     html = _client().get("/rewards?lang=ja&dept=host").text
 
     assert "Charlie" in html
-    assert "FFS 主催 I" in html
+    assert "FFS 主催 二等空士" in html
 
 
 # --- 正の対照 (拒否のテストが「cookie が届かなかった」で通っていないことの確認) ----

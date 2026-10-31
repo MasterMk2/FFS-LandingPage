@@ -166,7 +166,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     # ── points.html (フライトボード) ──
     # 文中の {n} {rank} などは テンプレート側で str.format() に渡して埋める。
     "pt_title": {"ja": "フライトボード", "en": "Flight Board"},
-    "pt_lead": {"ja": "飛んだ分だけ、称号が上がる。", "en": "Fly more, and your title climbs."},
+    "pt_lead": {"ja": "階級は、空で掴め。", "en": "Earn your rank in the sky."},
     "pt_note": {
         "ja": (
             "部門ごとのリワードで決まる称号と順位です。数値は公開せず、"

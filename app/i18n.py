@@ -166,7 +166,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     # ── points.html (フライトボード) ──
     # 文中の {n} {rank} などは テンプレート側で str.format() に渡して埋める。
     "pt_title": {"ja": "フライトボード", "en": "Flight Board"},
-    "pt_lead": {"ja": "飛んだ分だけ、称号が上がる。", "en": "Fly more, and your title climbs."},
+    "pt_lead": {"ja": "階級は、空で掴め。", "en": "Earn your rank in the sky."},
     "pt_note": {
         "ja": (
             "部門ごとのリワードで決まる称号と順位です。数値は公開せず、"
@@ -297,6 +297,11 @@ MESSAGES: dict[str, dict[str, str]] = {
     "pt_me_login": {"ja": "Discord でログイン", "en": "Log in with Discord"},
     "pt_me_logout": {"ja": "ログアウト", "en": "Log out"},
     "pt_me_name": {"ja": "DCS 名", "en": "DCS name"},
+    "pt_me_discord_name": {"ja": "Discord 名", "en": "Discord name"},
+    "pt_me_discord_only": {
+        "ja": "DCS アカウントと未連携のため、Discord の実績だけを表示しています。DCS サーバーで .linkme を使うと、飛行の記録と一つにまとまります。",
+        "en": "Only your Discord record is shown because no DCS account is linked. Use .linkme on the DCS server to combine it with your flights.",
+    },
     "pt_me_not_linked": {
         "ja": "DCS サーバーで .linkme により Discord 連携してください。",
         "en": "Link your Discord account on the DCS server with .linkme.",

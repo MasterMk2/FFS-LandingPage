@@ -349,6 +349,30 @@ def test_multiple_links_are_explained_apart_from_not_linked(discord_on, discord,
     assert 'class="pts-card"' not in html
 
 
+def test_discord_only_member_sees_their_record_and_how_to_link(discord_on, discord, upstream):
+    upstream["member_body"] = {**MEMBER_OK, "name": "テスト作者", "dcs_linked": False}
+    c = _login(_client())
+
+    html = c.get("/rewards?lang=ja").text
+
+    assert "Discord 名: テスト作者" in html
+    assert "DCS アカウントと未連携" in html
+    assert "飛行時間" not in html.split('class="pts-me"')[1].split("pts-logout")[0]
+    assert 'class="pts-card"' in html
+
+
+def test_several_accounts_are_shown_one_after_another(discord_on, discord, upstream):
+    first, second = {**MEMBER_OK, "name": "Bravo"}, {**MEMBER_OK, "name": "Alpha"}
+    upstream["member_body"] = {**first, "accounts": [first, second]}
+    c = _login(_client())
+
+    html = c.get("/rewards?lang=ja").text
+
+    assert html.index("DCS 名: Bravo") < html.index("DCS 名: Alpha")
+    assert html.count("DCS 名:") == 2
+    assert "複数の DCS アカウントが連携している" not in html
+
+
 def test_preparing_503_is_reported_as_preparing(discord_on, discord, upstream):
     upstream["member_status"] = 503
     upstream["member_body"] = {"detail": "not ready"}

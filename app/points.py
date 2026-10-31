@@ -313,8 +313,12 @@ def member_view(data: object, lang: str) -> dict | None:
     }
 
     name = data.get("name")
+    accounts = data.get("accounts") if isinstance(data.get("accounts"), list) else []
     return {
         "name": name[:NAME_MAX] if isinstance(name, str) else "",
+        # 複数連携は accounts に口座ごとの本人欄が並ぶ。先頭が主口座で data 本体と同じ。
+        "accounts": [view for view in (member_view(raw, lang) for raw in accounts) if view],
+        "dcs_linked": data.get("dcs_linked") is not False,
         "opted_out": bool(data.get("opted_out")),
         "season": _season_card(lang, data.get("season")),
         "season_history": _season_history(lang, data.get("season_history")),

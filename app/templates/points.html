@@ -76,8 +76,12 @@
       <p><a class="pts-btn" href="/auth/discord/login">{{ t('pt_me_login') }}</a></p>
     {% else %}
       {% if member_state == 'ok' %}
+        {% for member in (member.accounts or [member]) %}
         {% if member.name %}
-        <p class="pts-name">{{ t('pt_me_name') }}: {{ member.name }}</p>
+        <p class="pts-name">{{ t('pt_me_name') if member.dcs_linked else t('pt_me_discord_name') }}: {{ member.name }}</p>
+        {% endif %}
+        {% if not member.dcs_linked %}
+        <p class="notice">{{ t('pt_me_discord_only') }}</p>
         {% endif %}
         {% if member.opted_out %}
         <p class="notice">{{ t('pt_me_opted_out') }}</p>
@@ -125,6 +129,7 @@
             </ul>
           </article>
           {% endfor %}
+          {% if member.dcs_linked %}
           <article class="pts-card">
             <h4>{{ member.hours.label }}</h4>
             {% if member.hours.title %}
@@ -139,6 +144,7 @@
             <p class="pts-next">{{ t('pt_next_fmt').format(title=member.hours.next_title, n=member.hours.remaining, unit=member.hours.unit) }}</p>
             {% endif %}
           </article>
+          {% endif %}
         </div>
         {% if member.season_history %}
         <h4 class="pts-history-title">{{ t('pt_season_history') }}</h4>
@@ -148,6 +154,7 @@
           {% endfor %}
         </ul>
         {% endif %}
+        {% endfor %}
       {% elif member_state == 'not_linked' %}
         <p class="notice">{{ t('pt_me_not_linked') }}</p>
       {% elif member_state == 'multiple_links' %}

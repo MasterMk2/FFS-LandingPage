@@ -11,7 +11,7 @@ from datetime import datetime
 
 from . import i18n
 
-PERIODS = ("month", "all")
+PERIODS = ("month", "season", "all")
 # 総合 + 5 部門。表示順もこの順。
 BOARD_DEPTS = ("total", "host", "lead", "coop", "free", "author")
 # 本人欄で出す部門 (総合は別カード、飛行時間は free_hours から)。
@@ -19,16 +19,19 @@ MEMBER_DEPTS = ("host", "lead", "coop", "free", "author")
 BOARD_LIMIT = 10
 NAME_MAX = 64
 
-# 部門ごとの称号名 (i18n キー) と最大段位。段位 n は ROMAN[n-1]。
+# 部門ごとの称号名 (i18n キー)。階級は全部門 15 段で、3 段ごとに 1 階級。
 _TITLES = {
-    "host": ("pt_title_host", 4),
-    "lead": ("pt_title_lead", 4),
-    "coop": ("pt_title_coop", 5),
-    "free": ("pt_title_free", 5),
-    "author": ("pt_title_author", 4),
-    "hours": ("pt_title_hours", 5),
+    "host": "pt_title_host",
+    "lead": "pt_title_lead",
+    "coop": "pt_title_coop",
+    "free": "pt_title_free",
+    "author": "pt_title_author",
+    "hours": "pt_title_hours",
 }
-_ROMAN = ("I", "II", "III", "IV", "V")
+RANKS = 15
+RANK_CLASSES = 5
+# メダルの段位 n は MEDALS[n-1]。CSS のクラス名にも使う。
+MEDALS = ("bronze", "silver", "gold", "platinum")
 # 段位の単位 (複数形, 単数形) の i18n キー。英語の単数形は n == 1 のときだけ使う。
 _UNITS = {
     "host": ("pt_unit_times", "pt_unit_time"),
@@ -47,20 +50,34 @@ def _unit(lang: str, key: str, n: object) -> str:
     return i18n.t(lang, plural_key)
 
 
-def title(lang: str, key: str, tier: object) -> str | None:
-    """段位から称号名を作る。0 以下・範囲外・非整数は None (称号なし)。"""
-    if key not in _TITLES or isinstance(tier, bool) or not isinstance(tier, int):
-        return None
-    i18n_key, top = _TITLES[key]
-    if not 1 <= tier <= top:
-        return None
-    return f"{i18n.t(lang, i18n_key)} {_ROMAN[tier - 1]}"
-
-
 def _int_or_none(value: object) -> int | None:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value
+
+
+def _rank_name(lang: str, tier: object, stars: object = 0) -> str | None:
+    """階級名。0 以下・範囲外・非整数は None (称号なし)。最上位の先は ★ を足す。"""
+    if _int_or_none(tier) is None or not 1 <= tier <= RANKS:
+        return None
+    name = i18n.t(lang, f"pt_rank_name_{tier}")
+    return f"{name} ★{stars}" if _int_or_none(stars) and stars > 0 else name
+
+
+def title(lang: str, key: str, tier: object, stars: object = 0) -> str | None:
+    """階級から称号名を作る。称号が無ければ None。"""
+    name = _rank_name(lang, tier, stars)
+    if key not in _TITLES or name is None:
+        return None
+    return f"{i18n.t(lang, _TITLES[key])} {name}"
+
+
+def _medal(lang: str, level: object) -> dict | None:
+    """メダル 1 つ分。0・範囲外・非整数は None。"""
+    if _int_or_none(level) is None or not 1 <= level <= len(MEDALS):
+        return None
+    key = MEDALS[level - 1]
+    return {"key": key, "label": i18n.t(lang, "pt_medal_" + key)}
 
 
 def _num(value: object) -> str:
@@ -106,15 +123,26 @@ def parse_board(data: object) -> dict[str, dict[str, list[dict]]] | None:
                             "rank": rank,
                             "name": name[:NAME_MAX],
                             "tier": _int_or_none(raw.get("tier")),
+                            "stars": _int_or_none(raw.get("stars")) or 0,
+                            "medal": _int_or_none(raw.get("medal")),
                         }
                     )
             out[period][dept] = rows
     return out
 
 
-def _badge(text: str, key: str, tier: int) -> dict:
-    """称号 1 つ分。top は段位のゲージの段数。"""
-    return {"text": text, "tier": tier, "top": _TITLES[key][1]}
+def season_info(data: object) -> dict | None:
+    """開催中のシーズン。無いか形が違えば None。"""
+    season = data.get("season") if isinstance(data, dict) else None
+    if not isinstance(season, dict):
+        return None
+    season_id, ends = season.get("id"), season.get("ends")
+    return {"id": season_id, "ends": ends} if isinstance(season_id, str) and isinstance(ends, str) else None
+
+
+def _badge(text: str, tier: int) -> dict:
+    """称号 1 つ分。ゲージは階級の数で、階級の中の段は称号名で分かる。"""
+    return {"text": text, "tier": (tier + 2) // 3, "top": RANK_CLASSES}
 
 
 def held_titles(board: dict, lang: str) -> dict[str, list[dict]]:
@@ -123,16 +151,16 @@ def held_titles(board: dict, lang: str) -> dict[str, list[dict]]:
     上流の総合ボードは段位を持たないので、ここから補う。段位は累計の実績で決まり期間に
     よらない。部門ボードは上位だけなので、そこに載らない称号は出ない。
     """
-    held: dict[str, dict[str, int]] = {}
+    held: dict[str, dict[str, tuple[int, int]]] = {}
     for period in PERIODS:
         for dept in MEMBER_DEPTS:
             for row in board.get(period, {}).get(dept, []):
                 if title(lang, dept, row["tier"]) is not None:
-                    held.setdefault(row["name"], {})[dept] = row["tier"]
+                    held.setdefault(row["name"], {})[dept] = (row["tier"], row["stars"])
     return {
         name: [
-            _badge(f"{i18n.t(lang, 'pt_dept_' + dept)} {_ROMAN[tier - 1]}", dept, tier)
-            for dept, tier in sorted(depts.items(), key=lambda item: -item[1])
+            _badge(f"{i18n.t(lang, 'pt_dept_' + dept)} {_rank_name(lang, tier, stars)}", tier)
+            for dept, (tier, stars) in sorted(depts.items(), key=lambda item: -item[1][0])
         ]
         for name, depts in held.items()
     }
@@ -144,10 +172,11 @@ def board_rows(board: dict, period: str, dept: str, lang: str) -> list[dict]:
     rows = []
     for row in board.get(period, {}).get(dept, []):
         badges = held.get(row["name"], [])
-        name = title(lang, dept, row["tier"])
+        name = title(lang, dept, row["tier"], row["stars"])
         if name is not None:
-            badges = [_badge(name, dept, row["tier"])]
-        rows.append({"rank": row["rank"], "name": row["name"], "badges": badges})
+            badges = [_badge(name, row["tier"])]
+        rows.append({"rank": row["rank"], "name": row["name"], "badges": badges,
+                     "medal": _medal(lang, row["medal"])})
     return rows
 
 
@@ -158,6 +187,15 @@ def month_closing(lang: str, now: datetime) -> str:
         return i18n.t(lang, "pt_closing_today")
     unit = i18n.t(lang, "pt_unit_day" if left == 1 else "pt_unit_days")
     return i18n.t(lang, "pt_closing_fmt").format(n=left, unit=unit)
+
+
+def season_closing(lang: str, ends: str, now: datetime) -> str:
+    """シーズンの残り日数の文言。ends は最終日 (YYYY-MM-DD)、now は JST の現在時刻。"""
+    left = (datetime.fromisoformat(ends).date() - now.date()).days
+    if left <= 0:
+        return i18n.t(lang, "pt_season_closing_today")
+    unit = i18n.t(lang, "pt_unit_day" if left == 1 else "pt_unit_days")
+    return i18n.t(lang, "pt_season_closing_fmt").format(n=left, unit=unit)
 
 
 def _standing(standing: object, period: str, key: str) -> dict:
@@ -186,6 +224,7 @@ def _rank_view(standing: object, key: str) -> dict:
 def _dept_card(lang: str, key: str, dept: dict, standing: object) -> dict:
     """部門 1 枚分。key は MEMBER_DEPTS のいずれか、または "total"。"""
     tier = _int_or_none(dept.get("tier"))
+    stars = _int_or_none(dept.get("stars"))
     nxt = _int_or_none(dept.get("next"))
     remaining = _int_or_none(dept.get("remaining"))
     units = _int_or_none(dept.get("units"))
@@ -196,13 +235,40 @@ def _dept_card(lang: str, key: str, dept: dict, standing: object) -> dict:
         "points_total": _int_or_none(dept.get("points")),
         "units": units,
         "units_unit": _unit(lang, key, units),
-        "title": title(lang, key, tier),
+        "title": title(lang, key, tier, stars),
         "next_title": title(lang, key, (tier or 0) + 1) if nxt is not None else None,
         "remaining": remaining,
         "unit": _unit(lang, key, remaining),
         "top": nxt is None and (tier or 0) > 0,
         "rank": _rank_view(standing, key),
     }
+
+
+def _season_card(lang: str, season: object) -> dict | None:
+    """本人の今シーズン。開催前は None。"""
+    if not isinstance(season, dict) or not isinstance(season.get("id"), str):
+        return None
+    level = _int_or_none(season.get("medal")) or 0
+    following = _medal(lang, level + 1) if _int_or_none(season.get("next")) is not None else None
+    return {
+        "id": season["id"],
+        "points": _int_or_none(season.get("points")),
+        "medal": _medal(lang, level),
+        "next_medal": following,
+        "remaining": _int_or_none(season.get("remaining")),
+    }
+
+
+def _season_history(lang: str, history: object) -> list[dict]:
+    """過去のシーズンのメダル (新しい順)。"""
+    if not isinstance(history, list):
+        return []
+    out = []
+    for entry in history:
+        medal = _medal(lang, entry.get("medal")) if isinstance(entry, dict) else None
+        if medal is not None and isinstance(entry.get("season"), str):
+            out.append({"season": entry["season"], "medal": medal})
+    return out
 
 
 def member_view(data: object, lang: str) -> dict | None:
@@ -232,11 +298,12 @@ def member_view(data: object, lang: str) -> dict | None:
 
     hours = data.get("free_hours") if isinstance(data.get("free_hours"), dict) else {}
     hours_tier = _int_or_none(hours.get("tier"))
+    hours_stars = _int_or_none(hours.get("stars"))
     hours_next = hours.get("next")
     hours_card = {
         "label": i18n.t(lang, "pt_dept_hours"),
         "hours": _num(hours.get("hours")),
-        "title": title(lang, "hours", hours_tier),
+        "title": title(lang, "hours", hours_tier, hours_stars),
         "next_title": (
             title(lang, "hours", (hours_tier or 0) + 1) if hours_next is not None else None
         ),
@@ -249,6 +316,8 @@ def member_view(data: object, lang: str) -> dict | None:
     return {
         "name": name[:NAME_MAX] if isinstance(name, str) else "",
         "opted_out": bool(data.get("opted_out")),
+        "season": _season_card(lang, data.get("season")),
+        "season_history": _season_history(lang, data.get("season_history")),
         "cards": cards,
         "total": total_card,
         "hours": hours_card,

@@ -103,7 +103,7 @@ def test_public_ranking_shows_rank_name_and_title_but_no_points(set_board, disco
     section = _section(_points("?lang=ja&dept=host"), "pts-board")
 
     assert "Charlie" in section
-    assert "FFS 主催 I" in section
+    assert "FFS 主催 二等空士" in section
     assert "999" not in section
     assert "pt" not in re.split(r'[ <>"=/]+', section)
 
@@ -113,7 +113,7 @@ def test_total_ranking_has_no_title_and_no_points(set_board, discord_off):
     section = _section(_points("?lang=ja&dept=total"), "pts-board")
 
     assert "Charlie" in section
-    assert "主催 I" in section  # 総合の称号は部門ボードから補う
+    assert "主催 二等空士" in section  # 総合の称号は部門ボードから補う
     assert "999" not in section
     assert "pt" not in re.split(r'[ <>"=/]+', section)
 
@@ -123,7 +123,7 @@ def test_total_ranking_collects_titles_from_every_department(set_board, discord_
     section = _section(_points("?lang=ja&dept=total&period=all"), "pts-board")
 
     assert "Delta" in section
-    assert "フリーフライト III" in section
+    assert "フリーフライト 空士長" in section
 
 
 def test_rank_is_shown_as_text_with_ties_and_tier_gauge_matches_the_title(set_board, discord_off):
@@ -138,8 +138,8 @@ def test_rank_is_shown_as_text_with_ties_and_tier_gauge_matches_the_title(set_bo
     section = _section(_points("?lang=ja&dept=free"), "pts-board")
 
     assert section.count('class="pts-row pts-rank-2"') == 2
-    assert section.count("</i>") == 5  # 称号のある Echo のフリーフライトは全 5 段
-    assert section.count('<i class="on">') == 3
+    assert section.count("</i>") == 5  # ゲージは 5 階級
+    assert section.count('<i class="on">') == 1  # 3 段目までは最初の階級
 
 
 def test_empty_department_invites_the_first_entry(set_board, discord_off):
@@ -185,11 +185,11 @@ def test_free_flight_titles_use_department_name_and_period_switch(set_board, dis
     set_board(_ok_board())
 
     month = _section(_points("?lang=ja&dept=free&period=month"), "pts-board")
-    assert "Delta" in month and "FFS フリーフライト II" in month
+    assert "Delta" in month and "FFS フリーフライト 一等空士" in month
     assert "Bravo" in month
 
     all_time = _section(_points("?lang=ja&dept=free&period=all"), "pts-board")
-    assert "FFS フリーフライト III" in all_time
+    assert "FFS フリーフライト 空士長" in all_time
     assert "Bravo" not in all_time
 
 
@@ -231,7 +231,7 @@ def test_parse_board_drops_points_and_limits_rows():
 
     assert parsed is not None
     rows = parsed["month"]["host"]
-    assert rows == [{"rank": 1, "name": "Charlie", "tier": 1}]
+    assert rows == [{"rank": 1, "name": "Charlie", "tier": 1, "stars": 0, "medal": None}]
     assert "points" not in str(parsed)
 
 
@@ -243,9 +243,73 @@ def test_parse_board_rejects_unexpected_shape():
 def test_title_is_none_for_zero_missing_or_out_of_range_tiers():
     assert points.title("ja", "host", 0) is None
     assert points.title("ja", "host", None) is None
-    assert points.title("ja", "host", 5) is None  # 主催は IV まで
-    assert points.title("ja", "coop", 5) == "FFS COOP参加 V"
+    assert points.title("ja", "host", 16) is None  # 全部門 15 段まで
+    assert points.title("ja", "coop", 5) == "FFS COOP参加 二等空曹"
     assert points.title("ja", "total", 1) is None
+
+
+def test_top_rank_shows_stars_in_both_languages():
+    assert points.title("ja", "free", 15, 2) == "FFS フリーフライト 航空幕僚長 ★2"
+    assert points.title("en", "free", 15) == "FFS Free Flight Chief of Staff"
+
+
+SEASON_BOARD = {
+    **BOARD,
+    "season": {"id": "2027Q1", "ends": "2027-03-31"},
+    "boards": {**BOARD["boards"], "season": {
+        "total": [{"rank": 1, "name": "Charlie", "tier": None, "medal": 3, "points": 999},
+                  {"rank": 2, "name": "Delta", "tier": None, "medal": 0}],
+    }},
+}
+
+
+def test_season_tab_stays_hidden_until_a_season_is_running(set_board, discord_off):
+    set_board(_ok_board())
+    html = _points("?lang=ja&period=season")
+
+    assert "period=season" not in html
+    assert 'href="/rewards?dept=total&amp;period=month" aria-current="true"' in html
+
+
+def test_season_board_shows_medals_without_points(set_board, discord_off):
+    set_board(_ok_board(SEASON_BOARD))
+    html = _points("?lang=ja&period=season")
+    section = _section(html, "pts-board")
+
+    assert 'href="/rewards?dept=total&amp;period=season" aria-current="true"' in html
+    assert "ゴールド" in section and "pts-closing" in section
+    assert "999" not in section
+    assert section.count("pts-season-medal") == 1  # メダルの無い人には出さない
+
+
+def test_season_closing_counts_days_to_the_last_day():
+    ends = "2027-03-31"
+
+    assert points.season_closing("ja", ends, datetime(2027, 3, 29, 12)) == "今シーズンは残り 2 日"
+    assert points.season_closing("en", ends, datetime(2027, 3, 30, 12)) == "1 day left this season"
+    assert points.season_closing("ja", ends, datetime(2027, 3, 31, 12)) == "今シーズンは今日まで"
+
+
+def test_member_view_shows_the_season_and_past_medals():
+    view = points.member_view({
+        "departments": {},
+        "season": {"id": "2027Q2", "points": 12, "medal": 2, "next": 20, "remaining": 8},
+        "season_history": [{"season": "2027Q1", "medal": 4}, {"season": "2026Q4", "medal": 9}],
+    }, "ja")
+
+    assert view["season"]["medal"]["label"] == "シルバー"
+    assert view["season"]["next_medal"]["label"] == "ゴールド"
+    assert view["season_history"] == [
+        {"season": "2027Q1", "medal": {"key": "platinum", "label": "プラチナ"}}]
+
+
+def test_member_view_at_the_top_medal_has_no_next_goal():
+    view = points.member_view({
+        "departments": {},
+        "season": {"id": "2027Q2", "points": 40, "medal": 4, "next": None, "remaining": None},
+    }, "ja")
+
+    assert view["season"]["next_medal"] is None
 
 
 # --- dcssb (上流クライアント) --------------------------------------------------

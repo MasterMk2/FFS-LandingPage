@@ -996,6 +996,13 @@ def _points_url(dept: str, period: str) -> str:
     return "/rewards?" + urlencode({"dept": dept, "period": period})
 
 
+def _points_closing(lang: str, period: str, season: dict | None) -> str:
+    now = datetime.now(_JST)
+    if period == "month":
+        return points.month_closing(lang, now)
+    return points.season_closing(lang, season["ends"], now) if period == "season" else ""
+
+
 async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | None]:
     """本人欄の状態を返す。上流の詳細は外に出さず、状態名だけ返す。
 
@@ -1031,6 +1038,9 @@ async def points_page(request: Request):
     period = q.get("period") if q.get("period") in _POINTS_PERIOD_KEYS else "month"
 
     cached = points_cache.get()
+    season = points.season_info(cached.value.data) if cached.value and cached.value.ok else None
+    if period == "season" and season is None:
+        period = "month"
     board = None
     if cached.value is None:
         board_state = "error" if cached.error else "pending"
@@ -1061,11 +1071,11 @@ async def points_page(request: Request):
         "period_tabs": [
             {"key": p, "label": i18n.t(lang, "pt_period_" + p),
              "href": _points_url(dept, p), "active": p == period}
-            for p in _POINTS_PERIOD_KEYS
+            for p in _POINTS_PERIOD_KEYS if p != "season" or season is not None
         ],
         "dept_label": i18n.t(lang, "pt_dept_" + dept),
         "period_label": i18n.t(lang, "pt_period_" + period),
-        "closing": points.month_closing(lang, datetime.now(_JST)) if period == "month" else "",
+        "closing": _points_closing(lang, period, season),
         "how_to": i18n.t(lang, "pt_how_" + dept),
         "board_state": board_state,
         "rows": rows,

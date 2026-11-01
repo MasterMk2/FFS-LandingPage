@@ -404,6 +404,15 @@ footer small{font-size:.75rem}
 .pts-ranks .pts-gap{display:block;color:var(--muted);font-size:.76rem;margin-left:6.5rem}
 .pts-btn{display:inline-block;font:inherit;font-size:.82rem;color:var(--accent);text-decoration:none;background:transparent;padding:.35rem .8rem;border:1px solid var(--accent-line);border-radius:6px;cursor:pointer;transition:all .15s}
 .pts-btn:hover{background:rgba(var(--wash-rgb),.07);border-color:var(--accent)}
+.pts-btn-primary{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:700}
+.pts-btn-primary:hover{background:var(--accent-dim);border-color:var(--accent-dim)}
+.pts-link{margin:0 0 1rem;padding:0 0 1rem;border-bottom:1px solid var(--border)}
+.pts-link p{margin:0 0 .5rem}
+.pts-link-lead{font-size:.88rem}
+.pts-link-code{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem}
+.pts-link-code code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:1.3rem;font-weight:700;color:var(--fg);user-select:all}
+.pts-link-form{margin:.25rem 0 0}
+@media (pointer:coarse){.pts-link .pts-btn{display:inline-flex;align-items:center;min-height:44px}}
 .pts-logout{margin-top:.75rem}
 
 /* /known-issues page */

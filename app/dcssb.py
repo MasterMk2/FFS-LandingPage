@@ -123,15 +123,51 @@ async def get_points_board() -> FetchResult:
 _DISCORD_ID_RE = re.compile(r"[0-9]{5,25}")
 
 
+async def _points_personal(method: str, kind: str, discord_id: str) -> FetchResult:
+    """本人用の API。_get と違い、ログに Discord ID を含むパスと応答本文を残さない。"""
+    if not _DISCORD_ID_RE.fullmatch(discord_id or ""):
+        return FetchResult(ok=False, error="invalid id")
+    url = f"{DCSSB_BASE_URL.rstrip('/')}{DCSSB_POINTS_PREFIX}/{kind}/{discord_id}"
+    try:
+        async with httpx.AsyncClient(
+            timeout=DCSSB_TIMEOUT, transport=TRANSPORT
+        ) as client:
+            r = await client.request(method, url, headers=_headers())
+    except httpx.HTTPError as e:
+        log.warning("dcssb: %s points %s failed: %s", method, kind, type(e).__name__)
+        return FetchResult(ok=False, error=public_error(e))
+    if r.status_code != 200:
+        log.warning("dcssb: %s points %s -> HTTP %d", method, kind, r.status_code)
+        return FetchResult(
+            ok=False, status_code=r.status_code, error=f"HTTP {r.status_code}"
+        )
+    try:
+        return FetchResult(ok=True, data=r.json(), status_code=r.status_code)
+    except ValueError:
+        log.warning("dcssb: %s points %s -> invalid JSON", method, kind)
+        return FetchResult(ok=False, error="invalid response")
+
+
 async def get_points_member(discord_id: str) -> FetchResult:
     """Points API: GET /points/member/{discord_id} — 本人用。ログイン済みのときだけ呼ぶ。
 
     404 は「DCS と連携していない」、409 は「複数の DCS アカウントが連携している」、
     503 は「集計の準備中」。
     """
-    if not _DISCORD_ID_RE.fullmatch(discord_id or ""):
-        return FetchResult(ok=False, error="invalid id")
-    return await _get(f"/member/{discord_id}", prefix=DCSSB_POINTS_PREFIX)
+    return await _points_personal("GET", "member", discord_id)
+
+
+async def get_points_link(discord_id: str) -> FetchResult:
+    """Points API: GET /points/link/{discord_id} — 連携の状態と発行中のコード。本人用。
+
+    404 は旧版の Bot。
+    """
+    return await _points_personal("GET", "link", discord_id)
+
+
+async def post_points_link(discord_id: str) -> FetchResult:
+    """Points API: POST /points/link/{discord_id} — コードの発行。発行中なら期限が延びる。"""
+    return await _points_personal("POST", "link", discord_id)
 
 
 async def open_track_stream(

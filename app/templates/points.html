@@ -11,6 +11,14 @@
     {%- endif %}
   </li>
 {%- endmacro %}
+{% macro link_form(label, csrf, dept, period, primary=false) -%}
+  <form method="post" action="/rewards/link" class="pts-link-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="dept" value="{{ dept }}">
+    <input type="hidden" name="period" value="{{ period }}">
+    <button type="submit" class="pts-btn{% if primary %} pts-btn-primary{% endif %}">{{ label }}</button>
+  </form>
+{%- endmacro %}
 {% block content %}
 <section class="points-page">
   <header class="pts-header">
@@ -69,18 +77,53 @@
   </section>
 
   {% if login_enabled %}
-  <section class="pts-me" aria-labelledby="pts-me-title">
+  <section id="pts-me" class="pts-me" aria-labelledby="pts-me-title">
     <h3 id="pts-me-title">{{ t('pt_me_title') }}</h3>
     {% if not logged_in %}
       <p class="pts-hint">{{ t('pt_me_hint') }}</p>
       <p><a class="pts-btn" href="/auth/discord/login">{{ t('pt_me_login') }}</a></p>
     {% else %}
+      {% set show_link = link and link.state != 'verified' %}
+      {% if link_failed and (show_link or not link) %}
+      <div class="error">{{ t('pt_link_failed') }}</div>
+      {% if not link %}{{ link_form(t('pt_link_retry'), csrf, dept, period) }}{% endif %}
+      {% endif %}
+      {% if show_link %}
+      <div class="pts-link">
+        {% if not link.in_guild %}
+        <p class="pts-hint">{{ t('pt_link_guild') }}</p>
+        <p><a class="pts-btn pts-btn-primary" href="{{ discord_invite }}" target="_blank" rel="noopener">{{ t('pt_link_join') }}</a></p>
+        {% elif link.code %}
+        <p class="pts-link-lead">{{ t('pt_link_code_lead') }}</p>
+        <p class="pts-link-code">
+          <code id="pts-link-command">.linkme {{ link.code }}</code>
+          <button type="button" class="pts-btn" id="pts-link-copy" data-done="{{ t('pt_link_copied') }}" hidden>{{ t('pt_link_copy') }}</button>
+        </p>
+        {% if link.state == 'multiple' %}
+        <p class="pts-hint">{{ t('pt_link_multiple') }}</p>
+        {% endif %}
+        {% if link.expires %}
+        <p class="pts-hint">{{ t('pt_link_expires').format(at=link.expires) }}</p>
+        {% endif %}
+        {{ link_form(t('pt_link_renew'), csrf, dept, period) }}
+        {% elif link.state == 'name_match' %}
+        <p class="pts-hint">{{ t('pt_link_name_match') }}</p>
+        {{ link_form(t('pt_link_verify'), csrf, dept, period) }}
+        {% elif link.state == 'multiple' %}
+        <p class="pts-hint">{{ t('pt_link_multiple') }}</p>
+        {{ link_form(t('pt_link_verify'), csrf, dept, period) }}
+        {% else %}
+        <p class="pts-hint">{{ t('pt_link_none') }}</p>
+        {{ link_form(t('pt_link_start'), csrf, dept, period, primary=true) }}
+        {% endif %}
+      </div>
+      {% endif %}
       {% if member_state == 'ok' %}
         {% for member in (member.accounts or [member]) %}
         {% if member.name %}
         <p class="pts-name">{{ t('pt_me_name') if member.dcs_linked else t('pt_me_discord_name') }}: {{ member.name }}</p>
         {% endif %}
-        {% if not member.dcs_linked %}
+        {% if not member.dcs_linked and not show_link %}
         <p class="notice">{{ t('pt_me_discord_only') }}</p>
         {% endif %}
         {% if member.opted_out %}
@@ -156,7 +199,7 @@
         {% endif %}
         {% endfor %}
       {% elif member_state == 'not_linked' %}
-        <p class="notice">{{ t('pt_me_not_linked') }}</p>
+        {% if not show_link %}<p class="notice">{{ t('pt_me_not_linked') }}</p>{% endif %}
       {% elif member_state == 'multiple_links' %}
         <p class="notice">{{ t('pt_me_multiple_links') }}</p>
       {% elif member_state == 'preparing' %}
@@ -175,4 +218,21 @@
   <p class="pts-note">{{ t('pt_note') }}</p>
   <p class="updated">updated {{ age }} ({{ updated_at }})</p>
 </section>
+{% if link and link.code %}
+<script>
+  (function () {
+    var button = document.getElementById('pts-link-copy');
+    if (!button || !navigator.clipboard) return;
+    var command = document.getElementById('pts-link-command');
+    button.hidden = false;
+    button.addEventListener('click', function () {
+      navigator.clipboard.writeText(command.textContent).then(function () {
+        button.textContent = button.dataset.done;
+      }, function () {
+        window.getSelection().selectAllChildren(command);
+      });
+    });
+  })();
+</script>
+{% endif %}
 {% endblock %}

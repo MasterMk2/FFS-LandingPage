@@ -98,12 +98,15 @@ def discord(monkeypatch):
 @pytest.fixture
 def upstream(monkeypatch):
     """DCSSB の偽装。member_status / member_body を変えて本人欄の状態を作る。"""
-    state = {"member_status": 200, "member_body": MEMBER_OK, "seen": []}
+    state = {"member_status": 200, "member_body": MEMBER_OK, "seen": [],
+             "link_status": 404, "link_body": {"detail": "Not Found"}}
 
     def handler(request: httpx.Request) -> httpx.Response:
         state["seen"].append(request)
         if request.url.path.startswith("/points/member/"):
             return httpx.Response(state["member_status"], json=state["member_body"])
+        if request.url.path.startswith("/points/link/"):
+            return httpx.Response(state["link_status"], json=state["link_body"])
         if request.url.path == "/points/board":
             return httpx.Response(200, json={"boards": {"month": {}, "all": {}}})
         return httpx.Response(404)
@@ -534,3 +537,193 @@ def test_valid_session_cookie_is_accepted_positive_control(discord_on, discord, 
 
     assert 'class="pts-me"' in c.get("/rewards?lang=ja").text
     assert "Bravo" in c.get("/rewards?lang=ja").text
+
+
+# --- 本人欄からの DCS 連携 ---------------------------------------------------------
+
+def _link(upstream, state="none", code=None, in_guild=True):
+    upstream["link_status"] = 200
+    upstream["link_body"] = {
+        "state": state, "code": code, "in_guild": in_guild,
+        "expires_at": "2026-11-04T00:00:00+00:00" if code else None,
+    }
+
+
+def _me(html: str) -> str:
+    return html.split('class="pts-me"')[1].split("pts-logout")[0]
+
+
+def _posts(upstream) -> list[str]:
+    return [r.url.path for r in upstream["seen"] if r.method == "POST"]
+
+
+def test_unlinked_member_is_offered_the_link(discord_on, discord, upstream):
+    upstream["member_status"] = 404
+    upstream["member_body"] = {"detail": "not_linked"}
+    _link(upstream)
+
+    html = _login(_client()).get("/rewards?lang=ja").text
+
+    assert "DCS と連携" in _me(html) and 'action="/rewards/link"' in html
+    assert "DCS サーバーで .linkme により" not in html
+
+
+def test_pending_code_shows_command_and_deadline_in_jst(discord_on, discord, upstream):
+    upstream["member_status"] = 404
+    upstream["member_body"] = {"detail": "not_linked"}
+    _link(upstream, code="1234")
+
+    r = _login(_client()).get("/rewards?lang=ja")
+
+    assert ".linkme 1234" in _me(r.text)
+    assert "11/4 09:00" in _me(r.text) and "期限を延ばす" in _me(r.text)
+    assert r.headers["cache-control"] == "private, no-store"
+
+
+def test_english_page_uses_english_link_text(discord_on, discord, upstream):
+    _link(upstream, code="1234")
+
+    html = _login(_client()).get("/rewards?lang=en").text
+
+    assert "Valid until 11/4 09:00 JST" in html and "Extend the deadline" in html
+
+
+def test_name_matched_member_keeps_the_record_and_gets_one_line(discord_on, discord, upstream):
+    _link(upstream, state="name_match")
+
+    html = _me(_login(_client()).get("/rewards?lang=ja").text)
+
+    assert "名前で自動連携しています" in html and "本人確認" in html
+    assert "pts-btn-primary" not in html
+    assert 'class="pts-card"' in html
+
+
+def test_verified_member_sees_nothing_new(discord_on, discord, upstream):
+    _link(upstream, state="verified")
+
+    html = _login(_client()).get("/rewards?lang=ja&link=failed").text
+
+    assert "/rewards/link" not in html and "pts-link" not in html
+    assert "コードを発行できませんでした" not in html
+
+
+def test_multiple_links_warn_before_verifying(discord_on, discord, upstream):
+    _link(upstream, state="multiple")
+    html = _me(_login(_client()).get("/rewards?lang=ja").text)
+    assert "他のアカウントの実績は本人欄から外れます" in html and "本人確認" in html
+
+    _link(upstream, state="multiple", code="1234")
+    html = _me(_login(_client()).get("/rewards?lang=ja").text)
+    assert "他のアカウントの実績は本人欄から外れます" in html and ".linkme 1234" in html
+
+
+def test_member_outside_the_discord_is_invited(discord_on, discord, upstream):
+    upstream["member_status"] = 404
+    upstream["member_body"] = {"detail": "not_linked"}
+    _link(upstream, in_guild=False)
+
+    html = _me(_login(_client()).get("/rewards?lang=ja").text)
+
+    assert "https://discord.gg/h7VkMbUycE" in html and "/rewards/link" not in html
+
+
+def test_old_bot_hides_the_link_and_keeps_the_old_guidance(discord_on, discord, upstream):
+    upstream["member_status"] = 404
+    upstream["member_body"] = {"detail": "not_linked"}
+
+    html = _login(_client()).get("/rewards?lang=ja").text
+
+    assert "/rewards/link" not in html and "DCS サーバーで .linkme により" in html
+
+
+@pytest.mark.parametrize("body", [
+    {"state": "other"}, {"code": "1234"}, ["none"], "none",
+])
+def test_unexpected_link_shape_is_hidden(discord_on, discord, upstream, body):
+    upstream["link_status"] = 200
+    upstream["link_body"] = body
+
+    assert "/rewards/link" not in _login(_client()).get("/rewards?lang=ja").text
+
+
+def test_issue_requires_login_and_csrf(discord_on, discord, upstream):
+    _link(upstream)
+    c = _client()
+    assert c.post("/rewards/link", content=b"csrf=x", follow_redirects=False).status_code == 403
+    _login(c)
+    assert c.post("/rewards/link", content=b"csrf=wrong", follow_redirects=False).status_code == 403
+    assert c.post("/rewards/link", content=b"", follow_redirects=False).status_code == 403
+    assert c.post("/rewards/link", content=b"x" * 5000, follow_redirects=False).status_code == 413
+    assert not _posts(upstream)
+
+
+def test_issue_is_404_when_discord_env_is_missing(upstream):
+    assert _client().post("/rewards/link", content=b"csrf=x").status_code == 404
+
+
+def test_issue_uses_the_session_id_and_returns_to_the_same_tab(discord_on, discord, upstream):
+    _link(upstream, code="1234")
+    c = _login(_client())
+    token = _csrf(c.get("/rewards?lang=ja").text)
+
+    r = c.post("/rewards/link", follow_redirects=False,
+               content=f"csrf={token}&dept=free&period=all&discord_id=999999".encode(),
+               headers={"content-type": "application/x-www-form-urlencoded"})
+
+    assert r.status_code == 303
+    assert r.headers["location"] == "/rewards?dept=free&period=all#pts-me"
+    assert r.headers["cache-control"] == "no-store"
+    assert _posts(upstream) == [f"/points/link/{DISCORD_ID}"]
+
+
+def test_issue_ignores_unknown_tabs(discord_on, discord, upstream):
+    _link(upstream, code="1234")
+    c = _login(_client())
+    token = _csrf(c.get("/rewards?lang=ja").text)
+
+    r = c.post("/rewards/link", follow_redirects=False,
+               content=f"csrf={token}&dept=//evil&period=x".encode())
+
+    assert r.headers["location"] == "/rewards?dept=total&period=month#pts-me"
+
+
+@pytest.mark.parametrize("status,body", [
+    (503, {"detail": "not ready"}), (500, {"detail": MARKER}), (200, {"state": "other"}),
+])
+def test_failed_issue_is_shown_in_the_section_with_a_retry(discord_on, discord, upstream, status, body, caplog):
+    upstream["link_status"], upstream["link_body"] = status, body
+    c = _login(_client())
+    token = _csrf(c.get("/rewards?lang=ja").text)
+
+    r = c.post("/rewards/link", follow_redirects=False, content=f"csrf={token}".encode())
+
+    assert r.status_code == 303 and "link=failed" in r.headers["location"]
+    html = _me(c.get(r.headers["location"]).text)
+    assert "コードを発行できませんでした" in html and "もう一度" in html
+    assert 'class="pts-card"' in html and MARKER not in html
+
+
+def test_unreachable_bot_does_not_break_the_page(discord_on, discord, monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("no route to internal-host")
+
+    monkeypatch.setattr(dcssb, "TRANSPORT", httpx.MockTransport(handler))
+    c = _login(_client())
+    token = _csrf(c.get("/rewards?lang=ja").text)
+
+    r = c.post("/rewards/link", follow_redirects=False, content=f"csrf={token}".encode())
+    page = c.get(r.headers["location"])
+
+    assert page.status_code == 200 and "コードを発行できませんでした" in page.text
+    assert "internal-host" not in page.text
+
+
+def test_link_failures_keep_the_discord_id_and_code_out_of_the_log(discord_on, discord, upstream, caplog):
+    upstream["link_status"], upstream["link_body"] = 500, {"code": "1234", "detail": MARKER}
+    c = _login(_client())
+    token = _csrf(c.get("/rewards?lang=ja").text)
+    c.post("/rewards/link", content=f"csrf={token}".encode())
+
+    log = "\n".join(r.getMessage() for r in caplog.records if r.name in ("app.dcssb", "httpx"))
+    assert "points link -> HTTP 500" in log
+    assert DISCORD_ID not in log and "1234" not in log and MARKER not in log

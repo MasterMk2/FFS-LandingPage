@@ -28,6 +28,8 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+# httpx の INFO は要求 URL を出す。本人用の API の URL には Discord ID が入る。
+logging.getLogger("httpx").setLevel(logging.WARNING)
 log = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).parent
@@ -133,6 +135,7 @@ def _ga_measurement_id(raw: str) -> str | None:
     return value
 
 
+templates.env.globals["discord_invite"] = "https://discord.gg/h7VkMbUycE"
 templates.env.globals["ga_measurement_id"] = _ga_measurement_id(
     os.getenv("GA_MEASUREMENT_ID", "")
 )
@@ -1024,6 +1027,12 @@ async def _points_member_state(discord_id: str, lang: str) -> tuple[str, dict | 
     return "unavailable", None
 
 
+async def _points_link_state(discord_id: str) -> dict | None:
+    """連携の状態。取れないとき (旧版の Bot を含む) は None で、連携の表示だけ隠す。"""
+    res = await dcssb.get_points_link(discord_id)
+    return points.link_view(res.data) if res.ok else None
+
+
 @app.get("/points")
 async def points_moved(request: Request):
     query = request.url.query
@@ -1054,13 +1063,15 @@ async def points_page(request: Request):
     cfg = auth.config()
     uid = None
     csrf = ""
-    member_state, member = None, None
+    member_state, member, link = None, None, None
     if cfg is not None:
         session_token = request.cookies.get(auth.SESSION_COOKIE)
         uid = auth.read_session(cfg, session_token)
         if uid is not None:
             csrf = auth.csrf_token(cfg, session_token)
-            member_state, member = await _points_member_state(uid, lang)
+            (member_state, member), link = await asyncio.gather(
+                _points_member_state(uid, lang), _points_link_state(uid)
+            )
 
     ctx = {
         "dept_tabs": [
@@ -1083,6 +1094,10 @@ async def points_page(request: Request):
         "logged_in": uid is not None,
         "member_state": member_state,
         "member": member,
+        "link": link,
+        "link_failed": q.get("link") == "failed",
+        "dept": dept,
+        "period": period,
         "csrf": csrf,
         "login_failed": q.get("login") == "failed",
         "updated_at": _fmt_dt(cached.fetched_at),
@@ -1093,6 +1108,41 @@ async def points_page(request: Request):
     resp.headers["Vary"] = "Cookie"
     if uid is not None:
         resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+async def _posted_form(request: Request, cfg: auth.Config) -> dict[str, list[str]]:
+    """Cookie のセッションに結びついた CSRF トークンを確かめて、フォームの値を返す。"""
+    body = await request.body()
+    if len(body) > 4096:
+        raise HTTPException(413)
+    form = parse_qs(body.decode("utf-8", "replace"))
+    submitted = (form.get("csrf") or [""])[0]
+    if not auth.csrf_ok(cfg, request.cookies.get(auth.SESSION_COOKIE), submitted):
+        raise HTTPException(403, "invalid request")
+    return form
+
+
+@app.post("/rewards/link")
+async def points_link(request: Request):
+    cfg = auth.config()
+    if cfg is None:
+        raise HTTPException(404)
+    form = await _posted_form(request, cfg)
+    uid = auth.read_session(cfg, request.cookies.get(auth.SESSION_COOKIE))
+    if uid is None:
+        raise HTTPException(403, "invalid request")
+    dept = (form.get("dept") or [""])[0]
+    period = (form.get("period") or [""])[0]
+    url = _points_url(
+        dept if dept in _POINTS_DEPT_KEYS else "total",
+        period if period in _POINTS_PERIOD_KEYS else "month",
+    )
+    res = await dcssb.post_points_link(uid)
+    if not res.ok or points.link_view(res.data) is None:
+        url += "&link=failed"
+    resp = RedirectResponse(url + "#pts-me", status_code=303)
+    resp.headers["Cache-Control"] = "no-store"
     return resp
 
 
@@ -1148,12 +1198,7 @@ async def discord_logout(request: Request):
     cfg = auth.config()
     if cfg is None:
         raise HTTPException(404)
-    body = await request.body()
-    if len(body) > 4096:
-        raise HTTPException(413)
-    submitted = (parse_qs(body.decode("utf-8", "replace")).get("csrf") or [""])[0]
-    if not auth.csrf_ok(cfg, request.cookies.get(auth.SESSION_COOKIE), submitted):
-        raise HTTPException(403, "invalid request")
+    await _posted_form(request, cfg)
     resp = RedirectResponse("/rewards", status_code=303)
     resp.delete_cookie(
         auth.SESSION_COOKIE, path="/", httponly=True, secure=True, samesite="lax",

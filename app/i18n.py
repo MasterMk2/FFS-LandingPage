@@ -310,6 +310,41 @@ MESSAGES: dict[str, dict[str, str]] = {
         "ja": "この Discord アカウントに複数の DCS アカウントが連携しているため、リワードを表示できません。記録は残っています。普段使っている DCS 名を運営に伝えて、連携を整理してもらってください。",
         "en": "Several DCS accounts are linked to this Discord account, so your rewards can't be shown. Your records are safe. Tell the FFS staff which DCS name you use so they can fix the link.",
     },
+    "pt_link_none": {
+        "ja": "DCS アカウントと連携すると、飛行の記録がここに表示され、称号のロールも付きます。",
+        "en": "Link your DCS account to see your flights here and receive your title roles.",
+    },
+    "pt_link_start": {"ja": "DCS と連携", "en": "Link DCS account"},
+    "pt_link_code_lead": {
+        "ja": "DCS サーバーに入り、ゲーム内チャットで次のとおり入力してください。",
+        "en": "Join a DCS server and enter this in the in-game chat.",
+    },
+    "pt_link_copy": {"ja": "コピー", "en": "Copy"},
+    "pt_link_copied": {"ja": "コピーしました", "en": "Copied"},
+    "pt_link_expires": {
+        "ja": "有効期限: {at}（日本時間）。入力の後にこのページを開き直すと、記録が表示されます。",
+        "en": "Valid until {at} JST. After entering it, reload this page to see your record.",
+    },
+    "pt_link_renew": {"ja": "期限を延ばす", "en": "Extend the deadline"},
+    "pt_link_name_match": {
+        "ja": "名前で自動連携しています。本人確認をすると確定します。別の人のアカウントなら運営へ連絡してください。",
+        "en": "This account was linked automatically by name. Verify it to confirm the link. If it isn't yours, tell the FFS staff.",
+    },
+    "pt_link_verify": {"ja": "本人確認", "en": "Verify"},
+    "pt_link_multiple": {
+        "ja": "複数の DCS アカウントが連携しています。本人確認をすると、ゲームに入るアカウントだけが自分の記録になり、他のアカウントの実績は本人欄から外れます。",
+        "en": "Several DCS accounts are linked. Once you verify, only the account you join the game with counts as yours, and the others leave this section.",
+    },
+    "pt_link_guild": {
+        "ja": "連携には FFS の Discord への参加が必要です。参加してから、このページを開き直してください。",
+        "en": "Linking requires joining the FFS Discord. Join, then reload this page.",
+    },
+    "pt_link_join": {"ja": "Discord に参加", "en": "Join the Discord"},
+    "pt_link_failed": {
+        "ja": "コードを発行できませんでした。時間をおいて、もう一度お試しください。",
+        "en": "The code couldn't be issued. Please try again in a moment.",
+    },
+    "pt_link_retry": {"ja": "もう一度", "en": "Try again"},
     "pt_me_preparing": {
         "ja": "リワード集計の準備中です。しばらくしてから再読み込みしてください。",
         "en": "Rewards are being tallied. Reload in a little while.",

@@ -7,7 +7,8 @@
 from __future__ import annotations
 
 import calendar
-from datetime import datetime
+import re
+from datetime import datetime, timedelta, timezone
 
 from . import i18n
 
@@ -16,6 +17,9 @@ PERIODS = ("month", "season", "all")
 BOARD_DEPTS = ("total", "host", "lead", "coop", "free", "author")
 # 本人欄で出す部門 (総合は別カード、飛行時間は free_hours から)。
 MEMBER_DEPTS = ("host", "lead", "coop", "free", "author")
+# /points/link の状態。verified の人には何も足さない。
+LINK_STATES = ("none", "name_match", "multiple", "verified")
+JST = timezone(timedelta(hours=9))
 BOARD_LIMIT = 10
 NAME_MAX = 64
 
@@ -269,6 +273,25 @@ def _season_history(lang: str, history: object) -> list[dict]:
         if medal is not None and isinstance(entry.get("season"), str):
             out.append({"season": entry["season"], "medal": medal})
     return out
+
+
+def link_view(data: object) -> dict | None:
+    """/points/link/{id} の応答を本人欄の表示用に変える。形が違えば None。"""
+    if not isinstance(data, dict) or data.get("state") not in LINK_STATES:
+        return None
+    code = data.get("code")
+    if not (isinstance(code, str) and re.fullmatch(r"[0-9]{4}", code)):
+        code = None
+    try:
+        expires = datetime.fromisoformat(data["expires_at"]).astimezone(JST)
+    except (KeyError, TypeError, ValueError):
+        expires = None
+    return {
+        "state": data["state"],
+        "code": code,
+        "expires": f"{expires.month}/{expires.day} {expires:%H:%M}" if expires else None,
+        "in_guild": data.get("in_guild") is True,
+    }
 
 
 def member_view(data: object, lang: str) -> dict | None:

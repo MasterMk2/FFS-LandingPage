@@ -5,95 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>ダウンロード — Freedom Flight</title>
-<style>
-  :root {
-    --bg: #ffffff; --fg: #1d1d1f; --muted: #5b5f66; --line: #d9dce1; --link: #0a5bd3; --row: #f6f7f9;
-    color-scheme: light dark;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #16181c; --fg: #e8e9ec; --muted: #a4a9b1; --line: #33373e; --link: #7cb2ff; --row: #1e2126; }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font-family: "Segoe UI", "Yu Gothic UI", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
-    line-height: 1.6;
-  }
-  main { max-width: 52rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
-  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-  .lead { color: var(--muted); margin: 0 0 1.5rem; }
-  ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
-  li {
-    display: grid; grid-template-columns: 1fr auto; gap: 0.25rem 1rem; align-items: center;
-    padding: 0.9rem 0.5rem; border-bottom: 1px solid var(--line);
-  }
-  li:hover { background: var(--row); }
-  .name { font-weight: 600; font-size: 1.05rem; }
-  .desc { grid-column: 1; color: var(--muted); font-size: 0.92rem; }
-  .get { grid-column: 2; grid-row: 1 / span 2; white-space: nowrap; }
-  a { color: var(--link); }
-  a:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 2px; }
-  .get a { display: inline-block; padding: 0.45rem 0.2rem; min-height: 44px; line-height: 1.9; }
-  .tag { font-size: 0.8rem; color: var(--muted); margin-left: 0.4rem; font-weight: 400; }
-  section { margin-top: 2rem; }
-  h2 { font-size: 1.05rem; margin: 0 0 0.5rem; }
-  section p, section li { font-size: 0.95rem; }
-  section ul { border: 0; padding-left: 1.2rem; list-style: disc; }
-  section li { display: list-item; padding: 0.15rem 0; border: 0; }
-  section li:hover { background: none; }
-  @media (max-width: 34rem) {
-    li { grid-template-columns: 1fr; }
-    .get { grid-column: 1; grid-row: auto; }
-  }
-</style>
+<link rel="stylesheet" href="/updates/style.css">
 </head>
 <body>
 <main>
   <h1>ダウンロード</h1>
-  <p class="lead">自作の Windows 向けアプリのインストーラーです。各製品のページで最新版を入手できます。</p>
+  <p class="lead">自作の Windows 向けアプリです。製品名から紹介を、右のリンクからダウンロードページを開けます。</p>
 
-  <ul>
+  <ul class="products">
     <li>
-      <span class="name">EddiePDF</span>
+      <span class="name"><a href="/updates/eddiepdf/">EddiePDF</a></span>
       <span class="desc">オフラインで動く多機能 PDF 編集ソフト</span>
-      <span class="get"><a href="/updates/eddiepdf/full/">ダウンロードページ</a></span>
+      <span class="get"><a href="/updates/eddiepdf/full/">ダウンロード</a></span>
     </li>
     <li>
-      <span class="name">GUNYUPDF</span>
-      <span class="desc">書籍スキャン PDF の傾き・湾曲・影を補正するアプリ</span>
-      <span class="get"><a href="/updates/gunyupdf/full/">ダウンロードページ</a></span>
+      <span class="name"><a href="/updates/gunyupdf/">GUNYUPDF</a></span>
+      <span class="desc">書籍スキャン PDF の湾曲・傾き・影を補正するアプリ</span>
+      <span class="get"><a href="/updates/gunyupdf/full/">ダウンロード</a></span>
     </li>
     <li>
-      <span class="name">ALLOCR</span>
+      <span class="name"><a href="/updates/allocr/">ALLOCR</a></span>
       <span class="desc">日本語文書をクラウドに送らずにテキスト化する OCR アプリ</span>
-      <span class="get"><a href="/updates/allocr/full/">ダウンロードページ</a></span>
+      <span class="get"><a href="/updates/allocr/full/">ダウンロード</a></span>
     </li>
     <li>
-      <span class="name">Transinglater</span>
-      <span class="desc">オフラインで動く日英翻訳ソフト（モデル込みのフル版は約 4.5GB）</span>
-      <span class="get"><a href="/updates/transinglater/full/">ダウンロードページ</a></span>
+      <span class="name"><a href="/updates/transinglater/">Transinglater</a></span>
+      <span class="desc">オフラインで動く日英翻訳ソフト</span>
+      <span class="get"><a href="/updates/transinglater/full/">ダウンロード</a></span>
     </li>
     <li>
-      <span class="name">IshikawADE</span>
+      <span class="name"><a href="/updates/ishikawade/">IshikawADE</a></span>
       <span class="desc">やりたいことを開発タスクに整理し、計画と PR 本文案をつくるアプリ</span>
-      <span class="get"><a href="/updates/ishikawade/full/">ダウンロードページ</a></span>
+      <span class="get"><a href="/updates/ishikawade/full/">ダウンロード</a></span>
     </li>
     <li>
-      <span class="name">DCS Mission Studio<span class="tag">公開</span></span>
+      <span class="name"><a href="/dcs-mission-studio/">DCS Mission Studio</a><span class="status">公開</span></span>
       <span class="desc">DCS のミッション（.miz）を、原本を残して編集するツール</span>
       <span class="get"><a href="/dcs-mission-studio/">配布ページ</a></span>
     </li>
   </ul>
 
-  <section>
-    <h2>パスについて</h2>
-    <ul>
-      <li>DCS Mission Studio 以外のページを開くと、ブラウザが ID とパスワード（パス）を尋ねます。パスは配布元から受け取ったものを入力してください。</li>
-      <li>製品ごとのパスはその製品のページだけ、開発協力者用のパス（ID が dev- で始まるもの）はすべての製品のページで使えます。</li>
-      <li>入れたあとの更新はアプリの［更新を確認...］からできます。アプリでも同じパスを一度入力します。</li>
-      <li>配信を始めた製品から順に開けます。開けない製品は、まだ配信していないか、そのパスでは見られない製品です。</li>
-    </ul>
-  </section>
+  <h2>パスについて</h2>
+  <ul class="plain">
+    <li>DCS Mission Studio 以外のダウンロードページを開くと、ブラウザが ID とパスワード（パス）を尋ねます。パスは配布元から受け取ったものを入力してください。</li>
+    <li>製品ごとのパスはその製品だけ、開発協力者用のパス（ID が dev- で始まるもの）はすべての製品で使えます。</li>
+    <li>入れたあとの更新はアプリの［更新を確認...］からできます。アプリでも同じパスを一度入力します。</li>
+    <li>配信を始めた製品から順にダウンロードできます。開けない場合は、まだ配信していないか、そのパスでは見られない製品です。</li>
+  </ul>
 </main>
 </body>
 </html>

@@ -101,15 +101,19 @@
 	}
 	respond @updates_write 405
 
-	# 製品の一覧 (公開)。中身は repo の caddy/updates-index/index.html を compose がフォルダごと渡す
-	# (フォルダで渡すので、git pull だけで新しい版が見える)。各製品のページはパスが要る。
+	# 製品の一覧と各製品の紹介ページ (公開)。中身は repo の caddy/updates-index/ を compose がフォルダごと
+	# 渡す (フォルダで渡すので、git pull だけで新しい版が見える)。
+	#   /updates/ → index.html、/updates/style.css、/updates/<product>/ → <product>/index.html
+	# ダウンロード (update.json・files/・full/) は下の @updates_protected でパスが要る。
 	redir /updates /updates/ 308
-	@updates_index path /updates/ /updates/index.html
-	handle @updates_index {
+	@updates_product_noslash path_regexp ^/updates/(eddiepdf|transinglater|ishikawade|gunyupdf|allocr)$
+	redir @updates_product_noslash {path}/ 308
+	@updates_site path_regexp ^/updates/((eddiepdf|transinglater|ishikawade|gunyupdf|allocr)/)?(index\.html|style\.css)?$
+	handle @updates_site {
 		header X-Robots-Tag "noindex, nofollow, noarchive"
 		header Cache-Control "no-cache"
+		uri strip_prefix /updates
 		root * /srv/updates-index
-		rewrite * /index.html
 		file_server
 	}
 
@@ -118,7 +122,7 @@
 		import update_files
 	}
 
-	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade|gunyupdf|allocr)/
+	@updates_protected path_regexp updates ^/updates/(eddiepdf|transinglater|ishikawade|gunyupdf|allocr)/(update\.json$|files/|full/)
 	handle @updates_protected {
 		basic_auth {
 			import /etc/caddy/update-passes/*.users

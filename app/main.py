@@ -556,10 +556,12 @@ async def panel_fitbit(request: Request):
     c_7d = fitbit7d_cache.get()       # 7 日 chart + 睡眠バー (600s)
     live = c_live.value if (c_live.value and not c_live.value.get("error")) else None
     seven = c_7d.value if (c_7d.value and not c_7d.value.get("error")) else None
-    # error は live を優先 (認証エラー等は両者共通)
+    # error は live を優先 (認証エラー等は両者共通)。c_live.error は cache が
+    # 例外を汎用の分類にしたもの。value の error (認証の不備) は中身によらず
+    # 固定の文だけを出す (理由は fitbit.py がログに残す)。
     error = c_live.error
     if c_live.value and c_live.value.get("error"):
-        error = c_live.value["error"]
+        error = _fitbit.PUBLIC_UNAVAILABLE
     # live を後勝ちで merge (window_end / current_hr は live が正)
     data = None
     if live or seven:

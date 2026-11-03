@@ -284,19 +284,31 @@ async def _fetch_hr_sampled_chunked(
     return out
 
 
-def _auth_error() -> dict | None:
+# 返り値の "error" は /health の Pilot Health パネルにそのまま出る。設定の不備の
+# 詳細 (環境変数名や直し方) は公開せずログにだけ残し、外へはこの固定の文だけを返す。
+PUBLIC_UNAVAILABLE = "fitbit: unavailable"
+
+
+def _auth_problem() -> str | None:
+    """認証に必要な値が揃っていない理由 (ログ用)。揃っていれば None。"""
     if not CLIENT_ID or not CLIENT_SECRET:
-        return {"error": "FITBIT_CLIENT_ID / FITBIT_CLIENT_SECRET が未設定"}
+        return "FITBIT_CLIENT_ID / FITBIT_CLIENT_SECRET が未設定"
     if not _refresh_token:
         _load_tokens()
     if not _refresh_token:
-        return {
-            "error": (
-                "Google Health API 未認証 — fitbit_auth.py を実行して"
-                " FITBIT_REFRESH_TOKEN を .env に設定してください"
-            )
-        }
+        return (
+            "Google Health API 未認証 — fitbit_auth.py を実行して"
+            " FITBIT_REFRESH_TOKEN を .env に設定してください"
+        )
     return None
+
+
+def _auth_error() -> dict | None:
+    problem = _auth_problem()
+    if problem is None:
+        return None
+    log.warning("fitbit: %s", problem)
+    return {"error": PUBLIC_UNAVAILABLE}
 
 
 async def get_fitbit_data() -> dict:

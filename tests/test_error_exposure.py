@@ -4,6 +4,7 @@
 cache の error・描画されたパネルのどこにも目印が出ないことを確かめる。
 """
 import asyncio
+import logging
 
 import httpx
 import psycopg
@@ -202,6 +203,52 @@ def test_fetch_exception_renders_only_the_category(monkeypatch, fetcher_name, pa
     assert "unexpected error" in r.text
     assert MARKER not in r.text
     assert "RuntimeError" not in r.text
+
+
+# 認証に必要な値が揃っていないとき、/health が読む /panel/fitbit には固定の文だけを
+# 出し、環境変数名や直し方はログにだけ残す。
+@pytest.mark.parametrize(
+    ("client_id", "refresh_token", "logged"),
+    [
+        ("", "rt", "FITBIT_CLIENT_ID / FITBIT_CLIENT_SECRET"),
+        ("cid", "", "FITBIT_REFRESH_TOKEN"),
+    ],
+    ids=["no-client-id", "no-refresh-token"],
+)
+def test_fitbit_auth_problem_is_logged_but_not_published(
+    monkeypatch, tmp_path, caplog, client_id, refresh_token, logged
+):
+    monkeypatch.setattr(fitbit, "CLIENT_ID", client_id)
+    monkeypatch.setattr(fitbit, "CLIENT_SECRET", MARKER)
+    monkeypatch.setattr(fitbit, "_refresh_token", refresh_token)
+    # token ファイルからも refresh_token を読めないようにする (無いファイルを指す)
+    monkeypatch.setattr(fitbit, "_TOKEN_FILE", tmp_path / "fitbit_tokens.json")
+    caplog.set_level(logging.WARNING, logger="app.fitbit")
+
+    _refresh(monkeypatch, main.fitbit_cache)
+    _refresh(monkeypatch, main.fitbit7d_cache)
+
+    for cached in (main.fitbit_cache.get(), main.fitbit7d_cache.get()):
+        assert cached.value == {"error": "fitbit: unavailable"}
+        assert cached.error is None
+
+    r = client.get("/panel/fitbit")
+
+    assert r.status_code == 200
+    assert '<p class="error">fitbit: unavailable</p>' in r.text
+    for detail in ("FITBIT_", "fitbit_auth.py", ".env", "未設定", "未認証", MARKER):
+        assert detail not in r.text
+
+    assert logged in caplog.text
+    # client secret の値そのものはログにも出さない
+    assert MARKER not in caplog.text
+
+
+def test_healthz_keeps_the_shape_monitoring_reads():
+    r = client.get("/healthz")
+
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
 
 
 # --- sysmon のインターフェース名 ------------------------------------------------------

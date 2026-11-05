@@ -15,12 +15,14 @@
     <span class="fix-toc-label">{% if lang == 'ja' %}記事{% else %}Articles{% endif %}</span>
     <ul>
       {% if lang == 'ja' %}
+      <li><a href="#ipc-shm-startup-hang">[Fix] DCS サーバが起動の途中で止まり「unreachable … Killing」で強制再起動される — Bot と Xvfb の IPC namespace が分かれていたことによる MIT-SHM の取り違え</a></li>
       <li><a href="#split-lock-misery">[Fix] DCS 2.9.30 に更新したらサーバ FPS が 117 から 77 に落ちて戻らない — Linux カーネルの split lock 対策 (10 ms ペナルティ) と split_lock_mitigate=0</a></li>
       <li><a href="#wine-heap-lfh-olympus">[Fix] Olympus 有効化後、無人でも約 2.5 時間でサーバ FPS が 28 まで崩落する — Wine ヒープの空きリスト線形走査 (LFH 未活性化) と ntdll.dll パッチ</a></li>
       <li><a href="#ecore-affinity-lag">[Fix] 日によってサーバ FPS が 5〜30 まで落ちる — DCSServerBot auto_affinity による E-core 固定と、SAM レーダー制御スクリプトの A/B 結果</a></li>
       <li><a href="#sim-thread-stall">[Investigation] 全プレイヤーが同時に一瞬フリーズする — シムスレッドのバースト肥大とプロセス稼働時間の関係</a></li>
       <li><a href="#wine-stub-crash">[Fix] DCS 2.9.27.24969 dedicated server crashes immediately on Wine (Linux) — msvcp140_atomic_wait.dll stub crash</a></li>
       {% else %}
+      <li><a href="#ipc-shm-startup-hang">[Fix] The DCS server stops partway through startup and gets force-restarted as "unreachable … Killing" — an MIT-SHM mix-up caused by the Bot and Xvfb living in separate IPC namespaces</a></li>
       <li><a href="#split-lock-misery">[Fix] After updating to DCS 2.9.30, server FPS drops from 117 to 77 and stays there — the Linux kernel's split lock mitigation (10 ms penalty) and split_lock_mitigate=0</a></li>
       <li><a href="#wine-heap-lfh-olympus">[Fix] After enabling Olympus, server FPS collapses to 28 within ~2.5 hours even with zero players — Wine heap free-list linear scan (LFH never activated) and an ntdll.dll patch</a></li>
       <li><a href="#ecore-affinity-lag">[Fix] Server FPS drops to 5–30 on some days — DCSServerBot auto_affinity pinning to E-cores, and an A/B test of the SAM radar-control script</a></li>
@@ -29,6 +31,215 @@
       {% endif %}
     </ul>
   </nav>
+
+  <article class="fix-article" id="ipc-shm-startup-hang">
+    {% if lang == 'ja' %}
+    <h3>[Fix] DCS サーバが起動の途中で止まり「unreachable … Killing」で強制再起動される — Bot と Xvfb の IPC namespace が分かれていたことによる MIT-SHM の取り違え</h3>
+    {% else %}
+    <h3>[Fix] The DCS server stops partway through startup and gets force-restarted as "unreachable … Killing" — an MIT-SHM mix-up caused by the Bot and Xvfb living in separate IPC namespaces</h3>
+    {% endif %}
+
+    <div class="fix-meta">
+      <span class="fix-tag">DCS Dedicated Server</span>
+      <span class="fix-tag">Wine 11.0</span>
+      <span class="fix-tag">Xvfb / MIT-SHM</span>
+      <span class="fix-tag">Docker</span>
+      <span class="fix-tag">DCSServerBot</span>
+      <span class="fix-tag">Startup</span>
+      <span class="fix-tag">2026-11-05</span>
+    </div>
+
+      <nav class="fix-toc" aria-label="{% if lang == 'ja' %}目次{% else %}Table of contents{% endif %}">
+        <span class="fix-toc-label">{% if lang == 'ja' %}目次{% else %}Contents{% endif %}</span>
+      <ol class="fix-toc-list">
+        <li><a href="#ipc-shm-startup-hang--environment">Environment</a></li>
+        <li><a href="#ipc-shm-startup-hang--symptom">Symptom</a></li>
+        <li><a href="#ipc-shm-startup-hang--method">Method</a></li>
+        <li><a href="#ipc-shm-startup-hang--findings">Findings</a></li>
+        <li><a href="#ipc-shm-startup-hang--root-cause">Root Cause ({% if lang == 'ja' %}別々の IPC namespace と MIT-SHM{% else %}separate IPC namespaces and MIT-SHM{% endif %})</a></li>
+        <li><a href="#ipc-shm-startup-hang--not-the-cause">{% if lang == 'ja' %}Not the cause (確認済みの容疑者){% else %}Not the cause (suspects cleared){% endif %}</a></li>
+        <li><a href="#ipc-shm-startup-hang--fix">Fix</a></li>
+        <li><a href="#ipc-shm-startup-hang--status">Status / Verification</a></li>
+      </ol>
+      </nav>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--environment">
+      <h4>Environment</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li>DCS World Dedicated Server 3 台 (<code>--server --norender</code>)、Linux + WineHQ stable <code>11.0</code> + Docker</li>
+        <li>DCS は DCSServerBot (3.0.4.26) のコンテナから <code>wine</code> で直接起動している。描画先は、DCS サーバ用コンテナ (aterfax/dcs-world-dedicated-server) の中で動く Xvfb <code>:1</code></li>
+        <li>Bot コンテナは DCS サーバ用コンテナと network namespace と PID namespace を共有している (<code>network_mode</code> / <code>pid: "service:dcs-server-N"</code>)。IPC namespace は Docker の既定のまま、コンテナごとに別々 (<code>private</code>)</li>
+        {% else %}
+        <li>Three DCS World Dedicated Server instances (<code>--server --norender</code>), Linux + WineHQ stable <code>11.0</code> + Docker</li>
+        <li>DCS is launched directly with <code>wine</code> from the DCSServerBot (3.0.4.26) container. It draws to the Xvfb <code>:1</code> running inside the DCS server container (aterfax/dcs-world-dedicated-server)</li>
+        <li>The Bot container shares the network and PID namespaces with the DCS server container (<code>network_mode</code> / <code>pid: "service:dcs-server-N"</code>). The IPC namespace was left at Docker's default: separate per container (<code>private</code>)</li>
+        {% endif %}
+      </ul>
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--symptom">
+      <h4>Symptom</h4>
+      {% if lang == 'ja' %}
+      <p>Discord の管理者向けチャンネルに、DCSServerBot の警告「Server "FFS open alpha N" unreachable — Can't reach server for more than 3 minutes. Killing ...」が繰り返し出ていた。主に 04:00 / 16:00 JST の定期再起動と、しばらく止めていたサーバを起動したときに起きる。3 台すべてで起きていた。</p>
+      <p>失敗した起動では、<code>dcs.log</code> が起動から 10〜20 秒で止まり、その後 1 行も進まない。止まる場所は次の 3 か所のどれか。</p>
+      <ul>
+        <li><code>Successfully got authorization data.</code> の直後 (正常なら 60 ms 後に次の行が出る)</li>
+        <li><code>Immediate load done.</code> の直後 (正常なら約 5 秒後にメインウィンドウのリサイズが出る)</li>
+        <li><code>Waiting for module resource mounts</code> の直後</li>
+      </ul>
+      <p>約 6.5 分後に Bot が強制終了して起動し直し、2〜3 回目で起動することが多かった。プレイヤーから見ると、定期再起動のあとサーバがなかなか戻ってこない。</p>
+<pre class="fix-pre"><code># 2026-11-05 16:01 JST の定期再起動 (server1)
+16:01:17  起動 1 回目 → 16:01:19 "Successfully got authorization data." で停止
+16:07:48  Bot が unreachable として kill、起動 2 回目
+16:09:05  "Immediate load done." で停止
+16:15:48  Bot が unreachable として kill、起動 3 回目
+16:16:27  起動完了 (30 秒)</code></pre>
+      {% else %}
+      <p>The Discord admin channel kept getting DCSServerBot's warning "Server "FFS open alpha N" unreachable — Can't reach server for more than 3 minutes. Killing ...". It happened mostly on the 04:00 / 16:00 JST scheduled restarts and when starting a server that had been stopped for a while, on all three servers.</p>
+      <p>In a failed startup, <code>dcs.log</code> stops 10–20 seconds in and never writes another line. It always stops at one of three places:</p>
+      <ul>
+        <li>right after <code>Successfully got authorization data.</code> (normally the next line follows 60 ms later)</li>
+        <li>right after <code>Immediate load done.</code> (normally the main window resize follows about 5 s later)</li>
+        <li>right after <code>Waiting for module resource mounts</code></li>
+      </ul>
+      <p>About 6.5 minutes later the Bot kills it and launches again; the second or third attempt usually succeeded. To players, the server simply took a long time to come back after a scheduled restart.</p>
+<pre class="fix-pre"><code># 2026-11-05 16:01 JST scheduled restart (server1)
+16:01:17  attempt 1 → stops at 16:01:19 "Successfully got authorization data."
+16:07:48  Bot kills it as unreachable, attempt 2
+16:09:05  stops at "Immediate load done."
+16:15:48  Bot kills it as unreachable, attempt 3
+16:16:27  startup complete (30 s)</code></pre>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--method">
+      <h4>Method</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li>10/28〜11/05 の起動について、<code>dcs.log</code> と DCSServerBot のログを突き合わせ、止まる場所と時刻を一覧にした</li>
+        <li><code>dcs.log</code> を 3 秒ごとに見張るスクリプトを常駐させ、起動中にログが止まったら DCS の各スレッドの <code>/proc</code> の状態を記録するようにした。DCS のプロセスは起動時の pid で追跡した</li>
+        <li>Wine の標準エラー出力が流れる Bot コンテナの出力 (<code>docker logs</code>) を、止まった時刻の前後で調べた</li>
+        <li>DCS と Xvfb の IPC namespace (<code>/proc/&lt;pid&gt;/ns/ipc</code>) と、両コンテナの共有メモリ (<code>ipcs -m</code>) を比べた</li>
+        {% else %}
+        <li>Lined up <code>dcs.log</code> against the DCSServerBot log for every startup from 10/28 to 11/05, listing where and when each one stopped</li>
+        <li>Ran a watcher that checks <code>dcs.log</code> every 3 s and records the <code>/proc</code> state of every DCS thread when the log stalls during startup, tracking the DCS process by the pid it had at launch</li>
+        <li>Searched the Bot container's output (<code>docker logs</code>), where Wine's stderr goes, around the stall times</li>
+        <li>Compared the IPC namespaces of DCS and Xvfb (<code>/proc/&lt;pid&gt;/ns/ipc</code>) and the shared memory segments in both containers (<code>ipcs -m</code>)</li>
+        {% endif %}
+      </ul>
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--findings">
+      <h4>Findings</h4>
+      {% if lang == 'ja' %}
+      <p>失敗した起動では、ログが止まった約 20 秒後に <strong>DCS_server.exe のプロセス自体が消えていた</strong>。一方、起動役のプロセス (<code>start.exe</code> / <code>wine</code>) は残っている。そのため Bot は「まだ起動中」と判断して待ち続け、3 分の無応答判定を経て kill していた。「ハング」に見えていたのは、実際には起動直後のクラッシュだった。</p>
+      <p>同じ瞬間、Bot コンテナの出力に次の X11 のエラーが出ていた。</p>
+      {% else %}
+      <p>In each failed startup, <strong>the DCS_server.exe process itself was gone</strong> about 20 seconds after the log stopped, while the launcher processes (<code>start.exe</code> / <code>wine</code>) were still alive. So the Bot kept treating it as "still starting" and only killed it after its 3-minute unreachable check. What looked like a hang was really a crash during startup.</p>
+      <p>At the same moment, the Bot container's output showed this X11 error:</p>
+      {% endif %}
+<pre class="fix-pre"><code>X Error of failed request:  BadValue (integer parameter out of range for operation)
+  Major opcode of failed request:  130 (MIT-SHM)
+  Minor opcode of failed request:  3 (X_ShmPutImage)</code></pre>
+      {% if lang == 'ja' %}
+      <p>時刻は 07:01:20 UTC と 07:09:11 UTC で、ログが止まった 1 秒後と 6 秒後。出力が残っている範囲 (11/05 06:12 UTC 以降) では、失敗 2 回とエラー 2 件が一対一で対応し、成功した 3 回目の起動ではこのエラーは出ていない。それより前の出力はローテートで消えていた。Xlib の既定のエラーハンドラは、エラーを受けるとプロセスを終了させる。</p>
+      <p>止まる位置も合う。認証の直後と <code>Immediate load done.</code> の直後は、どちらも DCS がメインウィンドウを作ったりリサイズしたりする場面で、<code>--norender</code> でもウィンドウの描画は起きている。</p>
+      <p>IPC namespace を比べると、DCS と Xvfb で別々だった。しかも<strong>同じ番号の共有メモリが両側に、中身もサイズも別物として</strong>存在していた。</p>
+<pre class="fix-pre"><code># 同じ PID namespace 内の 2 プロセス
+DCS_server.exe   ipc:[4026535052]
+Xvfb :1          ipc:[4026533045]
+
+# shmid 12 が両側にある
+Bot 側 (DCS が作成)      262,144 bytes
+Xvfb 側 (別のセグメント)  33,554,432 bytes</code></pre>
+      {% else %}
+      <p>The timestamps were 07:01:20 UTC and 07:09:11 UTC — 1 s and 6 s after the log stopped. Within the output still on hand (11/05 06:12 UTC onward), the 2 failures matched the 2 errors one-to-one, and the successful third attempt had no such error. Older output had already been rotated away. Xlib's default error handler terminates the process when it receives an error.</p>
+      <p>The stop points fit too. Right after authorization and right after <code>Immediate load done.</code> are both moments when DCS creates or resizes its main window, and window drawing still happens under <code>--norender</code>.</p>
+      <p>Comparing IPC namespaces, DCS and Xvfb were in different ones. And <strong>a shared memory segment with the same number existed on both sides, with different contents and sizes</strong>:</p>
+<pre class="fix-pre"><code># two processes in the same PID namespace
+DCS_server.exe   ipc:[4026535052]
+Xvfb :1          ipc:[4026533045]
+
+# shmid 12 exists on both sides
+Bot side (created by DCS)      262,144 bytes
+Xvfb side (unrelated segment)  33,554,432 bytes</code></pre>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--root-cause">
+      <h4>Root Cause ({% if lang == 'ja' %}別々の IPC namespace と MIT-SHM{% else %}separate IPC namespaces and MIT-SHM{% endif %})</h4>
+      {% if lang == 'ja' %}
+      <p>Wine の X11 ドライバは、ウィンドウの中身を X サーバへ送るときに MIT-SHM を使う。自分の IPC namespace に System V 共有メモリを作り、その番号 (shmid) を X サーバに渡して attach してもらう仕組みで、X サーバはその番号を<strong>自分の</strong> IPC namespace で探す。</p>
+      <p>DCS (Bot コンテナ) と Xvfb (DCS サーバ用コンテナ) は IPC namespace が別々だったので、次のどちらかになる。</p>
+      <ul>
+        <li>Xvfb 側にその番号がない → attach が失敗し、Wine は共有メモリを使わない方法に切り替える。問題は起きない</li>
+        <li>Xvfb 側に<strong>たまたま同じ番号・同じ所有者の別のセグメントがある</strong> → attach は成功するが、別物のメモリを見ている。そのセグメントが画像より小さいと、<code>X_ShmPutImage</code> のサイズ検査で <code>BadValue</code> になり、Xlib が DCS を終了させる</li>
+      </ul>
+      <p>どちらになるかは、その時点の両側の shmid の割り当て次第なので、起動ごとに変わる。これが「不定期に、3 台すべてで」起きていた理由と考えている。構成を作った時点では「<code>--norender</code> なら MIT-SHM は使わないので、IPC namespace は分かれていてよい」と想定していたが、この前提が誤りだった。</p>
+      {% else %}
+      <p>Wine's X11 driver uses MIT-SHM to push window contents to the X server. It creates a System V shared memory segment in its own IPC namespace and hands the number (shmid) to the X server to attach — and the X server looks that number up in <strong>its own</strong> IPC namespace.</p>
+      <p>DCS (in the Bot container) and Xvfb (in the DCS server container) were in separate IPC namespaces, so one of two things happens:</p>
+      <ul>
+        <li>No segment with that number on the Xvfb side → attach fails and Wine falls back to drawing without shared memory. No problem.</li>
+        <li>Xvfb's side <strong>happens to have an unrelated segment with the same number and owner</strong> → attach succeeds but points at the wrong memory. If that segment is smaller than the image, <code>X_ShmPutImage</code>'s size check returns <code>BadValue</code> and Xlib terminates DCS.</li>
+      </ul>
+      <p>Which one happens depends on how shmids happen to be allocated on each side at that moment, so it changes from one startup to the next. We believe that is why it struck "at random, on all three servers". When the setup was built we assumed "with <code>--norender</code>, MIT-SHM isn't used, so separate IPC namespaces are fine" — that assumption was wrong.</p>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--not-the-cause">
+      <h4>{% if lang == 'ja' %}Not the cause (確認済みの容疑者){% else %}Not the cause (suspects cleared){% endif %}</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li><strong>起動が遅いだけ</strong>: ログは遅くなるのではなく完全に止まり、kill まで 1 行も進まない。待ち時間を延ばしても直らない</li>
+        <li><strong>ホストの資源不足</strong>: 失敗時もホストの CPU は 94% アイドル、メモリの空きは 18 GB、カーネルログは空</li>
+        <li><strong>ミッションやスクリプト</strong>: 止まるのはミッションを読み込む前 (認証の直後など) で、ミッションに関係なく起きる</li>
+        {% else %}
+        <li><strong>Just a slow startup</strong>: the log does not slow down, it stops completely and not a single line is written before the kill. Longer timeouts would not help</li>
+        <li><strong>Host resources</strong>: during failures the host CPU was 94% idle, 18 GB of memory was free, and the kernel log was empty</li>
+        <li><strong>Mission or scripts</strong>: it stops before the mission is loaded (e.g. right after authorization), regardless of the mission</li>
+        {% endif %}
+      </ul>
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--fix">
+      <h4>Fix</h4>
+      {% if lang == 'ja' %}
+      <p>Bot コンテナを、DCS サーバ用コンテナと同じ IPC namespace に入れる。docker-compose.yml の変更だけで、イメージの作り直しは要らない。反映には両方のコンテナの再作成が必要。</p>
+      {% else %}
+      <p>Put the Bot container into the same IPC namespace as the DCS server container. It is a docker-compose.yml change only; no image rebuild. Both containers must be recreated for it to take effect.</p>
+      {% endif %}
+<pre class="fix-pre"><code>services:
+  dcs-server-1:
+    ipc: shareable                     # {% if lang == 'ja' %}他のコンテナが参加できるようにする{% else %}let other containers join{% endif %}
+
+  dcsserverbot:
+    network_mode: "service:dcs-server-1"
+    pid: "service:dcs-server-1"
+    ipc: "service:dcs-server-1"        # {% if lang == 'ja' %}追加{% else %}added{% endif %}</code></pre>
+      {% if lang == 'ja' %}
+      <p>別の方法として、Bot コンテナの中に DCS 専用の Xvfb を立て、DCS の <code>DISPLAY</code> をそちらに向ける手もある。こちらは X サーバと DCS が同じコンテナに収まるが、entrypoint の変更とイメージの作り直しが要る。</p>
+      {% else %}
+      <p>An alternative is to run a dedicated Xvfb inside the Bot container and point DCS's <code>DISPLAY</code> at it. That keeps the X server and DCS in the same container, but needs an entrypoint change and an image rebuild.</p>
+      {% endif %}
+    </section>
+
+    <section class="fix-section" id="ipc-shm-startup-hang--status">
+      <h4>Status / Verification</h4>
+      <ul>
+        {% if lang == 'ja' %}
+        <li>2026-11-05 18:26 JST: 3 台すべてに適用。DCS と Xvfb が同じ IPC namespace に入ったことを確認した。Wine が作った共有メモリを Xvfb が正しく attach している (<code>ipcs -m</code> の attach 数が 2)</li>
+        <li>適用後最初の起動 (server1) は 30 秒で完了した。続けて 3 回再起動したところ、3 回とも 27 秒で起動を終え、X11 のエラーは 1 件も出ていない</li>
+        <li>この先の定期再起動 (04:00 / 16:00 JST) でも、unreachable の警告が出なくなるかを引き続き確認する</li>
+        {% else %}
+        <li>2026-11-05 18:26 JST: applied to all three servers. Confirmed that DCS and Xvfb now share one IPC namespace, and that Xvfb attaches the segments Wine creates correctly (attach count 2 in <code>ipcs -m</code>)</li>
+        <li>The first startup after the change (server1) completed in 30 s. Three restarts in a row then each finished starting in 27 s, with no X11 error at all</li>
+        <li>We will keep checking that the unreachable warning stays gone across the upcoming scheduled restarts (04:00 / 16:00 JST)</li>
+        {% endif %}
+      </ul>
+    </section>
+  </article>
 
   <article class="fix-article" id="split-lock-misery">
     {% if lang == 'ja' %}

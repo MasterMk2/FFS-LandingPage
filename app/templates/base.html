@@ -16,6 +16,12 @@
 </script>
 {% endif %}
 <title>{% block title %}FFS DCS Status{% endblock %}</title>
+{# サイトのアイコンは Discord サーバーのアイコンと同じ画像。差し替えたら v を上げる
+   (ブラウザは favicon を長く抱えるので、URL を変えないと古いまま残る)。
+   リンクを持たないページ向けに /favicon.ico と /apple-touch-icon.png も main.py で返す。 #}
+<link rel="icon" href="{{ url_for('static', path='favicon.ico') }}?v=1" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', path='icon-192.png') }}?v=1">
+<link rel="apple-touch-icon" href="{{ url_for('static', path='apple-touch-icon.png') }}?v=1">
 {% block head %}{% endblock %}
 <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}?v=16">
 {# Discord バーを閉じた人には最初から出さない。<head> で html にクラスを

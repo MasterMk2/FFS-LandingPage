@@ -491,6 +491,27 @@ async def skyrunner_page():
     return FileResponse(_SKYRUNNER_INDEX, media_type="text/html; charset=utf-8")
 
 
+# サイトのアイコン。ページの <link> は /static/ を指すが、ブラウザや検索エンジン、
+# iOS のホーム画面追加は <link> が無くても決め打ちでルート直下を取りに来るので、
+# 同じ画像をここでも返す。アイコン指定の無いサブアプリ (/landing-teacher/ 等) も
+# これに落ちる。
+_ICON_CACHE = {"Cache-Control": "public, max-age=86400"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse(
+        BASE_DIR / "static" / "favicon.ico", media_type="image/x-icon", headers=_ICON_CACHE
+    )
+
+
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+async def apple_touch_icon():
+    return FileResponse(
+        BASE_DIR / "static" / "apple-touch-icon.png", media_type="image/png", headers=_ICON_CACHE
+    )
+
+
 @app.get("/status", response_class=HTMLResponse)
 async def status_page(request: Request):
     return render(request, "index.html", {"poll_seconds": 15})

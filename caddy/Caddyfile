@@ -221,6 +221,10 @@ freedomflight.jp {
 		reverse_proxy ffs-dcs-server-3:4000
 	}
 
+	handle /olympus4/audio {
+		reverse_proxy ffs-dcs-server-4:4000
+	}
+
 	redir /olympus1 /olympus1/
 	handle_path /olympus1/* {
 		# ユニットをスポーンできる管制画面なので検索エンジンに拾わせない。
@@ -242,6 +246,14 @@ freedomflight.jp {
 	handle_path /olympus3/* {
 		header X-Robots-Tag "noindex, nofollow, noarchive"
 		reverse_proxy ffs-dcs-server-3:18183 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	redir /olympus4 /olympus4/
+	handle_path /olympus4/* {
+		header X-Robots-Tag "noindex, nofollow, noarchive"
+		reverse_proxy ffs-dcs-server-4:18184 {
 			header_up X-Real-IP {remote_host}
 		}
 	}

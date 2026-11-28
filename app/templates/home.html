@@ -61,6 +61,10 @@
       {%- if lang == 'ja' %}着陸・着艦を自動で採点 (空母は LSO 式、陸上は A〜E)。進入の軌跡も見返せます。現在は server1 のみ。
       {%- else %}Auto-grades landings and carrier traps (LSO scale at sea, A–E ashore) with an approach-path view. Server 1 only for now.{% endif %}
     {% endcall %}
+    {% call tool("https://casttac.freedomflight.jp/", "CastTAC — Tacview Archive & Viewer", true) %}
+      {%- if lang == 'ja' %}自動録画された Tacview (.acmi) をブラウザの地図で再生 (2D / 3D)。検索・1 フライト分の切り出し DL・パイロットごとの戦績のほか、飛行中の機体のライブ表示も。
+      {%- else %}Play auto-recorded Tacview (.acmi) files on a map in the browser (2D / 3D). Search, download a single flight, see per-pilot records, or watch aircraft live while they fly.{% endif %}
+    {% endcall %}
     {% call tool("https://lardoon.freedomflight.jp/", "Lardoon — Tacview Archive", true) %}
       {%- if lang == 'ja' %}自動録画された Tacview (.acmi) の一覧・検索・ダウンロード。1 フライト分だけ切り出せます。
       {%- else %}Browse, search and download auto-recorded Tacview (.acmi) files, trimmed to a single flight if you like.{% endif %}

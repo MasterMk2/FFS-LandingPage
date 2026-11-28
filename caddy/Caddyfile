@@ -16,7 +16,7 @@
 # 振り分け:
 #   freedomflight.jp
 #       → ffs-website:8000 (FastAPI) + パス振り分けのサブアプリ (/gca/ 等)
-#   sneaker / lardoon / gravitymap .freedomflight.jp
+#   sneaker / lardoon / casttac / gravitymap .freedomflight.jp
 #       → 各サブドメインのブロック
 #   line.iyakusai.com
 #       → 公式LINE の Webhook 受け口 (/webhook のみ)
@@ -406,6 +406,25 @@ lardoon.freedomflight.jp {
 	import security_headers
 	encode zstd gzip
 	reverse_proxy ffs-sneaklardooon:3883 {
+		header_up X-Real-IP {remote_host}
+	}
+	log
+}
+
+# CastTAC (Tacview 録画のアーカイブ + ブラウザ内ビューア + ライブ表示) — 別プロジェクトの
+# casttac コンテナの 3883 を HTTPS 終端。dcs_network に参加している。
+# DNS: casttac.freedomflight.jp CNAME freedomflight.jp
+#
+# ★ X-Forwarded-For を落とさない (Caddy 既定で付く)。CastTAC は CASTTAC_TRUST_PROXY=1 で
+#   これを送信元として読み、API のレート制限 (ライブ表示は 1 人あたり毎秒 1 回呼ぶ) と
+#   管理画面のログイン失敗の制限を利用者ごとに数える。
+# ★ encode の既定の対象 (text/*・JSON・JS など) だけが圧縮される。録画の DL
+#   (application/octet-stream) と地図 (application/vnd.pmtiles) は Range で配るので
+#   対象外のまま、ビューアの航跡は CastTAC 自身が gzip する (Content-Encoding 付きは素通し)。
+casttac.freedomflight.jp {
+	import security_headers
+	encode zstd gzip
+	reverse_proxy casttac:3883 {
 		header_up X-Real-IP {remote_host}
 	}
 	log

@@ -5,7 +5,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 - Home / Status / Leaderboard / Replays の 4 ページ構成
 - DCSServerBot (DCSSB) の RestAPI + Tracks API を参照してサーバ状況・戦績・リプレイ DL を提供
 - postgres `serverstats` を読み取り専用で直接叩き、FPS/CPU/Memory の時系列グラフを SVG で描画
-- Caddy を前段に立て、`freedomflight.jp` / `sneaker.~` / `lardoon.~` / `gravitymap.~` / `line.iyakusai.com` を Host ヘッダで振り分け
+- Caddy を前段に立て、`freedomflight.jp` / `sneaker.~` / `lardoon.~` / `casttac.~` / `gravitymap.~` / `line.iyakusai.com` を Host ヘッダで振り分け
 - `freedomflight.jp/gca/` は ../ffs-dcs-server の `dcs-web-gca` コンテナへパス振り分け (管制卓)
 - Let's Encrypt で TLS 自動発行・自動更新
 - Caddy で共通のセキュリティヘッダを付与 ([セキュリティ](#セキュリティ) 参照)
@@ -33,6 +33,7 @@ FFS DCS コミュニティの **公開ランディング + ステータスサイ
 | `https://line.iyakusai.com/webhook` | 医薬祭 公式LINE の Webhook 受け口 (LAN 内の別ホストへ転送、他のパスは 404)。`iyakusai.com` 本体は別ホストで配信していて、この Caddy には届かない |
 | `https://sneaker.freedomflight.jp/` | Sneaker (Live Map) — 実体は姉妹 repo コンテナ |
 | `https://lardoon.freedomflight.jp/` | Lardoon (Tacview Replay archive) |
+| `https://casttac.freedomflight.jp/` | CastTAC (Tacview の録画のアーカイブ、ブラウザ内ビューア、ライブ表示) — 実体は別プロジェクトのコンテナ (`casttac:3883`、dcs_network に参加) |
 | `https://gravitymap.freedomflight.jp/` | MyGravityMap — DCS とは無関係の個人ツール (姉妹 repo)、完全静的、file_server 配信 |
 | `https://freedomflight.jp/updates/<製品>/` | 自作デスクトップ製品のアプリ内更新とフルインストーラ。下の「更新配信」参照 |
 
@@ -71,6 +72,7 @@ EddiePDF / Transinglater / IshikawADE / GUNYUPDF / ALLOCR / DcsMissionStudio の
                     ├─── freedomflight.jp   → reverse_proxy ffs-website:8000
                     ├─── sneaker.~          → reverse_proxy ffs-sneaklardooon:7788
                     ├─── lardoon.~          → reverse_proxy ffs-sneaklardooon:3883
+                    ├─── casttac.~          → reverse_proxy casttac:3883
                     ├─── gravitymap.~       → file_server ./gravitymap/
                     └─── line.iyakusai.com  → /webhook のみ LAN 内の別ホストへ
 
@@ -95,7 +97,7 @@ FFS-LandingPage/
 ├── requirements.txt       # fastapi / uvicorn / jinja2 / httpx / psycopg[binary]
 ├── .env.example
 ├── caddy/
-│   └── Caddyfile          # freedomflight / sneaker / lardoon / gravitymap / line.iyakusai サイトブロック + 共通セキュリティヘッダ
+│   └── Caddyfile          # freedomflight / sneaker / lardoon / casttac / gravitymap / line.iyakusai サイトブロック + 共通セキュリティヘッダ
 ├── iyakusai/              # 医学薬学祭サイトの静的 HTML の原本 (配信は別ホスト。この Caddy では配信しない)
 └── app/
     ├── main.py            # FastAPI ルート / lifespan で cache 起動 / render() が lang と t() を注入
@@ -146,6 +148,7 @@ FFS-LandingPage/
    - `freedomflight.jp`
    - `sneaker.freedomflight.jp`
    - `lardoon.freedomflight.jp`
+   - `casttac.freedomflight.jp`
    - `gravitymap.freedomflight.jp`
    - `line.iyakusai.com`
 
